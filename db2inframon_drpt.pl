@@ -1,7 +1,7 @@
 #!/usr/bin/perl 
 #use strict;
 use warnings; 
-# ex) perl ./db2inframon_drpt.pl -c 4 -s 5 -t 10 -x ./aaa.sh -y ./aaa.sh -e -n ./aaa_header.sh
+# ex) perl ./db2inframon_drpt.pl -c 4 -s 5 -t 10 -x ./package.sh -y ./package.sh -n ./package_header.sh -e -l ./package_log.sh
 
 use Getopt::Std;
 my %options=();
