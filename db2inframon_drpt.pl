@@ -5,7 +5,7 @@ use warnings;
 
 use Getopt::Std;
 my %options=();
-getopts("hc:s:t:x:y:en:", \%options); 
+getopts("hc:s:t:x:y:n:el", \%options); 
 
 &do_help() if defined $options{h};
 defined $options{c} ? my $colnum = $options{c} : exit (print "require -c option... for help -h option...\n");
@@ -13,8 +13,9 @@ defined $options{s} ? my $sleepsec = $options{s} : exit (print "require -s optio
 defined $options{t} ? my $topcnt = $options{t} : exit (print "require -t option... for help -h option...\n");
 defined $options{x} ? my $ffilenm = $options{x} : exit (print "require -x option... for help -h option...\n");
 defined $options{y} ? my $sfilenm = $options{y} : exit (print "require -y option... for help -h option...\n");
-my $execdeltayn = $options{e} if defined $options{e};
 my $nfilenm = $options{n} if defined $options{n};
+my $execdeltayn = $options{e} if defined $options{e};
+my $logyn = $options{l} if defined $options{e} && defined $options{l};
 
 my $line;
 my @bdat;
@@ -87,6 +88,7 @@ foreach $Rb (@bdat) {
         }
 }
 
+print "**##### Time Delta : $timedelta sec [ $atime ] #####**\n";
 foreach $i (1..$colnum) {
 print "***** [$i]th column sort report *****\n";
 if($nfilenm) {
@@ -101,6 +103,7 @@ $loopcnt = 0;
 foreach $Rr (sort{$b->[$i] <=> $a->[$i]} @rdat) {
         foreach $j (0..$colnum) {
                 printf "%25s",$Rr->[$j];
+		system(qq{ksh ./aaa_log.sh "$Rr->[$j]" $atime}) if $j==0 && $logyn;
         }
         print "\n";
         $loopcnt++;
@@ -113,7 +116,7 @@ print "\n";
 
 sub do_help { 
 $helpstr = <<EOF; 
-*** usage: perl ./db2inframon_drpt.pl -c <column count> -s <sleep sec> -t <top result> -x <first file name> -y <second file name> [-e:execution delta yn] [-n <header file name>] 
+*** usage: perl ./db2inframon_drpt.pl -c <column count> -s <sleep sec> -t <top result> -x <first file name> -y <second file name> [-n <header file name>] [-e:execution delta yn [-l:log yn]] 
 *** help: perl ./db2inframon_drpt.pl -h 
 EOF
 print "$helpstr\n"; 
