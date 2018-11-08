@@ -5,7 +5,7 @@ use warnings;
 
 use Getopt::Std;
 my %options=();
-getopts("hc:s:t:x:y:n:el", \%options); 
+getopts("hc:s:t:x:y:n:el:", \%options); 
 
 &do_help() if defined $options{h};
 defined $options{c} ? my $colnum = $options{c} : exit (print "require -c option... for help -h option...\n");
@@ -103,7 +103,7 @@ $loopcnt = 0;
 foreach $Rr (sort{$b->[$i] <=> $a->[$i]} @rdat) {
         foreach $j (0..$colnum) {
                 printf "%25s",$Rr->[$j];
-		system(qq{ksh ./aaa_log.sh "$Rr->[$j]" $atime}) if $j==0 && $logyn;
+		system(qq{ksh $logyn "$Rr->[$j]" $atime}) if $j==0 && $logyn;
         }
         print "\n";
         $loopcnt++;
@@ -116,7 +116,7 @@ print "\n";
 
 sub do_help { 
 $helpstr = <<EOF; 
-*** usage: perl ./db2inframon_drpt.pl -c <column count> -s <sleep sec> -t <top result> -x <first file name> -y <second file name> [-n <header file name>] [-e:execution delta yn [-l:log yn]] 
+*** usage: perl ./db2inframon_drpt.pl -c <column count> -s <sleep sec> -t <top result> -x <first file name> -y <second file name> [-n <header file name>] [-e:execution delta yn [-l <log file name>]] 
 *** help: perl ./db2inframon_drpt.pl -h 
 EOF
 print "$helpstr\n"; 
