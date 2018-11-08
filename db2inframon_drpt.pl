@@ -1,7 +1,7 @@
 #!/usr/bin/perl 
 #use strict;
 use warnings; 
-# ex) perl ./db2inframon_drpt.pl -c 4 -s 5 -t 10 -x ./package.sh -y ./package.sh -n ./package_header.sh -e -l ./package_log.sh
+# ex) perl ./db2inframon_drpt.pl -c 4 -s 5 -t 10 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -e
 
 use Getopt::Std;
 my %options=();
@@ -14,8 +14,8 @@ defined $options{t} ? my $topcnt = $options{t} : exit (print "require -t option.
 defined $options{x} ? my $ffilenm = $options{x} : exit (print "require -x option... for help -h option...\n");
 defined $options{y} ? my $sfilenm = $options{y} : exit (print "require -y option... for help -h option...\n");
 my $nfilenm = $options{n} if defined $options{n};
+my $logyn = $options{l} if defined defined $options{l};
 my $execdeltayn = $options{e} if defined $options{e};
-my $logyn = $options{l} if defined $options{e} && defined $options{l};
 
 my $line;
 my @bdat;
@@ -116,7 +116,7 @@ print "\n";
 
 sub do_help { 
 $helpstr = <<EOF; 
-*** usage: perl ./db2inframon_drpt.pl -c <column count> -s <sleep sec> -t <top result> -x <first file name> -y <second file name> [-n <header file name>] [-e:execution delta yn [-l <log file name>]] 
+*** usage: perl ./db2inframon_drpt.pl -c <column count> -s <sleep sec> -t <top result> -x <first file name> -y <second file name> [-n <header file name>] [-l <log file name>] [-e:execution delta yn] 
 *** help: perl ./db2inframon_drpt.pl -h 
 EOF
 print "$helpstr\n"; 
