@@ -1,11 +1,10 @@
-#!/usr/bin/perl
-#use strict; 
+#!/usr/bin/perl#use strict; 
 #use perl ./db2inframon_apinfo.pl -d kttcop -s 10 -q 1000000 -w 1000 -e 1000000 -t 10 -a 5 -p 2 -o /instance/cop/IFR/MONITOR/LOG_PERL -z -x -c 
 
 use Getopt::Std; 
  
 my %options=(); 
-getopts("hd:s:q:w:e:t:a:p:o:zxcv", \%options); 
+getopts("hd:s:q:w:e:t:a:p:o:zxcvWR", \%options); 
  
 if($options{h}) { do_help(); } 
 if($options{d}) { $db = $options{d}; } else { print "require -d option... for help -h option...\n"; exit; } 
@@ -22,6 +21,9 @@ if($options{z}) { $log = $options{z}; }
 if($options{x}) { $loglockapinfo = $options{x}; } 
 if($options{c}) { $logappapinfo = $options{c}; } 
 if($options{v}) { $before = $options{v}; } 
+
+if($options{W}) { $sortwrite = $options{W}; } 
+if($options{R}) { $sortread = $options{R}; } 
 
 # $db = "kttcop";    # database
 # $scnt = 10;     # sleep
@@ -237,30 +239,82 @@ print "$adate Rows_write $ddbcnt2 : $gddbcnt2\n";
 print "-" x 20 . "\n";
 ## snaptab
 if($tabtopcnt > 0) {
-foreach $kk (sort{(split /:/, $dtabcnt1{$b})[0]+(split /:/, $dtabcnt1{$b})[1]  <=> (split /:/, $dtabcnt1{$a})[0]+(split /:/, $dtabcnt1{$a})[1]} keys %dtabcnt1) {
-$gdtabcnt1 = "#" x (((split /:/, $dtabcnt1{$kk})[0]+(split /:/, $dtabcnt1{$kk})[1])/$sd3);
-print "$adate Tab_Rows_rw $kk : $dtabcnt1{$kk} : $gdtabcnt1\n";
-$loopcnt++;
-last if($loopcnt == $tabtopcnt);
+if($sortwrite) {
+	foreach $kk (sort{(split /:/, $dtabcnt1{$b})[1]  <=> (split /:/, $dtabcnt1{$a})[1]} keys %dtabcnt1) {
+	$gdtabcnt1 = "#" x (((split /:/, $dtabcnt1{$kk})[1])/$sd3);
+	print "$adate Tab_Rows_rw $kk : $dtabcnt1{$kk} : $gdtabcnt1\n";
+	$loopcnt++;
+	last if($loopcnt == $tabtopcnt);
+	}
+}
+elsif($sortread) {
+	foreach $kk (sort{(split /:/, $dtabcnt1{$b})[0] <=> (split /:/, $dtabcnt1{$a})[0]} keys %dtabcnt1) {
+	$gdtabcnt1 = "#" x (((split /:/, $dtabcnt1{$kk})[0])/$sd3);
+	print "$adate Tab_Rows_rw $kk : $dtabcnt1{$kk} : $gdtabcnt1\n";
+	$loopcnt++;
+	last if($loopcnt == $tabtopcnt);
+	}
+}
+else {
+	foreach $kk (sort{(split /:/, $dtabcnt1{$b})[0]+(split /:/, $dtabcnt1{$b})[1]  <=> (split /:/, $dtabcnt1{$a})[0]+(split /:/, $dtabcnt1{$a})[1]} keys %dtabcnt1) {
+	$gdtabcnt1 = "#" x (((split /:/, $dtabcnt1{$kk})[0]+(split /:/, $dtabcnt1{$kk})[1])/$sd3);
+	print "$adate Tab_Rows_rw $kk : $dtabcnt1{$kk} : $gdtabcnt1\n";
+	$loopcnt++;
+	last if($loopcnt == $tabtopcnt);
+	}
 }
 $loopcnt = 0;
 print "-" x 20 . "\n";
 }
 ## snapappl
 if($apptopcnt > 0) {
-foreach $kk (sort{(split /:/, $dapplcnt1{$b})[0]+(split /:/, $dapplcnt1{$b})[1]  <=> (split /:/, $dapplcnt1{$a})[0]+(split /:/, $dapplcnt1{$a})[1]} keys %dapplcnt1) {
-$gdtabcnt1 = "#" x (((split /:/, $dapplcnt1{$kk})[0]+(split /:/, $dapplcnt1{$kk})[1])/$sd3);
-print "$adate appl_Rows_rw $kk : $dapplcnt1{$kk} : $gdapplcnt1\n";
-$loopcnt++;
-last if($loopcnt == $apptopcnt);
-if($logappapinfo) {
-if($loopcnt <= $topappapinfo) {
-   @app = split /\./, $kk;
-   $app = pop @app;
-   $t2apinfo = `db2pd -d $db -apinfo $app`;
-   print LOG_APINFO "$adate t${topappapinfo}apinfo $t2apinfo";
-   }
+if($sortwrite) {
+	foreach $kk (sort{(split /:/, $dapplcnt1{$b})[1]  <=> (split /:/, $dapplcnt1{$a})[1]} keys %dapplcnt1) {
+	$gdtabcnt1 = "#" x (((split /:/, $dapplcnt1{$kk})[1])/$sd3);
+	print "$adate appl_Rows_rw $kk : $dapplcnt1{$kk} : $gdapplcnt1\n";
+	$loopcnt++;
+	last if($loopcnt == $apptopcnt);
+	if($logappapinfo) {
+	if($loopcnt <= $topappapinfo) {
+	   @app = split /\./, $kk;
+	   $app = pop @app;
+	   $t2apinfo = `db2pd -d $db -apinfo $app`;
+	   print LOG_APINFO "$adate t${topappapinfo}apinfo $t2apinfo";
+	   }
+	}
+	}
 }
+elsif($sortread) {
+	foreach $kk (sort{(split /:/, $dapplcnt1{$b})[0] <=> (split /:/, $dapplcnt1{$a})[0]} keys %dapplcnt1) {
+	$gdtabcnt1 = "#" x (((split /:/, $dapplcnt1{$kk})[0])/$sd3);
+	print "$adate appl_Rows_rw $kk : $dapplcnt1{$kk} : $gdapplcnt1\n";
+	$loopcnt++;
+	last if($loopcnt == $apptopcnt);
+	if($logappapinfo) {
+	if($loopcnt <= $topappapinfo) {
+	   @app = split /\./, $kk;
+	   $app = pop @app;
+	   $t2apinfo = `db2pd -d $db -apinfo $app`;
+	   print LOG_APINFO "$adate t${topappapinfo}apinfo $t2apinfo";
+	   }
+	}
+	}
+}
+else {
+	foreach $kk (sort{(split /:/, $dapplcnt1{$b})[0]+(split /:/, $dapplcnt1{$b})[1]  <=> (split /:/, $dapplcnt1{$a})[0]+(split /:/, $dapplcnt1{$a})[1]} keys %dapplcnt1) {
+	$gdtabcnt1 = "#" x (((split /:/, $dapplcnt1{$kk})[0]+(split /:/, $dapplcnt1{$kk})[1])/$sd3);
+	print "$adate appl_Rows_rw $kk : $dapplcnt1{$kk} : $gdapplcnt1\n";
+	$loopcnt++;
+	last if($loopcnt == $apptopcnt);
+	if($logappapinfo) {
+	if($loopcnt <= $topappapinfo) {
+	   @app = split /\./, $kk;
+	   $app = pop @app;
+	   $t2apinfo = `db2pd -d $db -apinfo $app`;
+	   print LOG_APINFO "$adate t${topappapinfo}apinfo $t2apinfo";
+	   }
+	}
+	}
 }
 }
 
@@ -272,12 +326,10 @@ print "+" x 100 . "\n";
 
 sub do_help { 
     $help = <<EOF; 
-usage: perl ./db2inframon_apinfo -d <dbname> -s <sleepsec> -q <read> -w <mod,tran> -e <table,appl> -t <toptab> -a <topappl> -p <topappllog> -o <directory> [-z:log] [-x:locklog] [-c:applog] [-v:before ver.] 
+usage: perl ./db2inframon_apinfo -d <dbname> -s <sleepsec> -q <read> -w <mod,tran> -e <table,appl> -t <toptab> -a <topappl> -p <topappllog> -o <directory> [-z:log] [-x:locklog] [-c:applog] [-v:before ver.] [-W:write sort] [-R:read sort]
 help: perl ./db2inframon_apinfo -h 
 EOF
     print "$help\n"; 
     exit; 
-
 } 
-
 
