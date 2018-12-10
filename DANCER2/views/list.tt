@@ -1,0 +1,29 @@
+<div class="container-fluid">
+<h1>Board List</h1><br>
+<table class="table table-hover">
+<thead class="thead-dark">
+<tr>
+  <th>제&nbsp; 목</th>
+  <th><img src="images/clipw.gif"></th>
+  <th>글쓴이</th>
+  <th>읽음수</th>
+  <th>날짜</th>
+</tr>
+</thead>
+
+<tbody>
+<% foreach var1 in vars1 %>
+<tr>
+  <td><a href="content?board_idx=<%var1.0%>&gotopage=<%%>"><% var1.2 %></a></td>
+  <td></td>
+  <td><% var1.1 %></td>
+  <td><% var1.6 %></td>
+  <td><% var1.3 %></td>
+</tr>
+<% end %>
+</tbody>
+
+</table>
+
+
+</div>

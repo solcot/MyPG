@@ -1,0 +1,12 @@
+<div>
+<% var2 %><br>
+<% vars1.article %><br>
+<% vars1.person.email %><br>
+<% vars1.primes.first %><br>
+<% vars1.primes.3 %><br>
+<% vars1.primes.last %><br>
+<% vars1.primes.size %><br>
+<% vars1.primes.join(',') %><br>
+<% vars1.primes.reverse.0 %><br>
+<% vars1.wizard('a','b','c') %><br>
+</div>
