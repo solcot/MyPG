@@ -1,18 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-<meta http-equiv="Content-Type" content="text/html; charset=ks_c_5601-1987">
-<title></title>
-<style type="text/css">
-  A {text-decoration: none; color:navy } 
-  A:hover {text-decoration: underline; color:orange} 
-  td {font-family:돋움;font-size:12 }
-  input,Textarea {
-    font-family:돋움; 
-    border: 1 solid white; 
-    border-bottom: 1 solid silver
-  }
-</style>
+  <title>Bootstrap 4 Example</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="<% request.uri_base %>/css/bootstrap.min.css">
+  <script src="<% request.uri_base %>/javascripts/jquery.min.js"></script>
+  <script src="<% request.uri_base %>/javascripts/popper.min.js"></script>
+  <script src="<% request.uri_base %>/javascripts/bootstrap.min.js"></script>
 </head>
 <body>
 <% content %>

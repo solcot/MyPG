@@ -1,3 +1,4 @@
+<div class="container">
 <script language="javascript">
 <!--
 function sendit() 
@@ -5,65 +6,60 @@ function sendit()
   //제목
   if (document.myform.title.value == "") {
     alert("제목을 입력해 주십시오.");
-    return;
+    document.myform.title.focus();
+    return false;
   }
   //이름
   if (document.myform.name.value == "") {
     alert("이름을 입력해 주십시오.");
-    return;
+    document.myform.name.focus();
+    return false;
   }
   //글 내용
   if (document.myform.memo.value == "" ) {
     alert("글을 작성 안하셨습니다. 글을 작성해 주십시요");
-    return;
+    document.myform.memo.focus();
+    return false;
   } 
-  document.myform.submit(); 
+  //document.myform.submit(); 
 }
 //-->
 </script>
 
-<div bgcolor="#ffffff" onload="javascript:document.all.title.focus();">
-<form method="POST" action="insert" name="myform">
-  <table border="0" cellspacing="0" width="520" cellpadding="0">
-    <tr height="50">
-      <td align="right" width="170" >
-        <input type="button" value="글 저장" name="write" OnClick="sendit()"
-          style="background-color:khaki"></td>
-        <td width="350" align="left" style="padding-left:70">
-          <font color="blue">글을 남겨주세요...</font></td>
-    </tr>
-    <tr height="30" >
-      <td width="170" align="right" >제목</td>
-      <td width="350" align="left" style="padding-left: 20; padding-right: 30">
-        <input type="text" name="title" size="50"></td>
-    </tr>
-    <tr>
-      <td align="right" >이름</td>
-      <td align="left" style="padding-left: 20; padding-right: 30">
-        <input type="text" name="name" size="50"></td>
-    </tr>
-    <tr>
-      <td align="right" >메일</td>
-      <td align="left" style="padding-left: 20; padding-right: 30">
-        <input type="text" name="mail" size="50"></td>
-    </tr>
-    <tr>
-      <td align="right" >사이트</td>
-      <td align="left" style="padding-left: 20; padding-right: 30">
-        <input type="text" name="url" size="50"></td>
-    </tr>
-    <tr>
-      <td align="right" >글</td>
-      <td align="left" style="padding-left: 20; padding-top: 5; padding-bottom: 5">
-        <textarea wrap="hard" rows="10" name="memo" cols="50"></textarea></td>
-    </tr>
-    <tr height="25">
-      <td align="right" colspan="2" style="padding-right:25">비밀번호 
-        <input type="password" name="pwd" size="7">
-        <input type="button" value="글 저장" name="write" OnClick="sendit()"
-          style="background-color:khaki">
-      </td>
-    </tr>
-  </table>
+<form method="post" action="insert" name="myform" onsubmit="return sendit()">
+
+<h1>글을 남겨주세요...</h1>
+
+<div class="form-group">
+<label for="title">제목</label>
+<input type="text" class="form-control" placeholder="title" id="title" name="title" required>
+</div>
+
+<div class="form-group">
+<label for="name">이름</label>
+<input type="text" class="form-control" placeholder="name" id="name" name="name" required>
+</div>
+
+<div class="form-group">
+<label for="mail">메일</label>
+<input type="email" class="form-control" placeholder="mail" id="mail" name="mail">
+</div>
+
+<div class="form-group">
+<label for="url">사이트</label>
+<input type="url" class="form-control" placeholder="url" id="url" name="url">
+</div>
+
+<div class="form-group">
+<label for="memo">글</label>
+<textarea class="form-control" placeholder="memo" id="memo" rows="10" name="memo" required></textarea>
+</div>
+
+<div class="form-group">
+<label for="pwd">비밀번호</label>
+<input type="password" class="form-control" placeholder="pwd" id="pwd" name="pwd">&nbsp&nbsp
+</div>
+<button type="submit" class="btn btn-primary">글작성</button>
+
 </form>
 </div>
