@@ -43,14 +43,14 @@ print "**** $name $mail $title **** $sql\n\n\n\n";
 };
 
 get '/myboard/list' => sub {
-	my $pagesize = 2;
+	my $pagesize = 5;
 	my $gotopage = 1;
 	my $maxnum = $gotopage*$pagesize;
 	my $minnum = ($gotopage-1)*$pagesize+1;
 
 	my $sql = qq/
 	select *
-	from (select a.*, row_number() over(order by board_idx desc) as num
+	from (select a.*, to_char(b_date, 'YY-MM-DD HH24:MI') mdate, row_number() over(order by board_idx desc) as num
 		from myboard a fetch first $maxnum rows only) a
 	where num >= $minnum
 	/;
@@ -63,7 +63,7 @@ get '/myboard/list' => sub {
 	$sth->finish;
 	$dbh->disconnect;
 	
-	template 'list' => { 'vars1'=>$vars1 }, { 'layout'=>'myboard' };
+	template 'list_bulma' => { 'vars1'=>$vars1 }, { 'layout'=>'bulma' };
 
 
 };
