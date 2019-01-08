@@ -14,7 +14,7 @@ defined $options{t} ? my $topcnt = $options{t} : exit (print "require -t option.
 defined $options{x} ? my $ffilenm = $options{x} : exit (print "require -x option... for help -h option...\n");
 defined $options{y} ? my $sfilenm = $options{y} : exit (print "require -y option... for help -h option...\n");
 my $nfilenm = $options{n} if defined $options{n};
-my $logyn = $options{l} if defined defined $options{l};
+my $logyn = $options{l} if defined $options{l};
 my $execdeltayn = $options{e} if defined $options{e};
 
 my $line;
