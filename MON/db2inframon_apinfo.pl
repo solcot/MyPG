@@ -1,4 +1,5 @@
-#!/usr/bin/perl#use strict; 
+#!/usr/bin/perl
+#use strict; 
 #use perl ./db2inframon_apinfo.pl -d kttcop -s 10 -q 1000000 -w 1000 -e 1000000 -t 10 -a 5 -p 2 -o /instance/cop/IFR/MONITOR/LOG_PERL -z -x -c 
 
 use Getopt::Std; 
@@ -82,9 +83,9 @@ $tmpdb =~ s/^\s+|\s+$//g;
 if($tabtopcnt > 0) {
 $bsnaptabts = `db2 -x "values current timestamp with ur"`;
 if($before) {
-   $btabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) from sysibmadm.snaptab group by tabschema, tabname with ur"`;   
+   $btabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || char(0) || ':' || char(0) from sysibmadm.snaptab group by tabschema, tabname with ur"`;   
 } else {
-   $btabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) from table(MON_GET_TABLE(null,null,-2)) group by tabschema, tabname with ur"`;
+   $btabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(sum(section_exec_with_col_references)) from table(MON_GET_TABLE(null,null,-2)) group by tabschema, tabname with ur"`;
 }
 %btabcnt1s = split /\s+/, $btabcnt1;
 }
@@ -117,9 +118,9 @@ $tmpdb =~ s/^\s+|\s+$//g;
 if($tabtopcnt > 0) {
 $asnaptabts = `db2 -x "values current timestamp with ur"`;
 if($before) {
-   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) from sysibmadm.snaptab group by tabschema, tabname with ur"`;   
+   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || char(0) || ':' || char(0) from sysibmadm.snaptab group by tabschema, tabname with ur"`;   
 } else {
-   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) from table(MON_GET_TABLE(null,null,-2)) group by tabschema, tabname with ur"`;
+   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(sum(section_exec_with_col_references)) from table(MON_GET_TABLE(null,null,-2)) group by tabschema, tabname with ur"`;
 }
 %atabcnt1s = split /\s+/, $atabcnt1;
 }
@@ -166,7 +167,7 @@ foreach $k1 (keys %atabcnt1s) {
 				if($k1 eq $k2) {
 				@atabs = split /:/, $atabcnt1s{$k1};
 				@btabs = split /:/, $btabcnt1s{$k2};
-				$dtabcnt1{$k1} = int(($atabs[0] - $btabs[0])/$snaptabtimediff) . ":" . int(($atabs[1] - $btabs[1])/$snaptabtimediff);
+				$dtabcnt1{$k1} = int(($atabs[0] - $btabs[0])/$snaptabtimediff) . ":" . int(($atabs[1] - $btabs[1])/$snaptabtimediff) . ":" . int($atabs[2] - $btabs[2]) . ":" . int($atabs[3] - $btabs[3]);
 				next;
 				}				
         }
