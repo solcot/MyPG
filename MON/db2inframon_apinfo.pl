@@ -167,7 +167,7 @@ foreach $k1 (keys %atabcnt1s) {
 				if($k1 eq $k2) {
 				@atabs = split /:/, $atabcnt1s{$k1};
 				@btabs = split /:/, $btabcnt1s{$k2};
-				$dtabcnt1{$k1} = int(($atabs[0] - $btabs[0])/$snaptabtimediff) . ":" . int(($atabs[1] - $btabs[1])/$snaptabtimediff) . ":" . int($atabs[2] - $btabs[2]) . ":" . int($atabs[3] - $btabs[3]);
+				$dtabcnt1{$k1} = int(($atabs[0] - $btabs[0])/$snaptabtimediff) . ":" . int(($atabs[1] - $btabs[1])/$snaptabtimediff) . ":" . sprintf("%.2f",($atabs[2] - $btabs[2])/$snaptabtimediff) . ":" . sprintf("%.2f",($atabs[3] - $btabs[3])/$snaptabtimediff);
 				next;
 				}				
         }
