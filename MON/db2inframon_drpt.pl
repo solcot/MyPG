@@ -1,11 +1,11 @@
 #!/usr/bin/perl 
 #use strict;
 use warnings; 
-# ex) perl ./db2inframon_drpt.pl -c 4 -s 5 -t 10 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -e
+# ex) perl ./db2inframon_drpt.pl -c 4 -s 5 -t 10 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -e -o 2019-01-29-10.10.10 -p 2019-01-29-10.10.30
 
 use Getopt::Std;
 my %options=();
-getopts("hc:s:t:x:y:n:el:", \%options); 
+getopts("hc:s:t:x:y:n:l:eo:p:", \%options); 
 
 &do_help() if defined $options{h};
 defined $options{c} ? my $colnum = $options{c} : exit (print "require -c option... for help -h option...\n");
@@ -16,6 +16,8 @@ defined $options{y} ? my $sfilenm = $options{y} : exit (print "require -y option
 my $nfilenm = $options{n} if defined $options{n};
 my $logyn = $options{l} if defined $options{l};
 my $execdeltayn = $options{e} if defined $options{e};
+my $time1 = $options{o} if defined $options{o};
+my $time2 = $options{p} if defined $options{p};
 
 my $line;
 my @bdat;
@@ -38,7 +40,12 @@ my $numexec;
 
 #open FR, "file1.txt" || die("Cannot open the file $!");
 open FR, "ksh $ffilenm|" || die("Cannot open the file $!");
-chomp( $btime = `date +'%Y-%m-%d-%H.%M.%S'` );
+if($time1) {
+	$btime = $time1;
+}
+else {
+	chomp( $btime = `date +'%Y-%m-%d-%H.%M.%S'` );
+}
 while ($line=<FR>) 
 {   
         push @bdat, [ split(m/\s+/,$line) ];
@@ -49,7 +56,12 @@ sleep $sleepsec;
 
 #open FR, "file2.txt" || die("Cannot open the file $!");
 open FR, "ksh $sfilenm|" || die("Cannot open the file $!");
-chomp( $atime = `date +'%Y-%m-%d-%H.%M.%S'` );
+if($time2) {
+	$atime = $time2;
+}
+else {
+	chomp( $atime = `date +'%Y-%m-%d-%H.%M.%S'` );
+}
 while ($line=<FR>) 
 {   
         push @adat, [ split(m/\s+/,$line) ];
@@ -88,6 +100,7 @@ foreach $Rb (@bdat) {
         }
 }
 
+$size = $#rdat +1;
 print "**##### Time Delta : $timedelta sec [ $atime ] #####**\n";
 foreach $i (1..$colnum) {
 print "***** [$i]th column sort report *****\n";
@@ -110,13 +123,14 @@ foreach $Rr (sort{$b->[$i] <=> $a->[$i]} @rdat) {
         last if($loopcnt == $topcnt);
 }
 print "\n";
+last if ($size == 1);
 }
 
 
 
 sub do_help { 
 $helpstr = <<EOF; 
-*** usage: perl ./db2inframon_drpt.pl -c <column count> -s <sleep sec> -t <top result> -x <first file name> -y <second file name> [-n <header file name>] [-l <log file name>] [-e:execution delta yn] 
+*** usage: perl ./db2inframon_drpt.pl -c <column count> -s <sleep sec> -t <top result> -x <first file name> -y <second file name> [-n <header file name>] [-l <log file name>] [-e:execution delta yn] [-o <time1>] [-p <time2>] 
 *** help: perl ./db2inframon_drpt.pl -h 
 EOF
 print "$helpstr\n"; 
