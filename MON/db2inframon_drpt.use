@@ -1,0 +1,63 @@
+cat > package.sh
+db2 connect to tdb > /dev/null
+db2 -x "select executable_id, num_exec_with_metrics, stmt_exec_time, rows_read, rows_returned, total_cpu_time
+from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>1</modified_within>',-2))
+where stmt_text like '%cd_cls ||%'
+or stmt_text like '%cd_cls||%'
+or  stmt_text like '%CD_CLS ||%'
+or  stmt_text like '%CD_CLS||%'"
+
+cat > package_header.sh
+perl -e '
+printf "%66s%25s%25s%25s%25s%25s\n", "exec_id","num_exec","exec_time","rows_read","rows_returned","total_cpu";
+'
+cat > package_log.sh
+db2 connect to kttcop > /dev/null
+echo -e "\n!! $1 [ $2 ] !!" >> $2.log
+# db2 -x "select stmt_text from table(mon_get_pkg_cache_stmt(null, $1, null, -2))" >> $2.log
+db2 "call explain_from_section ($1, 'M', null, 0, null, ?, ?, ?, ?, ?)" > /dev/null 2>&1
+db2exfmt -d kttcop -1 >> $2.log 2>/dev/null
+db2 "select varchar(object_type,10) type,varchar(object_schema,10) schema,varchar(object_module,10) module,varchar(object_name,30) name from table(mon_get_section_object($1,null,null,null,null,-2))" >> $2.log 2>&1
+=====> cat 2018-11-08-15.11.17.log | perl -ane 'BEGIN{$/="\n!!";} print if/0100000000000000030000000000000000000000020020181108132426897881/'
+
+### perl ./db2inframon_drpt.pl -c 5 -u 5 -s 5 -t 10 -x ./package.sh -y ./package.sh -n ./package_header.sh [-l ./package_log.sh] [-e] [-o 2019-01-29-10.10.10] [-p 2019-01-29-10.10.30]
+
+cat > table.sh
+db2 connect to tdb > /dev/null
+db2 -x "select replace(tabschema,' ','')||'.'||replace(tabname,' ','') tabname, sum(table_scans), sum(rows_read), sum(rows_inserted+rows_updated+rows_deleted) rows_write, max(section_exec_with_col_references) num_query
+from table(MON_GET_TABLE(null,null,-2))
+where tabschema not like 'SYS%'
+group by tabschema, tabname"
+cat > table_header.sh
+perl -e '
+printf "%25s%25s%25s%25s%25s\n", "tabname","table_scans","rows_read","rows_write","num_query";
+'
+
+### perl ./db2inframon_drpt.pl -c 4 -u 4 -s 5 -t 10 -x ./table.sh -y ./table.sh -n ./table_header.sh
+
+cat > snapdb.sh
+db2 connect to hadrdb > /dev/null
+db2 -x "select 'snapdb'
+,rows_read
+,rows_modified
+,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks
+,total_cons
+,static_sql_stmts
+,dynamic_sql_stmts
+,failed_sql_stmts
+,select_sql_stmts
+,uid_sql_stmts
+,ddl_sql_stmts
+,total_cpu_time
+,total_extended_latch_waits 
+from table(mon_get_database(-2)) with ur"
+cat > snapdb_header.sh
+perl -e '
+printf "%25s%25s%25s%25s%25s%25s%25s%25s%25s%25s%25s%25s%25s\n", "dbname","rows_read","rows_mod","trans","cons","static_stmt","dynamic_stmt","failed_stmt","select_stmt","uid_stmt","ddl_stmt","cpu","latch_wait";
+'
+
+### perl ./db2inframon_drpt.pl -c 12 -u 1 -s 5 -t 1 -x ./snapdb.sh -y ./snapdb.sh -n ./snapdb_header.sh
+
+cat > textfile.sh
+cat ./textfile1.txt
+
