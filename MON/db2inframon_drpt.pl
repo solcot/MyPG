@@ -1,14 +1,15 @@
 #!/usr/bin/perl 
 #use strict;
 use warnings; 
-# ex) perl ./db2inframon_drpt.pl -c 4 -s 5 -t 10 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -e -o 2019-01-29-10.10.10 -p 2019-01-29-10.10.30
+# ex) perl ./db2inframon_drpt.pl -c 5 -u 2 -s 5 -t 10 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -e -o 2019-01-29-10.10.10 -p 2019-01-29-10.10.30
 
 use Getopt::Std;
 my %options=();
-getopts("hc:s:t:x:y:n:l:eo:p:", \%options); 
+getopts("hc:u:s:t:x:y:n:l:eo:p:", \%options); 
 
 &do_help() if defined $options{h};
 defined $options{c} ? my $colnum = $options{c} : exit (print "require -c option... for help -h option...\n");
+defined $options{u} ? my $sortcolnum = $options{u} : exit (print "require -u option... for help -h option...\n");
 defined $options{s} ? my $sleepsec = $options{s} : exit (print "require -s option... for help -h option...\n");
 defined $options{t} ? my $topcnt = $options{t} : exit (print "require -t option... for help -h option...\n");
 defined $options{x} ? my $ffilenm = $options{x} : exit (print "require -x option... for help -h option...\n");
@@ -102,7 +103,7 @@ foreach $Rb (@bdat) {
 
 $size = $#rdat +1;
 print "**##### Time Delta : $timedelta sec [ $atime ] #####**\n";
-foreach $i (1..$colnum) {
+foreach $i (1..$sortcolnum) {
 print "***** [$i]th column sort report *****\n";
 if($nfilenm) {
         open FR, "ksh $nfilenm|" || die("Cannot open the file $!");
@@ -130,7 +131,7 @@ last if ($size == 1);
 
 sub do_help { 
 $helpstr = <<EOF; 
-*** usage: perl ./db2inframon_drpt.pl -c <column count> -s <sleep sec> -t <top result> -x <first file name> -y <second file name> [-n <header file name>] [-l <log file name>] [-e:execution delta yn] [-o <time1>] [-p <time2>] 
+*** usage: perl ./db2inframon_drpt.pl -c <column count> -u <sort column count> -s <sleep sec> -t <top result> -x <first file name> -y <second file name> [-n <header file name>] [-l <log file name>] [-e:execution delta yn] [-o <time1>] [-p <time2>] 
 *** help: perl ./db2inframon_drpt.pl -h 
 EOF
 print "$helpstr\n"; 
