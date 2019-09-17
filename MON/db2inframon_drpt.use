@@ -20,7 +20,7 @@ db2exfmt -d kttcop -1 >> $2.log 2>/dev/null
 db2 "select varchar(object_type,10) type,varchar(object_schema,10) schema,varchar(object_module,10) module,varchar(object_name,30) name from table(mon_get_section_object($1,null,null,null,null,-2))" >> $2.log 2>&1
 =====> cat 2018-11-08-15.11.17.log | perl -ane 'BEGIN{$/="\n!!";} print if/0100000000000000030000000000000000000000020020181108132426897881/'
 
-### perl ./db2inframon_drpt.pl -c 5 -u 5 -s 5 -t 10 -x ./package.sh -y ./package.sh -n ./package_header.sh [-l ./package_log.sh] [-e] [-o 2019-01-29-10.10.10] [-p 2019-01-29-10.10.30]
+### perl ./db2inframon_drpt.pl -c 5 -u 5 -s 5 -t 10 -x ./package.sh -y ./package.sh -n ./package_header.sh [-l ./package_log.sh [-q 2]] [-e] [-o 2019-01-29-10.10.10] [-p 2019-01-29-10.10.30]
 
 cat > table.sh
 db2 connect to tdb > /dev/null

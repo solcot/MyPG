@@ -1,11 +1,11 @@
 #!/usr/bin/perl 
 #use strict;
 use warnings; 
-# ex) perl ./db2inframon_drpt.pl -c 5 -u 2 -s 5 -t 10 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -e -o 2019-01-29-10.10.10 -p 2019-01-29-10.10.30
+# ex) perl ./db2inframon_drpt.pl -c 5 -u 2 -s 5 -t 10 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -e -o 2019-01-29-10.10.10 -p 2019-01-29-10.10.30
 
 use Getopt::Std;
 my %options=();
-getopts("hc:u:s:t:x:y:n:l:eo:p:", \%options); 
+getopts("hc:u:s:t:x:y:n:l:q:eo:p:", \%options); 
 
 &do_help() if defined $options{h};
 defined $options{c} ? my $colnum = $options{c} : exit (print "require -c option... for help -h option...\n");
@@ -16,6 +16,7 @@ defined $options{x} ? my $ffilenm = $options{x} : exit (print "require -x option
 defined $options{y} ? my $sfilenm = $options{y} : exit (print "require -y option... for help -h option...\n");
 my $nfilenm = $options{n} if defined $options{n};
 my $logyn = $options{l} if defined $options{l};
+my $logcnt = $options{q} if defined $options{q};
 my $execdeltayn = $options{e} if defined $options{e};
 my $time1 = $options{o} if defined $options{o};
 my $time2 = $options{p} if defined $options{p};
@@ -117,7 +118,7 @@ $loopcnt = 0;
 foreach $Rr (sort{$b->[$i] <=> $a->[$i]} @rdat) {
         foreach $j (0..$colnum) {
                 printf "%25s",$Rr->[$j];
-		system(qq{ksh $logyn "$Rr->[$j]" $atime}) if $j==0 && $logyn;
+		system(qq{ksh $logyn "$Rr->[$j]" $atime}) if $j==0 && $logyn && $logcnt>$loopcnt;
         }
         print "\n";
         $loopcnt++;
@@ -131,7 +132,7 @@ last if ($size == 1);
 
 sub do_help { 
 $helpstr = <<EOF; 
-*** usage: perl ./db2inframon_drpt.pl -c <column count> -u <sort column count> -s <sleep sec> -t <top result> -x <first file name> -y <second file name> [-n <header file name>] [-l <log file name>] [-e:execution delta yn] [-o <time1>] [-p <time2>] 
+*** usage: perl ./db2inframon_drpt.pl -c <column count> -u <sort column count> -s <sleep sec> -t <top result> -x <first file name> -y <second file name> [-n <header file name>] [-l <log file name> [-q <log top cnt>]] [-e:execution delta yn] [-o <time1>] [-p <time2>] 
 *** help: perl ./db2inframon_drpt.pl -h 
 EOF
 print "$helpstr\n"; 
@@ -147,4 +148,3 @@ $atimesec = timelocal($sec2,$min2,$hour2,$day2,$month2-1,$year2);
 $timediff = $atimesec - $btimesec;
 return $timediff;
 }
-
