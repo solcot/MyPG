@@ -68,69 +68,89 @@ if($logappapinfo or $loglockapinfo) { open LOG_APINFO, ">> $logfile_apinfo" or d
 `db2 connect to $db`;
 
 ################ delta1
-chomp( $bdate = `date +%Y%m%d%H%M%S` );
+#chomp( $bdate = `date +%Y%m%d%H%M%S` );
+open(IN, "tmpdate"); $bdate = <IN>; close(IN);
 ## snapdb
-$bsnapdbts = `db2 -x "values current timestamp with ur"`;
+#$bsnapdbts = `db2 -x "values current timestamp with ur"`;
+open(IN, "tmpdbts"); $bsnapdbts = <IN>; close(IN);
 if($before) {
-   $tmpdb = `db2 -x "select rows_read,rows_deleted+rows_inserted+rows_updated,commit_sql_stmts+int_commits+rollback_sql_stmts+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,0,0 from sysibmadm.snapdb with ur"`;
+#   $tmpdb = `db2 -x "select rows_read,rows_deleted+rows_inserted+rows_updated,commit_sql_stmts+int_commits+rollback_sql_stmts+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,0,0 from sysibmadm.snapdb with ur"`;
+   open(IN, "tmpdb"); $tmpdb = <IN>; close(IN);
 } else {
-   $tmpdb = `db2 -x "select rows_read,rows_modified,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS from table(MON_GET_DATABASE(-2)) with ur"`;
+#   $tmpdb = `db2 -x "select rows_read,rows_modified,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS from table(MON_GET_DATABASE(-2)) with ur"`;
+   open(IN, "tmpdb"); $tmpdb = <IN>; close(IN);
 }
 $tmpdb =~ s/^\s+|\s+$//g;
 ($bdbcnt1, $bdbcnt2, $bdbcnt3, $bdbcnt4, $bdbcnt5, $bdbcnt6, $bdbcnt7, $bdbcnt8, $bdbcnt9, $bdbcnt10, $bdbcnt11, $bdbcnt12) = split /\s+/, $tmpdb;
 #print "$bdbcnt1, $bdbcnt2, $bdbcnt3\n";
 ## snaptab
 if($tabtopcnt > 0) {
-$bsnaptabts = `db2 -x "values current timestamp with ur"`;
+#$bsnaptabts = `db2 -x "values current timestamp with ur"`;
+open(IN, "tmptabts"); $bsnaptabts = <IN>; close(IN);
 if($before) {
-   $btabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || char(0) || ':' || char(0) from sysibmadm.snaptab group by tabschema, tabname with ur"`;   
+#   $btabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || char(0) || ':' || char(0) from sysibmadm.snaptab group by tabschema, tabname with ur"`;   
+   open(IN, "tmptab"); $btabcnt1 = do{local $/; <IN>}; close(IN);
 } else {
-   $btabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(max(section_exec_with_col_references)) from table(MON_GET_TABLE(null,null,-2)) group by tabschema, tabname with ur"`;
+#   $btabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(max(section_exec_with_col_references)) from table(MON_GET_TABLE(null,null,-2)) group by tabschema, tabname with ur"`;
+   open(IN, "tmptab"); $btabcnt1 = do{local $/; <IN>}; close(IN);
 }
 %btabcnt1s = split /\s+/, $btabcnt1;
 }
 ## snapappl
 if($apptopcnt > 0) {
-$bsnapapplts = `db2 -x "values current timestamp with ur"`;
+#$bsnapapplts = `db2 -x "values current timestamp with ur"`;
+open(IN, "tmpapplts"); $bsnapapplts = <IN>; close(IN);
 if($before) {
-   $bapplcnt1 = `db2 -x "select varchar(replace(b.appl_name,\047 \047,\047\047)||\047.\047||replace(char(b.AGENT_ID),\047 \047,\047\047),50), trim(char(a.rows_read)) || ':' || trim(char(a.rows_written)) from sysibmadm.snapappl a join sysibmadm.applications b on a.agent_id = b.agent_id with ur"`;
+#   $bapplcnt1 = `db2 -x "select varchar(replace(b.appl_name,\047 \047,\047\047)||\047.\047||replace(char(b.AGENT_ID),\047 \047,\047\047),50), trim(char(a.rows_read)) || ':' || trim(char(a.rows_written)) from sysibmadm.snapappl a join sysibmadm.applications b on a.agent_id = b.agent_id with ur"`;
+   open(IN, "tmpappl"); $bapplcnt1 = do{local $/; <IN>}; close(IN);
 } else {
-   $bapplcnt1 = `db2 -x "select varchar(replace(a.application_name,\047 \047,\047\047)||\047.\047||replace(char(a.application_handle),\047 \047,\047\047),50), varchar(rows_read) || ':' || varchar(rows_modified) from table(MON_GET_CONNECTION(null,-2)) a with ur"`;
+#   $bapplcnt1 = `db2 -x "select varchar(replace(a.application_name,\047 \047,\047\047)||\047.\047||replace(char(a.application_handle),\047 \047,\047\047),50), varchar(rows_read) || ':' || varchar(rows_modified) from table(MON_GET_CONNECTION(null,-2)) a with ur"`;
+   open(IN, "tmpappl"); $bapplcnt1 = do{local $/; <IN>}; close(IN);
 }
 %bapplcnt1s = split /\s+/, $bapplcnt1;
 }
 
 ################ sleep
-sleep $scnt-$sdiff;
+#sleep $scnt-$sdiff;
 
 ################ delta2
 chomp( $adate = `date +%Y%m%d%H%M%S` );
+open(OUT, ">tmpdate"); print OUT "$adate"; close(OUT);
 ## snapdb
 $asnapdbts = `db2 -x "values current timestamp with ur"`;
+open(OUT, ">tmpdbts"); print OUT "$asnapdbts"; close(OUT);
 if($before) {
    $tmpdb = `db2 -x "select rows_read,rows_deleted+rows_inserted+rows_updated,commit_sql_stmts+int_commits+rollback_sql_stmts+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,0,0 from sysibmadm.snapdb with ur"`;
+   open(OUT, ">tmpdb"); print OUT "$tmpdb"; close(OUT);
 } else {
    $tmpdb = `db2 -x "select rows_read,rows_modified,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS from table(MON_GET_DATABASE(-2)) with ur"`;
+   open(OUT, ">tmpdb"); print OUT "$tmpdb"; close(OUT);
 }
 $tmpdb =~ s/^\s+|\s+$//g;
 ($adbcnt1, $adbcnt2, $adbcnt3, $adbcnt4, $adbcnt5, $adbcnt6, $adbcnt7, $adbcnt8, $adbcnt9, $adbcnt10, $adbcnt11, $adbcnt12) = split /\s+/, $tmpdb;
 ## snaptab
 if($tabtopcnt > 0) {
 $asnaptabts = `db2 -x "values current timestamp with ur"`;
+open(OUT, ">tmptabts"); print OUT "$asnaptabts"; close(OUT);
 if($before) {
    $atabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || char(0) || ':' || char(0) from sysibmadm.snaptab group by tabschema, tabname with ur"`;   
+   open(OUT, ">tmptab"); print OUT "$atabcnt1"; close(OUT);
 } else {
    $atabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(max(section_exec_with_col_references)) from table(MON_GET_TABLE(null,null,-2)) group by tabschema, tabname with ur"`;
+   open(OUT, ">tmptab"); print OUT "$atabcnt1"; close(OUT);
 }
 %atabcnt1s = split /\s+/, $atabcnt1;
 }
 ## snapappl
 if($apptopcnt > 0) {
 $asnapapplts = `db2 -x "values current timestamp with ur"`;
+open(OUT, ">tmpapplts"); print OUT "$asnapapplts"; close(OUT);
 if($before) {
    $aapplcnt1 = `db2 -x "select varchar(replace(b.appl_name,\047 \047,\047\047)||\047.\047||replace(char(b.AGENT_ID),\047 \047,\047\047),50), trim(char(a.rows_read)) || ':' || trim(char(a.rows_written)) from sysibmadm.snapappl a join sysibmadm.applications b on a.agent_id = b.agent_id with ur"`;
+   open(OUT, ">tmpappl"); print OUT "$aapplcnt1"; close(OUT);
 } else {
    $aapplcnt1 = `db2 -x "select varchar(replace(a.application_name,\047 \047,\047\047)||\047.\047||replace(char(a.application_handle),\047 \047,\047\047),50), varchar(rows_read) || ':' || varchar(rows_modified) from table(MON_GET_CONNECTION(null,-2)) a with ur"`;
+   open(OUT, ">tmpappl"); print OUT "$aapplcnt1"; close(OUT);
 }
 %aapplcnt1s = split /\s+/, $aapplcnt1;
 }
@@ -164,12 +184,12 @@ if($tabtopcnt > 0) {
 %dtabcnt1 = ();
 foreach $k1 (keys %atabcnt1s) {
         foreach $k2 (keys %btabcnt1s) {
-				if($k1 eq $k2) {
-				@atabs = split /:/, $atabcnt1s{$k1};
-				@btabs = split /:/, $btabcnt1s{$k2};
-				$dtabcnt1{$k1} = int(($atabs[0] - $btabs[0])/$snaptabtimediff) . ":" . int(($atabs[1] - $btabs[1])/$snaptabtimediff) . ":" . sprintf("%.2f",($atabs[2] - $btabs[2])/$snaptabtimediff) . ":" . sprintf("%.2f",($atabs[3] - $btabs[3])/$snaptabtimediff);
-				next;
-				}				
+                                if($k1 eq $k2) {
+                                @atabs = split /:/, $atabcnt1s{$k1};
+                                @btabs = split /:/, $btabcnt1s{$k2};
+                                $dtabcnt1{$k1} = int(($atabs[0] - $btabs[0])/$snaptabtimediff) . ":" . int(($atabs[1] - $btabs[1])/$snaptabtimediff) . ":" . sprintf("%.2f",($atabs[2] - $btabs[2])/$snaptabtimediff) . ":" . sprintf("%.2f",($atabs[3] - $btabs[3])/$snaptabtimediff);
+                                next;
+                                }                               
         }
 }
 }
@@ -178,12 +198,12 @@ if($apptopcnt > 0) {
 %dapplcnt1 = ();
 foreach $k1 (keys %aapplcnt1s) {
         foreach $k2 (keys %bapplcnt1s) {
-				if($k1 eq $k2) {
-				@aappls = split /:/, $aapplcnt1s{$k1};
-				@bappls = split /:/, $bapplcnt1s{$k2};
-				$dapplcnt1{$k1} = int(($aappls[0] - $bappls[0])/$snapappltimediff) . ":" . int(($aappls[1] - $bappls[1])/$snapappltimediff);
-				next;
-				}	
+                                if($k1 eq $k2) {
+                                @aappls = split /:/, $aapplcnt1s{$k1};
+                                @bappls = split /:/, $bapplcnt1s{$k2};
+                                $dapplcnt1{$k1} = int(($aappls[0] - $bappls[0])/$snapappltimediff) . ":" . int(($aappls[1] - $bappls[1])/$snapappltimediff);
+                                next;
+                                }       
         }
 }
 }
@@ -204,7 +224,7 @@ if($before) {
         where a.agent_id_holding_lk not in (select agent_id from sysibmadm.snaplockwait) group by a.agent_id_holding_lk, a.tabname with ur"`;
 } else {
    $lock = `db2 -x "select a.hld_application_handle, a.tabname from sysibmadm.mon_lockwaits a
-	where a.hld_application_handle not in (select req_application_handle from sysibmadm.mon_lockwaits) group by a.hld_application_handle, a.tabname with ur"`;
+        where a.hld_application_handle not in (select req_application_handle from sysibmadm.mon_lockwaits) group by a.hld_application_handle, a.tabname with ur"`;
 }
 @locks = split /\s+/, $lock;
 ## connection
@@ -216,6 +236,8 @@ if($before) {
 @conns = split /\s+/, $conn;
 
 ################ print
+## timediff
+print "dbsecdiff: $snapdbtimediff tabsecdiff: $snaptabtimediff applsecdiff: $snapappltimediff\n";
 ## cpu
 $avmm = int($avm*4/1024);
 $frem = int($fre*4/1024);
@@ -241,28 +263,28 @@ print "-" x 20 . "\n";
 ## snaptab
 if($tabtopcnt > 0) {
 if($sortwrite) {
-	foreach $kk (sort{(split /:/, $dtabcnt1{$b})[1]  <=> (split /:/, $dtabcnt1{$a})[1]} keys %dtabcnt1) {
-	$gdtabcnt1 = "#" x (((split /:/, $dtabcnt1{$kk})[1])/$sd3);
-	print "$adate Tab_Rows_rw $kk : $dtabcnt1{$kk} : $gdtabcnt1\n";
-	$loopcnt++;
-	last if($loopcnt == $tabtopcnt);
-	}
+        foreach $kk (sort{(split /:/, $dtabcnt1{$b})[1]  <=> (split /:/, $dtabcnt1{$a})[1]} keys %dtabcnt1) {
+        $gdtabcnt1 = "#" x (((split /:/, $dtabcnt1{$kk})[1])/$sd3);
+        print "$adate Tab_Rows_rw $kk : $dtabcnt1{$kk} : $gdtabcnt1\n";
+        $loopcnt++;
+        last if($loopcnt == $tabtopcnt);
+        }
 }
 elsif($sortread) {
-	foreach $kk (sort{(split /:/, $dtabcnt1{$b})[0] <=> (split /:/, $dtabcnt1{$a})[0]} keys %dtabcnt1) {
-	$gdtabcnt1 = "#" x (((split /:/, $dtabcnt1{$kk})[0])/$sd3);
-	print "$adate Tab_Rows_rw $kk : $dtabcnt1{$kk} : $gdtabcnt1\n";
-	$loopcnt++;
-	last if($loopcnt == $tabtopcnt);
-	}
+        foreach $kk (sort{(split /:/, $dtabcnt1{$b})[0] <=> (split /:/, $dtabcnt1{$a})[0]} keys %dtabcnt1) {
+        $gdtabcnt1 = "#" x (((split /:/, $dtabcnt1{$kk})[0])/$sd3);
+        print "$adate Tab_Rows_rw $kk : $dtabcnt1{$kk} : $gdtabcnt1\n";
+        $loopcnt++;
+        last if($loopcnt == $tabtopcnt);
+        }
 }
 else {
-	foreach $kk (sort{(split /:/, $dtabcnt1{$b})[0]+(split /:/, $dtabcnt1{$b})[1]  <=> (split /:/, $dtabcnt1{$a})[0]+(split /:/, $dtabcnt1{$a})[1]} keys %dtabcnt1) {
-	$gdtabcnt1 = "#" x (((split /:/, $dtabcnt1{$kk})[0]+(split /:/, $dtabcnt1{$kk})[1])/$sd3);
-	print "$adate Tab_Rows_rw $kk : $dtabcnt1{$kk} : $gdtabcnt1\n";
-	$loopcnt++;
-	last if($loopcnt == $tabtopcnt);
-	}
+        foreach $kk (sort{(split /:/, $dtabcnt1{$b})[0]+(split /:/, $dtabcnt1{$b})[1]  <=> (split /:/, $dtabcnt1{$a})[0]+(split /:/, $dtabcnt1{$a})[1]} keys %dtabcnt1) {
+        $gdtabcnt1 = "#" x (((split /:/, $dtabcnt1{$kk})[0]+(split /:/, $dtabcnt1{$kk})[1])/$sd3);
+        print "$adate Tab_Rows_rw $kk : $dtabcnt1{$kk} : $gdtabcnt1\n";
+        $loopcnt++;
+        last if($loopcnt == $tabtopcnt);
+        }
 }
 $loopcnt = 0;
 print "-" x 20 . "\n";
@@ -270,52 +292,52 @@ print "-" x 20 . "\n";
 ## snapappl
 if($apptopcnt > 0) {
 if($sortwrite) {
-	foreach $kk (sort{(split /:/, $dapplcnt1{$b})[1]  <=> (split /:/, $dapplcnt1{$a})[1]} keys %dapplcnt1) {
-	$gdtabcnt1 = "#" x (((split /:/, $dapplcnt1{$kk})[1])/$sd3);
-	print "$adate appl_Rows_rw $kk : $dapplcnt1{$kk} : $gdapplcnt1\n";
-	$loopcnt++;
-	last if($loopcnt == $apptopcnt);
-	if($logappapinfo) {
-	if($loopcnt <= $topappapinfo) {
-	   @app = split /\./, $kk;
-	   $app = pop @app;
-	   $t2apinfo = `db2pd -d $db -apinfo $app`;
-	   print LOG_APINFO "$adate t${topappapinfo}apinfo $t2apinfo";
-	   }
-	}
-	}
+        foreach $kk (sort{(split /:/, $dapplcnt1{$b})[1]  <=> (split /:/, $dapplcnt1{$a})[1]} keys %dapplcnt1) {
+        $gdtabcnt1 = "#" x (((split /:/, $dapplcnt1{$kk})[1])/$sd3);
+        print "$adate appl_Rows_rw $kk : $dapplcnt1{$kk} : $gdapplcnt1\n";
+        $loopcnt++;
+        last if($loopcnt == $apptopcnt);
+        if($logappapinfo) {
+        if($loopcnt <= $topappapinfo) {
+           @app = split /\./, $kk;
+           $app = pop @app;
+           $t2apinfo = `db2pd -d $db -apinfo $app`;
+           print LOG_APINFO "$adate t${topappapinfo}apinfo $t2apinfo";
+           }
+        }
+        }
 }
 elsif($sortread) {
-	foreach $kk (sort{(split /:/, $dapplcnt1{$b})[0] <=> (split /:/, $dapplcnt1{$a})[0]} keys %dapplcnt1) {
-	$gdtabcnt1 = "#" x (((split /:/, $dapplcnt1{$kk})[0])/$sd3);
-	print "$adate appl_Rows_rw $kk : $dapplcnt1{$kk} : $gdapplcnt1\n";
-	$loopcnt++;
-	last if($loopcnt == $apptopcnt);
-	if($logappapinfo) {
-	if($loopcnt <= $topappapinfo) {
-	   @app = split /\./, $kk;
-	   $app = pop @app;
-	   $t2apinfo = `db2pd -d $db -apinfo $app`;
-	   print LOG_APINFO "$adate t${topappapinfo}apinfo $t2apinfo";
-	   }
-	}
-	}
+        foreach $kk (sort{(split /:/, $dapplcnt1{$b})[0] <=> (split /:/, $dapplcnt1{$a})[0]} keys %dapplcnt1) {
+        $gdtabcnt1 = "#" x (((split /:/, $dapplcnt1{$kk})[0])/$sd3);
+        print "$adate appl_Rows_rw $kk : $dapplcnt1{$kk} : $gdapplcnt1\n";
+        $loopcnt++;
+        last if($loopcnt == $apptopcnt);
+        if($logappapinfo) {
+        if($loopcnt <= $topappapinfo) {
+           @app = split /\./, $kk;
+           $app = pop @app;
+           $t2apinfo = `db2pd -d $db -apinfo $app`;
+           print LOG_APINFO "$adate t${topappapinfo}apinfo $t2apinfo";
+           }
+        }
+        }
 }
 else {
-	foreach $kk (sort{(split /:/, $dapplcnt1{$b})[0]+(split /:/, $dapplcnt1{$b})[1]  <=> (split /:/, $dapplcnt1{$a})[0]+(split /:/, $dapplcnt1{$a})[1]} keys %dapplcnt1) {
-	$gdtabcnt1 = "#" x (((split /:/, $dapplcnt1{$kk})[0]+(split /:/, $dapplcnt1{$kk})[1])/$sd3);
-	print "$adate appl_Rows_rw $kk : $dapplcnt1{$kk} : $gdapplcnt1\n";
-	$loopcnt++;
-	last if($loopcnt == $apptopcnt);
-	if($logappapinfo) {
-	if($loopcnt <= $topappapinfo) {
-	   @app = split /\./, $kk;
-	   $app = pop @app;
-	   $t2apinfo = `db2pd -d $db -apinfo $app`;
-	   print LOG_APINFO "$adate t${topappapinfo}apinfo $t2apinfo";
-	   }
-	}
-	}
+        foreach $kk (sort{(split /:/, $dapplcnt1{$b})[0]+(split /:/, $dapplcnt1{$b})[1]  <=> (split /:/, $dapplcnt1{$a})[0]+(split /:/, $dapplcnt1{$a})[1]} keys %dapplcnt1) {
+        $gdtabcnt1 = "#" x (((split /:/, $dapplcnt1{$kk})[0]+(split /:/, $dapplcnt1{$kk})[1])/$sd3);
+        print "$adate appl_Rows_rw $kk : $dapplcnt1{$kk} : $gdapplcnt1\n";
+        $loopcnt++;
+        last if($loopcnt == $apptopcnt);
+        if($logappapinfo) {
+        if($loopcnt <= $topappapinfo) {
+           @app = split /\./, $kk;
+           $app = pop @app;
+           $t2apinfo = `db2pd -d $db -apinfo $app`;
+           print LOG_APINFO "$adate t${topappapinfo}apinfo $t2apinfo";
+           }
+        }
+        }
 }
 }
 
@@ -332,5 +354,5 @@ help: perl ./db2inframon_apinfo -h
 EOF
     print "$help\n"; 
     exit; 
-} 
+}
 
