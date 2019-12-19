@@ -133,10 +133,10 @@ if($tabtopcnt > 0) {
 $asnaptabts = `db2 -x "values current timestamp with ur"`;
 open(OUT, ">tmptabts"); print OUT "$asnaptabts"; close(OUT);
 if($before) {
-   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || char(0) || ':' || char(0) from sysibmadm.snaptab group by tabschema, tabname with ur"`;   
+   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || char(0) || ':' || char(0) from sysibmadm.snaptab where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;   
    open(OUT, ">tmptab"); print OUT "$atabcnt1"; close(OUT);
 } else {
-   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(max(section_exec_with_col_references)) from table(MON_GET_TABLE(null,null,-2)) group by tabschema, tabname with ur"`;
+   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(max(section_exec_with_col_references)) from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
    open(OUT, ">tmptab"); print OUT "$atabcnt1"; close(OUT);
 }
 %atabcnt1s = split /\s+/, $atabcnt1;
