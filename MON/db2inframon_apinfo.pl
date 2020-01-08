@@ -53,21 +53,35 @@ $atimesec = timelocal($sec2,$min2,$hour2,$day2,$month2-1,$year2);
 $timediff = $atimesec - $btimesec;
 return $timediff;
 }
+
 #--------------------------------------------------------
+
+`db2 connect to $db`;
 
 chomp( $logsdate = `date +"%Y%m%d"` );
 $flogfile_dir = $logfile_dir . "/" . substr($logsdate, 0, 6);
 `mkdir $flogfile_dir` if !(-d "$flogfile_dir");
 $logfile = $flogfile_dir . "/db2inframon_$logsdate.log";
 $logfile_apinfo = $flogfile_dir . "/db2apinfo_$logsdate.log";
+
+# once a day logging =======================
+if (!(-e "$logfile")) {
+$out = `db2 "select current_timestamp ts,rows_read,rows_modified,rows_inserted,rows_updated,rows_deleted,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks trans,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS from table(MON_GET_DATABASE(-2)) with ur"`;
+open(OUT, ">" . $logfile . "_db"); print OUT "$out"; close(OUT);
+$out = `db2 "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50) tabname, sum(rows_read) rr, sum(rows_inserted+rows_updated+rows_deleted) rm, sum(rows_inserted) ri, sum(rows_updated) ru, sum(rows_deleted) rd, sum(table_scans) ts, max(section_exec_with_col_references) sewcr, sum(COALESCE(DATA_OBJECT_L_PAGES,0)) datpag, sum(COALESCE(LOB_OBJECT_L_PAGES,0)) lobpg, sum(COALESCE(INDEX_OBJECT_L_PAGES,0)) idxpg, count(*) pcnt from table(MON_GET_TABLE(null,null,-2)) where tabschema not like \047SYS%\047 and tabschema not like \047IDBA%\047 group by tabschema, tabname with ur"`;
+open(OUT, ">" . $logfile . "_tab"); print OUT "$out"; close(OUT);
+$out = `db2 +w "select executable_id, num_exec_with_metrics, stmt_exec_time, rows_read, rows_modified, rows_returned, total_cpu_time, varchar(stmt_text,250) stmt_text from table(mon_get_pkg_cache_stmt(null,null,null,-2))"`;
+open(OUT, ">" . $logfile . "_pcache"); print OUT "$out"; close(OUT);
+}
+# ==========================================
+
 if($log) {
    open STDOUT, ">> $logfile" or die "error $!";
    open STDERR, ">> $logfile" or die "error $!";
 }
 if($logappapinfo or $loglockapinfo) { open LOG_APINFO, ">> $logfile_apinfo" or die "error $!"; }
-#----------------------------------------------------------
 
-`db2 connect to $db`;
+#----------------------------------------------------------
 
 ################ delta1
 #chomp( $bdate = `date +%Y%m%d%H%M%S` );
@@ -138,7 +152,7 @@ if($before) {
    $atabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || char(0) || ':' || char(0) from sysibmadm.snaptab where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;   
    open(OUT, ">" . $logfile_dir . "/tmptab"); print OUT "$atabcnt1"; close(OUT);
 } else {
-   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(max(section_exec_with_col_references)) from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
+   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','') || '.' || replace(tabname,' ',''),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(max(section_exec_with_col_references)) || ':' || varchar(sum(COALESCE(DATA_OBJECT_L_PAGES,0))) || ':' || varchar(sum(COALESCE(LOB_OBJECT_L_PAGES,0))) || ':' || varchar(sum(COALESCE(INDEX_OBJECT_L_PAGES,0))) || ':' || varchar(count(*)) from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
    open(OUT, ">" . $logfile_dir . "/tmptab"); print OUT "$atabcnt1"; close(OUT);
 }
 %atabcnt1s = split /\s+/, $atabcnt1;
@@ -189,7 +203,7 @@ foreach $k1 (keys %atabcnt1s) {
                                 if($k1 eq $k2) {
                                 @atabs = split /:/, $atabcnt1s{$k1};
                                 @btabs = split /:/, $btabcnt1s{$k2};
-                                $dtabcnt1{$k1} = int(($atabs[0] - $btabs[0])/$snaptabtimediff) . ":" . int(($atabs[1] - $btabs[1])/$snaptabtimediff) . ":" . sprintf("%.2f",($atabs[2] - $btabs[2])/$snaptabtimediff) . ":" . sprintf("%.2f",($atabs[3] - $btabs[3])/$snaptabtimediff);
+                                $dtabcnt1{$k1} = int(($atabs[0] - $btabs[0])/$snaptabtimediff) . ":" . int(($atabs[1] - $btabs[1])/$snaptabtimediff) . ":" . sprintf("%.2f",($atabs[2] - $btabs[2])/$snaptabtimediff) . ":" . sprintf("%.2f",($atabs[3] - $btabs[3])/$snaptabtimediff) . ":" . int($atabs[4]) . ":" . int($atabs[5]) . ":" . int($atabs[6]) . ":" . int($atabs[7]);
                                 next;
                                 }                               
         }
