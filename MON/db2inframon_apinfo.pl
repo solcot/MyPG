@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #use strict; 
-#use perl ./db2inframon_apinfo.pl -d kttcop -s 10 -q 1000000 -w 1000 -e 1000000 -t 10 -a 5 -p 2 -o /instance/cop/IFR/MONITOR/LOG_PERL -z -x -c 
+#use perl ./db2inframon_apinfo.pl -d sample -s 5 -q 1000000 -w 1000 -e 1000000 -t 10 -a 5 -p 2 -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL -z -x -c 
 
 use Getopt::Std; 
  
@@ -26,24 +26,10 @@ if($options{v}) { $before = $options{v}; }
 if($options{W}) { $sortwrite = $options{W}; } 
 if($options{R}) { $sortread = $options{R}; } 
 
-# $db = "kttcop";    # database
-# $scnt = 10;     # sleep
+
 $sdiff = 0;     # sleep compensation
-# $sd1 = 100000;     # graphic scale-down, rows_read
-# $sd2 = 100;      # graphic scale-down, rows_mod trans
-# $sd3 = 100000;    # graphic scale-down, table reads, appl reads
-# $tabtopcnt = 10;   # top table count
-# $apptopcnt = 5    # top appl count
-# $topappapinfo = 2;   # top appl info count
 
-# $logfile_dir = "/instance/cop/IFR/MONITOR/LOGTMP";
-
-# $log = 1;
-# $loglockapinfo = 1;
-# $logappapinfo = 1;
-# $before = 1;     # Ver <= 9.7
 #--------------------------------------------------------------
-
 sub timediff {
 use Time::Local;
 ($year,$month,$day,$hour,$min,$sec) = (substr($_[0],0,4),substr($_[0],5,2),substr($_[0],8,2),substr($_[0],11,2),,substr($_[0],14,2),substr($_[0],17,2));
@@ -53,7 +39,6 @@ $atimesec = timelocal($sec2,$min2,$hour2,$day2,$month2-1,$year2);
 $timediff = $atimesec - $btimesec;
 return $timediff;
 }
-
 #--------------------------------------------------------
 
 `db2 connect to $db`;
@@ -66,11 +51,11 @@ $logfile_apinfo = $flogfile_dir . "/db2apinfo_$logsdate.log";
 
 # once a day logging =======================
 if (!(-e "$logfile")) {
-$out = `db2 "select current_timestamp ts,rows_read,rows_modified,rows_inserted,rows_updated,rows_deleted,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks trans,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS from table(MON_GET_DATABASE(-2)) with ur"`;
+$out = `db2 "select '$db' dbnm,rows_read,rows_modified,rows_inserted,rows_updated,rows_deleted,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks trans,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,current_timestamp ts from table(MON_GET_DATABASE(-2)) with ur"`;
 open(OUT, ">" . $logfile . "_db"); print OUT "$out"; close(OUT);
-$out = `db2 "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50) tabname, sum(rows_read) rr, sum(rows_inserted+rows_updated+rows_deleted) rm, sum(rows_inserted) ri, sum(rows_updated) ru, sum(rows_deleted) rd, sum(table_scans) ts, max(section_exec_with_col_references) sewcr, sum(COALESCE(DATA_OBJECT_L_PAGES,0)) datpag, sum(COALESCE(LOB_OBJECT_L_PAGES,0)) lobpg, sum(COALESCE(INDEX_OBJECT_L_PAGES,0)) idxpg, count(*) pcnt from table(MON_GET_TABLE(null,null,-2)) where tabschema not like \047SYS%\047 and tabschema not like \047IDBA%\047 group by tabschema, tabname with ur"`;
+$out = `db2 "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50) tabname, sum(rows_read) rr, sum(rows_inserted+rows_updated+rows_deleted) rm, sum(rows_inserted) ri, sum(rows_updated) ru, sum(rows_deleted) rd, sum(table_scans) ts, max(section_exec_with_col_references) sewcr, sum(COALESCE(DATA_OBJECT_L_PAGES,0)) datpag, sum(COALESCE(LOB_OBJECT_L_PAGES,0)) lobpg, sum(COALESCE(INDEX_OBJECT_L_PAGES,0)) idxpg, count(*) pcnt,current_timestamp ts from table(MON_GET_TABLE(null,null,-2)) where tabschema not like \047SYS%\047 and tabschema not like \047IDBA%\047 group by tabschema, tabname with ur"`;
 open(OUT, ">" . $logfile . "_tab"); print OUT "$out"; close(OUT);
-$out = `db2 +w "select executable_id, num_exec_with_metrics, stmt_exec_time, rows_read, rows_modified, rows_returned, total_cpu_time, varchar(stmt_text,250) stmt_text from table(mon_get_pkg_cache_stmt(null,null,null,-2))"`;
+$out = `db2 +w "select executable_id, num_exec_with_metrics, stmt_exec_time, rows_read, rows_modified, rows_returned, total_cpu_time, varchar(stmt_text,250) stmt_text,current_timestamp ts from table(mon_get_pkg_cache_stmt(null,null,null,-2))"`;
 open(OUT, ">" . $logfile . "_pcache"); print OUT "$out"; close(OUT);
 }
 # ==========================================
@@ -114,20 +99,20 @@ if($before) {
 }
 ## snapappl
 if($apptopcnt > 0) {
-#$bsnapapplts = `db2 -x "values current timestamp with ur"`;
-open(IN, $logfile_dir . "/tmpapplts"); $bsnapapplts = <IN>; close(IN);
+$bsnapapplts = `db2 -x "values current timestamp with ur"`;
+#open(IN, $logfile_dir . "/tmpapplts"); $bsnapapplts = <IN>; close(IN);
 if($before) {
-#   $bapplcnt1 = `db2 -x "select varchar(replace(b.appl_name,\047 \047,\047\047)||\047.\047||replace(char(b.AGENT_ID),\047 \047,\047\047),50), trim(char(a.rows_read)) || ':' || trim(char(a.rows_written)) from sysibmadm.snapappl a join sysibmadm.applications b on a.agent_id = b.agent_id with ur"`;
-   open(IN, $logfile_dir . "/tmpappl"); $bapplcnt1 = do{local $/; <IN>}; close(IN);
+   $bapplcnt1 = `db2 -x "select varchar(replace(b.appl_name,\047 \047,\047\047)||\047.\047||replace(char(b.AGENT_ID),\047 \047,\047\047),50), trim(char(a.rows_read)) || ':' || trim(char(a.rows_written)) from sysibmadm.snapappl a join sysibmadm.applications b on a.agent_id = b.agent_id with ur"`;
+#   open(IN, $logfile_dir . "/tmpappl"); $bapplcnt1 = do{local $/; <IN>}; close(IN);
 } else {
-#   $bapplcnt1 = `db2 -x "select varchar(replace(a.application_name,\047 \047,\047\047)||\047.\047||replace(char(a.application_handle),\047 \047,\047\047),50), varchar(rows_read) || ':' || varchar(rows_modified) from table(MON_GET_CONNECTION(null,-2)) a with ur"`;
-   open(IN, $logfile_dir . "/tmpappl"); $bapplcnt1 = do{local $/; <IN>}; close(IN);
+   $bapplcnt1 = `db2 -x "select varchar(replace(a.application_name,\047 \047,\047\047)||\047.\047||replace(char(a.application_handle),\047 \047,\047\047),50), varchar(rows_read) || ':' || varchar(rows_modified) from table(MON_GET_CONNECTION(null,-2)) a with ur"`;
+#   open(IN, $logfile_dir . "/tmpappl"); $bapplcnt1 = do{local $/; <IN>}; close(IN);
 }
 %bapplcnt1s = split /\s+/, $bapplcnt1;
 }
 
 ################ sleep
-#sleep $scnt-$sdiff;
+sleep $scnt-$sdiff;
 
 ################ delta2
 chomp( $adate = `date +%Y%m%d%H%M%S` );
@@ -149,7 +134,7 @@ if($tabtopcnt > 0) {
 $asnaptabts = `db2 -x "values current timestamp with ur"`;
 open(OUT, ">" . $logfile_dir . "/tmptabts"); print OUT "$asnaptabts"; close(OUT);
 if($before) {
-   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || char(0) || ':' || char(0) from sysibmadm.snaptab where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;   
+   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || trim(char(0)) || ':' || trim(char(0)) || ':' || trim(varchar(sum(COALESCE(DATA_OBJECT_PAGES,0)))) || ':' || trim(varchar(sum(COALESCE(LOB_OBJECT_PAGES,0)))) || ':' || trim(varchar(sum(COALESCE(INDEX_OBJECT_PAGES,0)))) || ':' || trim(varchar(count(*)))  from sysibmadm.snaptab where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;   
    open(OUT, ">" . $logfile_dir . "/tmptab"); print OUT "$atabcnt1"; close(OUT);
 } else {
    $atabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','') || '.' || replace(tabname,' ',''),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(max(section_exec_with_col_references)) || ':' || varchar(sum(COALESCE(DATA_OBJECT_L_PAGES,0))) || ':' || varchar(sum(COALESCE(LOB_OBJECT_L_PAGES,0))) || ':' || varchar(sum(COALESCE(INDEX_OBJECT_L_PAGES,0))) || ':' || varchar(count(*)) from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
@@ -365,7 +350,7 @@ close(LOG_APINFO);
 
 sub do_help { 
     $help = <<EOF; 
-usage: perl ./db2inframon_apinfo -d <dbname> -s <sleepsec> -q <read> -w <mod,tran> -e <table,appl> -t <toptab> -a <topappl> -p <topappllog> -o <directory> [-z:log] [-x:locklog] [-c:applog] [-v:before ver.] [-W:write sort] [-R:read sort]
+usage: perl ./db2inframon_apinfo -d <dbname> -s <appsleepsec> -q <read> -w <mod,tran> -e <table,appl> -t <toptab> -a <topappl> -p <topappllog> -o <directory> [-z:log] [-x:locklog] [-c:applog] [-v:before ver.] [-W:write sort] [-R:read sort]
 help: perl ./db2inframon_apinfo -h 
 EOF
     print "$help\n"; 
