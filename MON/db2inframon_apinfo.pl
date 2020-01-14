@@ -9,7 +9,7 @@ getopts("hd:s:q:w:e:t:a:p:o:zxcvWR", \%options);
  
 if($options{h}) { do_help(); } 
 if($options{d}) { $db = $options{d}; } else { print "require -d option... for help -h option...\n"; exit; } 
-if($options{s}) { $scnt = $options{s}; } else { print "require -s option... for help -h option...\n"; exit; } 
+if($options{s} or $options{s} == 0) { $scnt = $options{s}; } else { print "require -s option... for help -h option...\n"; exit; } 
 if($options{q}) { $sd1 = $options{q}; } else { print "require -q option... for help -h option...\n"; exit; } 
 if($options{w}) { $sd2 = $options{w}; } else { print "require -w option... for help -h option...\n"; exit; } 
 if($options{e}) { $sd3 = $options{e}; } else { print "require -e option... for help -h option...\n"; exit; } 
@@ -53,9 +53,9 @@ $logfile_apinfo = $flogfile_dir . "/db2apinfo_$logsdate.log";
 if (!(-e "$logfile")) {
 $out = `db2 "select '$db' dbnm,rows_read,rows_modified,rows_inserted,rows_updated,rows_deleted,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks trans,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,current_timestamp ts from table(MON_GET_DATABASE(-2)) with ur"`;
 open(OUT, ">" . $logfile . "_db"); print OUT "$out"; close(OUT);
-$out = `db2 "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50) tabname, sum(rows_read) rr, sum(rows_inserted+rows_updated+rows_deleted) rm, sum(rows_inserted) ri, sum(rows_updated) ru, sum(rows_deleted) rd, sum(table_scans) ts, max(section_exec_with_col_references) sewcr, sum(COALESCE(DATA_OBJECT_L_PAGES,0)) datpag, sum(COALESCE(LOB_OBJECT_L_PAGES,0)) lobpg, sum(COALESCE(INDEX_OBJECT_L_PAGES,0)) idxpg, count(*) pcnt,current_timestamp ts from table(MON_GET_TABLE(null,null,-2)) where tabschema not like \047SYS%\047 and tabschema not like \047IDBA%\047 group by tabschema, tabname with ur"`;
+$out = `db2 "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50) tabname, sum(rows_read) rr, sum(rows_inserted+rows_updated+rows_deleted) rm, sum(rows_inserted) ri, sum(rows_updated) ru, sum(rows_deleted) rd, sum(table_scans) ts, max(section_exec_with_col_references) sewcr, sum(COALESCE(DATA_OBJECT_L_PAGES,0)) datpag, sum(COALESCE(LOB_OBJECT_L_PAGES,0)) lobpg, sum(COALESCE(INDEX_OBJECT_L_PAGES,0)) idxpg, count(*) pcnt,current_timestamp ts from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
 open(OUT, ">" . $logfile . "_tab"); print OUT "$out"; close(OUT);
-$out = `db2 +w "select executable_id, num_exec_with_metrics, stmt_exec_time, rows_read, rows_modified, rows_returned, total_cpu_time, varchar(stmt_text,250) stmt_text,current_timestamp ts from table(mon_get_pkg_cache_stmt(null,null,null,-2))"`;
+$out = `db2 +w "select executable_id, num_exec_with_metrics, stmt_exec_time, rows_read, rows_modified, rows_returned, total_cpu_time, varchar(stmt_text,250) stmt_text,current_timestamp ts from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>720</modified_within>',-2))"`;
 open(OUT, ">" . $logfile . "_pcache"); print OUT "$out"; close(OUT);
 }
 # ==========================================
@@ -89,24 +89,27 @@ if($tabtopcnt > 0) {
 #$bsnaptabts = `db2 -x "values current timestamp with ur"`;
 open(IN, $logfile_dir . "/tmptabts"); $bsnaptabts = <IN>; close(IN);
 if($before) {
-#   $btabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || char(0) || ':' || char(0) from sysibmadm.snaptab group by tabschema, tabname with ur"`;   
+#   $btabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || char(0) || ':' || char(0) from sysibmadm.snaptab group by tabschema, tabname with ur"`;   
    open(IN, $logfile_dir . "/tmptab"); $btabcnt1 = do{local $/; <IN>}; close(IN);
 } else {
-#   $btabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(max(section_exec_with_col_references)) from table(MON_GET_TABLE(null,null,-2)) group by tabschema, tabname with ur"`;
+#   $btabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(max(section_exec_with_col_references)) from table(MON_GET_TABLE(null,null,-2)) group by tabschema, tabname with ur"`;
    open(IN, $logfile_dir . "/tmptab"); $btabcnt1 = do{local $/; <IN>}; close(IN);
 }
 %btabcnt1s = split /\s+/, $btabcnt1;
 }
 ## snapappl
 if($apptopcnt > 0) {
-$bsnapapplts = `db2 -x "values current timestamp with ur"`;
-#open(IN, $logfile_dir . "/tmpapplts"); $bsnapapplts = <IN>; close(IN);
+if($scnt > 0)
+{ $bsnapapplts = `db2 -x "values current timestamp with ur"`; } else
+{ open(IN, $logfile_dir . "/tmpapplts"); $bsnapapplts = <IN>; close(IN); }
 if($before) {
-   $bapplcnt1 = `db2 -x "select varchar(replace(b.appl_name,\047 \047,\047\047)||\047.\047||replace(char(b.AGENT_ID),\047 \047,\047\047),50), trim(char(a.rows_read)) || ':' || trim(char(a.rows_written)) from sysibmadm.snapappl a join sysibmadm.applications b on a.agent_id = b.agent_id with ur"`;
-#   open(IN, $logfile_dir . "/tmpappl"); $bapplcnt1 = do{local $/; <IN>}; close(IN);
+   if($scnt > 0)
+   { $bapplcnt1 = `db2 -x "select varchar(replace(b.appl_name,' ','')||'.'||replace(char(b.AGENT_ID),' ',''),50), trim(char(a.rows_read)) || ':' || trim(char(a.rows_written)) from sysibmadm.snapappl a join sysibmadm.applications b on a.agent_id = b.agent_id with ur"`; } else
+   { open(IN, $logfile_dir . "/tmpappl"); $bapplcnt1 = do{local $/; <IN>}; close(IN); }
 } else {
-   $bapplcnt1 = `db2 -x "select varchar(replace(a.application_name,\047 \047,\047\047)||\047.\047||replace(char(a.application_handle),\047 \047,\047\047),50), varchar(rows_read) || ':' || varchar(rows_modified) from table(MON_GET_CONNECTION(null,-2)) a with ur"`;
-#   open(IN, $logfile_dir . "/tmpappl"); $bapplcnt1 = do{local $/; <IN>}; close(IN);
+   if($scnt > 0)
+   { $bapplcnt1 = `db2 -x "select varchar(replace(a.application_name,' ','')||'.'||replace(char(a.application_handle),' ',''),50), varchar(rows_read) || ':' || varchar(rows_modified) from table(MON_GET_CONNECTION(null,-2)) a with ur"`; } else
+   { open(IN, $logfile_dir . "/tmpappl"); $bapplcnt1 = do{local $/; <IN>}; close(IN); }
 }
 %bapplcnt1s = split /\s+/, $bapplcnt1;
 }
@@ -134,7 +137,7 @@ if($tabtopcnt > 0) {
 $asnaptabts = `db2 -x "values current timestamp with ur"`;
 open(OUT, ">" . $logfile_dir . "/tmptabts"); print OUT "$asnaptabts"; close(OUT);
 if($before) {
-   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,\047 \047,\047\047)||\047.\047||replace(tabname,\047 \047,\047\047),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || trim(char(0)) || ':' || trim(char(0)) || ':' || trim(varchar(sum(COALESCE(DATA_OBJECT_PAGES,0)))) || ':' || trim(varchar(sum(COALESCE(LOB_OBJECT_PAGES,0)))) || ':' || trim(varchar(sum(COALESCE(INDEX_OBJECT_PAGES,0)))) || ':' || trim(varchar(count(*)))  from sysibmadm.snaptab where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;   
+   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || trim(char(0)) || ':' || trim(char(0)) || ':' || trim(char(sum(COALESCE(DATA_OBJECT_PAGES,0)))) || ':' || trim(char(sum(COALESCE(LOB_OBJECT_PAGES,0)))) || ':' || trim(char(sum(COALESCE(INDEX_OBJECT_PAGES,0)))) || ':' || trim(char(count(*)))  from sysibmadm.snaptab where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;   
    open(OUT, ">" . $logfile_dir . "/tmptab"); print OUT "$atabcnt1"; close(OUT);
 } else {
    $atabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','') || '.' || replace(tabname,' ',''),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(max(section_exec_with_col_references)) || ':' || varchar(sum(COALESCE(DATA_OBJECT_L_PAGES,0))) || ':' || varchar(sum(COALESCE(LOB_OBJECT_L_PAGES,0))) || ':' || varchar(sum(COALESCE(INDEX_OBJECT_L_PAGES,0))) || ':' || varchar(count(*)) from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
@@ -145,13 +148,13 @@ if($before) {
 ## snapappl
 if($apptopcnt > 0) {
 $asnapapplts = `db2 -x "values current timestamp with ur"`;
-open(OUT, ">" . $logfile_dir . "/tmpapplts"); print OUT "$asnapapplts"; close(OUT);
+if($scnt == 0) { open(OUT, ">" . $logfile_dir . "/tmpapplts"); print OUT "$asnapapplts"; close(OUT); }
 if($before) {
-   $aapplcnt1 = `db2 -x "select varchar(replace(b.appl_name,\047 \047,\047\047)||\047.\047||replace(char(b.AGENT_ID),\047 \047,\047\047),50), trim(char(a.rows_read)) || ':' || trim(char(a.rows_written)) from sysibmadm.snapappl a join sysibmadm.applications b on a.agent_id = b.agent_id with ur"`;
-   open(OUT, ">" . $logfile_dir . "/tmpappl"); print OUT "$aapplcnt1"; close(OUT);
+   $aapplcnt1 = `db2 -x "select varchar(replace(b.appl_name,' ','')||'.'||replace(char(b.AGENT_ID),' ',''),50), trim(char(a.rows_read)) || ':' || trim(char(a.rows_written)) from sysibmadm.snapappl a join sysibmadm.applications b on a.agent_id = b.agent_id with ur"`;
+   if($scnt == 0) { open(OUT, ">" . $logfile_dir . "/tmpappl"); print OUT "$aapplcnt1"; close(OUT); }
 } else {
-   $aapplcnt1 = `db2 -x "select varchar(replace(a.application_name,\047 \047,\047\047)||\047.\047||replace(char(a.application_handle),\047 \047,\047\047),50), varchar(rows_read) || ':' || varchar(rows_modified) from table(MON_GET_CONNECTION(null,-2)) a with ur"`;
-   open(OUT, ">" . $logfile_dir . "/tmpappl"); print OUT "$aapplcnt1"; close(OUT);
+   $aapplcnt1 = `db2 -x "select varchar(replace(a.application_name,' ','')||'.'||replace(char(a.application_handle),' ',''),50), varchar(rows_read) || ':' || varchar(rows_modified) from table(MON_GET_CONNECTION(null,-2)) a with ur"`;
+   if($scnt == 0) { open(OUT, ">" . $logfile_dir . "/tmpappl"); print OUT "$aapplcnt1"; close(OUT); }
 }
 %aapplcnt1s = split /\s+/, $aapplcnt1;
 }
@@ -350,7 +353,7 @@ close(LOG_APINFO);
 
 sub do_help { 
     $help = <<EOF; 
-usage: perl ./db2inframon_apinfo -d <dbname> -s <appsleepsec> -q <read> -w <mod,tran> -e <table,appl> -t <toptab> -a <topappl> -p <topappllog> -o <directory> [-z:log] [-x:locklog] [-c:applog] [-v:before ver.] [-W:write sort] [-R:read sort]
+usage: perl ./db2inframon_apinfo -d <dbname> -s <appsleepsec,0> -q <read> -w <mod,tran> -e <table,appl> -t <toptab,0> -a <topappl,0> -p <topappllog> -o <directory> [-z:log] [-x:locklog] [-c:applog] [-v:before ver.] [-W:write sort] [-R:read sort]
 help: perl ./db2inframon_apinfo -h 
 EOF
     print "$help\n"; 
