@@ -247,7 +247,6 @@ if($before) {
    $conn = `db2 -x "select APPLS_CUR_CONS, APPLS_IN_DB2, NUM_LOCKS_WAITING,ACTIVE_SORTS from table(MON_GET_DATABASE(-2)) with ur"`;
 }
 @conns = split /\s+/, $conn;
-print "@conns\n";
 
 ################ print
 ## timediff
