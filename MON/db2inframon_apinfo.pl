@@ -15,7 +15,7 @@ if($options{w}) { $sd2 = $options{w}; } else { print "require -w option... for h
 if($options{e}) { $sd3 = $options{e}; } else { print "require -e option... for help -h option...\n"; exit; } 
 if($options{t} or $options{t} == 0) { $tabtopcnt = $options{t}; } else { print "require -t option... for help -h option...\n"; exit; } 
 if($options{a} or $options{a} == 0) { $apptopcnt = $options{a}; } else { print "require -a option... for help -h option...\n"; exit; } 
-if($options{p}) { $topappapinfo = $options{p}; } else { print "require -p option... for help -h option...\n"; exit; } 
+if($options{p} or $options{p} == 0) { $topappapinfo = $options{p}; } else { print "require -p option... for help -h option...\n"; exit; } 
 if($options{o}) { $logfile_dir = $options{o}; } else { print "require -o option... for help -h option...\n"; exit; } 
 
 if($options{z}) { $log = $options{z}; } 
