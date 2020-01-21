@@ -51,11 +51,11 @@ $logfile_apinfo = $flogfile_dir . "/db2apinfo_$logsdate.log";
 
 # once a day logging =======================
 if (!(-e "$logfile")) {
-$out = `db2 "select '$db' dbnm,rows_read,rows_modified,rows_inserted,rows_updated,rows_deleted,total_app_commits,int_commits,total_app_rollbacks,int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS,current_timestamp ts from table(MON_GET_DATABASE(-2)) with ur"`;
+$out = `db2 "select '$db' dbnm,rows_read,rows_modified,rows_inserted,rows_updated,rows_deleted,total_app_commits,int_commits,total_app_rollbacks,int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,LOCK_ESCALS,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS,current_timestamp ts from table(MON_GET_DATABASE(-2)) with ur"`;
 open(OUT, ">" . $logfile . "_db"); print OUT "$out"; close(OUT);
-$out = `db2 "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50) tabname, sum(rows_read) rr, sum(rows_inserted+rows_updated+rows_deleted) rm, sum(rows_inserted) ri, sum(rows_updated) ru, sum(rows_deleted) rd, sum(table_scans) ts, max(section_exec_with_col_references) sewcr, sum(COALESCE(DATA_OBJECT_L_PAGES,0)) datpag, sum(COALESCE(LOB_OBJECT_L_PAGES,0)) lobpg, sum(COALESCE(INDEX_OBJECT_L_PAGES,0)) idxpg, count(*) pcnt,current_timestamp ts from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
+$out = `db2 "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50) tabname, sum(rows_read) rr, sum(rows_inserted+rows_updated+rows_deleted) rm, sum(rows_inserted) ri, sum(rows_updated) ru, sum(rows_deleted) rd, sum(table_scans) ts, max(section_exec_with_col_references) sewcr, sum(COALESCE(DATA_OBJECT_L_PAGES,0)) datpag, sum(COALESCE(LOB_OBJECT_L_PAGES,0)) lobpg, sum(COALESCE(INDEX_OBJECT_L_PAGES,0)) idxpg, sum(LOCK_ESCALS) lock_escals,sum(LOCK_WAITS) lock_waits,count(*) pcnt,current_timestamp ts from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
 open(OUT, ">" . $logfile . "_tab"); print OUT "$out"; close(OUT);
-$out = `db2 +w "select executable_id, num_exec_with_metrics, stmt_exec_time, rows_read, rows_modified, rows_returned, total_cpu_time, total_sorts, SORT_OVERFLOWS, varchar(stmt_text,250) stmt_text,current_timestamp ts from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>720</modified_within>',-2))"`;
+$out = `db2 +w "select executable_id, num_exec_with_metrics, stmt_exec_time, rows_read, rows_modified, rows_returned, total_cpu_time, total_sorts, SORT_OVERFLOWS,LOCK_ESCALS,LOCK_WAITS,DEADLOCKS,LOCK_TIMEOUTS, varchar(stmt_text,250) stmt_text,current_timestamp ts from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>720</modified_within>',-2))"`;
 open(OUT, ">" . $logfile . "_pcache"); print OUT "$out"; close(OUT);
 }
 # ==========================================
@@ -82,7 +82,7 @@ if($before) {
    open(IN, $logfile_dir . "/tmpdb"); $tmpdb = <IN>; close(IN);
 }
 $tmpdb =~ s/^\s+|\s+$//g;
-($bdbcnt1, $bdbcnt2, $bdbcnt3, $bdbcnt4, $bdbcnt5, $bdbcnt6, $bdbcnt7, $bdbcnt8, $bdbcnt9, $bdbcnt10, $bdbcnt11, $bdbcnt12, $bdbcnt13,$bdbcnt14,$bdbcnt15,$bdbcnt16,$bdbcnt17, $bdbcnt18,$bdbcnt19,$bdbcnt20,$bdbcnt21 ) = split /\s+/, $tmpdb;
+($bdbcnt1, $bdbcnt2, $bdbcnt3, $bdbcnt4, $bdbcnt5, $bdbcnt6, $bdbcnt7, $bdbcnt8, $bdbcnt9, $bdbcnt10, $bdbcnt11, $bdbcnt12, $bdbcnt13,$bdbcnt14,$bdbcnt15,$bdbcnt16,$bdbcnt17, $bdbcnt18,$bdbcnt19,$bdbcnt20,$bdbcnt21, $bdbcnt22) = split /\s+/, $tmpdb;
 #print "$bdbcnt1, $bdbcnt2, $bdbcnt3\n";
 ## snaptab
 if($tabtopcnt > 0) {
@@ -124,23 +124,23 @@ open(OUT, ">" . $logfile_dir . "/tmpdate"); print OUT "$adate"; close(OUT);
 $asnapdbts = `db2 -x "values current timestamp with ur"`;
 open(OUT, ">" . $logfile_dir . "/tmpdbts"); print OUT "$asnapdbts"; close(OUT);
 if($before) {
-   $tmpdb = `db2 -x "select rows_read,rows_deleted+rows_inserted+rows_updated,commit_sql_stmts+int_commits+rollback_sql_stmts+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,0,0,0,0,0,0,0,0,0,0,0 from sysibmadm.snapdb with ur"`;
+   $tmpdb = `db2 -x "select rows_read,rows_deleted+rows_inserted+rows_updated,commit_sql_stmts+int_commits+rollback_sql_stmts+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,0,0,0,0,0,0,0,0,0,0,0,0 from sysibmadm.snapdb with ur"`;
    open(OUT, ">" . $logfile_dir . "/tmpdb"); print OUT "$tmpdb"; close(OUT);
 } else {
-   $tmpdb = `db2 -x "select rows_read,rows_modified,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS, total_app_commits,int_commits,total_app_rollbacks,int_rollbacks from table(MON_GET_DATABASE(-2)) with ur"`;
+   $tmpdb = `db2 -x "select rows_read,rows_modified,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS, total_app_commits,int_commits,total_app_rollbacks,int_rollbacks, LOCK_ESCALS from table(MON_GET_DATABASE(-2)) with ur"`;
    open(OUT, ">" . $logfile_dir . "/tmpdb"); print OUT "$tmpdb"; close(OUT);
 }
 $tmpdb =~ s/^\s+|\s+$//g;
-($adbcnt1, $adbcnt2, $adbcnt3, $adbcnt4, $adbcnt5, $adbcnt6, $adbcnt7, $adbcnt8, $adbcnt9, $adbcnt10, $adbcnt11, $adbcnt12, $adbcnt13,$adbcnt14,$adbcnt15,$adbcnt16,$adbcnt17, $adbcnt18,$adbcnt19,$adbcnt20,$adbcnt21) = split /\s+/, $tmpdb;
+($adbcnt1, $adbcnt2, $adbcnt3, $adbcnt4, $adbcnt5, $adbcnt6, $adbcnt7, $adbcnt8, $adbcnt9, $adbcnt10, $adbcnt11, $adbcnt12, $adbcnt13,$adbcnt14,$adbcnt15,$adbcnt16,$adbcnt17, $adbcnt18,$adbcnt19,$adbcnt20,$adbcnt21, $adbcnt22) = split /\s+/, $tmpdb;
 ## snaptab
 if($tabtopcnt > 0) {
 $asnaptabts = `db2 -x "values current timestamp with ur"`;
 open(OUT, ">" . $logfile_dir . "/tmptabts"); print OUT "$asnaptabts"; close(OUT);
 if($before) {
-   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || trim(char(0)) || ':' || trim(char(0)) || ':' || trim(char(sum(COALESCE(DATA_OBJECT_PAGES,0)))) || ':' || trim(char(sum(COALESCE(LOB_OBJECT_PAGES,0)))) || ':' || trim(char(sum(COALESCE(INDEX_OBJECT_PAGES,0)))) || ':' || trim(char(count(*)))  from sysibmadm.snaptab where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;   
+   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || trim(char(0)) || ':' || trim(char(0)) || ':' || trim(char(sum(COALESCE(DATA_OBJECT_PAGES,0)))) || ':' || trim(char(sum(COALESCE(LOB_OBJECT_PAGES,0)))) || ':' || trim(char(sum(COALESCE(INDEX_OBJECT_PAGES,0)))) || ':' || trim(char(count(*))) || ':' || trim(char(0)) || ':' || trim(char(0)) from sysibmadm.snaptab where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;   
    open(OUT, ">" . $logfile_dir . "/tmptab"); print OUT "$atabcnt1"; close(OUT);
 } else {
-   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','') || '.' || replace(tabname,' ',''),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(max(section_exec_with_col_references)) || ':' || varchar(sum(COALESCE(DATA_OBJECT_L_PAGES,0))) || ':' || varchar(sum(COALESCE(LOB_OBJECT_L_PAGES,0))) || ':' || varchar(sum(COALESCE(INDEX_OBJECT_L_PAGES,0))) || ':' || varchar(count(*)) from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
+   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','') || '.' || replace(tabname,' ',''),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(max(section_exec_with_col_references)) || ':' || varchar(sum(COALESCE(DATA_OBJECT_L_PAGES,0))) || ':' || varchar(sum(COALESCE(LOB_OBJECT_L_PAGES,0))) || ':' || varchar(sum(COALESCE(INDEX_OBJECT_L_PAGES,0))) || ':' || varchar(count(*)) || ':' || varchar(sum(LOCK_ESCALS)) || ':' || varchar(sum(LOCK_WAITS)) from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
    open(OUT, ">" . $logfile_dir . "/tmptab"); print OUT "$atabcnt1"; close(OUT);
 }
 %atabcnt1s = split /\s+/, $atabcnt1;
@@ -191,6 +191,7 @@ $ddbcnt18 = int(($adbcnt18-$bdbcnt18)/$snapdbtimediff);
 $ddbcnt19 = int(($adbcnt19-$bdbcnt19)/$snapdbtimediff);
 $ddbcnt20 = int(($adbcnt20-$bdbcnt20)/$snapdbtimediff);
 $ddbcnt21 = int(($adbcnt21-$bdbcnt21)/$snapdbtimediff);
+$ddbcnt22 = sprintf("%.2f", ($adbcnt22-$bdbcnt22)/$snapdbtimediff);
 #print "$ddbcnt1, $ddbcnt2, $ddbcnt3\n";
 ## snaptab
 if($tabtopcnt > 0) {
@@ -200,7 +201,7 @@ foreach $k1 (keys %atabcnt1s) {
                                 if($k1 eq $k2) {
                                 @atabs = split /:/, $atabcnt1s{$k1};
                                 @btabs = split /:/, $btabcnt1s{$k2};
-                                $dtabcnt1{$k1} = int(($atabs[0] - $btabs[0])/$snaptabtimediff) . ":" . int(($atabs[1] - $btabs[1])/$snaptabtimediff) . ":" . sprintf("%.2f",($atabs[2] - $btabs[2])/$snaptabtimediff) . ":" . sprintf("%.2f",($atabs[3] - $btabs[3])/$snaptabtimediff) . ":" . int($atabs[4]) . ":" . int($atabs[5]) . ":" . int($atabs[6]) . ":" . int($atabs[7]);
+                                $dtabcnt1{$k1} = int(($atabs[0] - $btabs[0])/$snaptabtimediff) . ":" . int(($atabs[1] - $btabs[1])/$snaptabtimediff) . ":" . sprintf("%.2f",($atabs[2] - $btabs[2])/$snaptabtimediff) . ":" . sprintf("%.2f",($atabs[3] - $btabs[3])/$snaptabtimediff) . ":" . int($atabs[4]) . ":" . int($atabs[5]) . ":" . int($atabs[6]) . ":" . int($atabs[7]) . ":" . sprintf("%.2f",($atabs[8] - $btabs[8])/$snaptabtimediff) . ":" . sprintf("%.2f",($atabs[9] - $btabs[9])/$snaptabtimediff);
                                 next;
                                 }                               
         }
@@ -266,16 +267,16 @@ while(defined($flockap = shift @locks)) {
 }
 }
 ## snapdb
-print "$adate Lock $ddbcnt13 $ddbcnt14 $ddbcnt15 : $conns[3]\n";
-print "$adate Sort $ddbcnt16 $ddbcnt17 : $conns[4]\n";
-print "$adate CPU_time $ddbcnt11 : $ddbcnt12\n";
-print "$adate Connection $conns[1] $conns[2] : $ddbcnt4\n";
-print "$adate Trans $ddbcnt3 : $ddbcnt18 $ddbcnt19 $ddbcnt20 $ddbcnt21 : $gddbcnt3\n";
-print "$adate Throughput $ddbthrouput : $ddbcnt5 $ddbcnt6 $ddbcnt7 : $ddbcnt8 $ddbcnt9 $ddbcnt10\n";
+print "$adate Lock $ddbcnt22 $ddbcnt13 $ddbcnt14 $ddbcnt15 : $conns[3]\n"; #escal,dead,timeout,wait,waiting
+print "$adate Sort $ddbcnt16 $ddbcnt17 : $conns[4]\n"; #total,overflow,active
+print "$adate CPU_time $ddbcnt11 : $ddbcnt12\n"; #time,latchwait
+print "$adate Connection $conns[1] $conns[2] : $ddbcnt4\n"; #total,active,nowconn
+print "$adate Trans $ddbcnt3 : $ddbcnt18 $ddbcnt19 $ddbcnt20 $ddbcnt21 : $gddbcnt3\n"; #tran,commit,intcomm,rollback,introll
+print "$adate Throughput $ddbthrouput : $ddbcnt5 $ddbcnt6 $ddbcnt7 : $ddbcnt8 $ddbcnt9 $ddbcnt10\n"; #8+9+10,static,dynamic,failed,select,iud,ddl
 print "$adate Rows_read $ddbcnt1 : $gddbcnt1\n";
 print "$adate Rows_write $ddbcnt2 : $gddbcnt2\n";
 print "-" x 20 . "\n";
-## snaptab
+## snaptab : read,write,tbscan,qrycnt,data,lob,index,pcnt,escal,wait
 if($tabtopcnt > 0) {
 if($sortwrite) {
         foreach $kk (sort{(split /:/, $dtabcnt1{$b})[1]  <=> (split /:/, $dtabcnt1{$a})[1]} keys %dtabcnt1) {
@@ -304,7 +305,7 @@ else {
 $loopcnt = 0;
 print "-" x 20 . "\n";
 }
-## snapappl
+## snapappl : read,write
 if($apptopcnt > 0) {
 if($sortwrite) {
         foreach $kk (sort{(split /:/, $dapplcnt1{$b})[1]  <=> (split /:/, $dapplcnt1{$a})[1]} keys %dapplcnt1) {
