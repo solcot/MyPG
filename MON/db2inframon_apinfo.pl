@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #use strict; 
-#use perl ./db2inframon_apinfo.pl -d sample -s 5 -q 10000000 -w 1000000 -e 10000000 -t 10 -a 5 -p 2 -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL -z -x -c 
+#use perl ./db2inframon_apinfo.pl -d sample -s 0 -q 10000000 -w 1000000 -e 10000000 -t 10 -a 0 -p 0 -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL -z -x -c 
 
 use Getopt::Std; 
  
@@ -49,16 +49,16 @@ $flogfile_dir = $logfile_dir . "/" . substr($logsdate, 0, 6);
 $logfile = $flogfile_dir . "/db2inframon_$logsdate.log";
 $logfile_apinfo = $flogfile_dir . "/db2apinfo_$logsdate.log";
 
-# once a day logging =======================
-if (!(-e "$logfile")) {
-$out = `db2 "select '$db' dbnm,rows_read,rows_modified,rows_inserted,rows_updated,rows_deleted,total_app_commits,int_commits,total_app_rollbacks,int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,LOCK_ESCALS,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS,current_timestamp ts from table(MON_GET_DATABASE(-2)) with ur"`;
-open(OUT, ">" . $logfile . "_db"); print OUT "$out"; close(OUT);
-$out = `db2 "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50) tabname, sum(rows_read) rr, sum(rows_inserted+rows_updated+rows_deleted) rm, sum(rows_inserted) ri, sum(rows_updated) ru, sum(rows_deleted) rd, sum(table_scans) ts, max(section_exec_with_col_references) sewcr, sum(COALESCE(DATA_OBJECT_L_PAGES,0)) datpag, sum(COALESCE(LOB_OBJECT_L_PAGES,0)) lobpg, sum(COALESCE(INDEX_OBJECT_L_PAGES,0)) idxpg, sum(LOCK_ESCALS) lock_escals,sum(LOCK_WAITS) lock_waits,count(*) pcnt,current_timestamp ts from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
-open(OUT, ">" . $logfile . "_tab"); print OUT "$out"; close(OUT);
-$out = `db2 +w "select executable_id, num_exec_with_metrics, stmt_exec_time, rows_read, rows_modified, rows_returned, total_cpu_time, total_sorts, SORT_OVERFLOWS,LOCK_ESCALS,LOCK_WAITS,DEADLOCKS,LOCK_TIMEOUTS,PACKAGE_SCHEMA,PACKAGE_NAME,EFFECTIVE_ISOLATION,varchar(stmt_text,250) stmt_text,current_timestamp ts from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>1440</modified_within>',-2))"`;
-open(OUT, ">" . $logfile . "_pcache"); print OUT "$out"; close(OUT);
-}
-# ==========================================
+#---#--# once a day logging =======================
+#---#--if (!(-e "$logfile")) {
+#---#--$out = `db2 "select '$db' dbnm,rows_read,rows_modified,rows_inserted,rows_updated,rows_deleted,total_app_commits,int_commits,total_app_rollbacks,int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,LOCK_ESCALS,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS,current_timestamp ts from table(MON_GET_DATABASE(-2)) with ur"`;
+#---#--open(OUT, ">" . $logfile . "_db"); print OUT "$out"; close(OUT);
+#---#--$out = `db2 "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50) tabname, sum(rows_read) rr, sum(rows_inserted+rows_updated+rows_deleted) rm, sum(rows_inserted) ri, sum(rows_updated) ru, sum(rows_deleted) rd, sum(table_scans) ts, max(section_exec_with_col_references) sewcr, sum(COALESCE(DATA_OBJECT_L_PAGES,0)) datpag, sum(COALESCE(LOB_OBJECT_L_PAGES,0)) lobpg, sum(COALESCE(INDEX_OBJECT_L_PAGES,0)) idxpg, sum(LOCK_ESCALS) lock_escals,sum(LOCK_WAITS) lock_waits,count(*) pcnt,current_timestamp ts from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
+#---#--open(OUT, ">" . $logfile . "_tab"); print OUT "$out"; close(OUT);
+#---#--$out = `db2 +w "select executable_id, num_exec_with_metrics, stmt_exec_time, rows_read, rows_modified, rows_returned, total_cpu_time, total_sorts, SORT_OVERFLOWS,LOCK_ESCALS,LOCK_WAITS,DEADLOCKS,LOCK_TIMEOUTS,PACKAGE_SCHEMA,PACKAGE_NAME,EFFECTIVE_ISOLATION,varchar(stmt_text,250) stmt_text,current_timestamp ts from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>1440</modified_within>',-2))"`;
+#---#--open(OUT, ">" . $logfile . "_pcache"); print OUT "$out"; close(OUT);
+#---#--}
+#---#--# ==========================================
 
 if($log) {
    open STDOUT, ">> $logfile" or die "error $!";

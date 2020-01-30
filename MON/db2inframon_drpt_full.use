@@ -1,0 +1,70 @@
+cat > db2inframon.sh
+#!/usr/bin/ksh
+
+#### init
+export TERM=vt100 
+export LANG=KO_KR.UTF-8
+export DB2CODEPAGE=1208
+. ~db2i115/sqllib/db2profile
+
+#### db2 monitor
+while true 
+do  
+perl /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon_apinfo.pl -d sample -s 0 -q 10000000 -w 1000000 -e 10000000 -t 10 -a 0 -p 0 -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL -z -x -c
+perl /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon_drpt_full.pl -c 5 -u 2 -t 10 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -e -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL
+sleep 300
+done 
+
+#### reset
+
+
+
+cat > package.sh
+db2 connect to sample > /dev/null
+db2 -x "select executable_id, num_exec_with_metrics, rows_read, stmt_exec_time, rows_returned, total_cpu_time
+from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>10</modified_within>',-2))"
+
+
+
+cat > package_header.sh
+perl -e '
+printf "%66s%25s%25s%25s%25s%25s\n", "exec_id","num_exec","rows_read","exec_time","rows_returned","total_cpu";
+'
+
+
+
+cat > package_log.sh
+db2 connect to sample > /dev/null
+echo -e '\n!! $1 [ $2 ] !!' >> $2
+db2 "select varchar(object_type,10) type,varchar(object_schema,10) schema,varchar(object_module,10) module,varchar(object_name,30) name from table(mon_get_section_object($1,null,null,null,null,-2))" >> $2 2>&1
+db2 "call explain_from_section ($1, 'M', null, 0, null, ?, ?, ?, ?, ?)" > /dev/null 2>&1
+db2exfmt -d sample -1 >> $2 2>/dev/null
+
+
+
+************************* table anal
+cat db2inframon_20200117.log | grep "Tab_Rows_rw " |perl -MData::Dumper -ane '
+@roww = split(/:/,$F[4]);
+if($seen{$F[2]}) {
+ $cnt = $seen{$F[2]}->[0] + 1;
+ $seen{$F[2]}->[0] = $cnt;
+ $seen{$F[2]}->[1] = ($seen{$F[2]}->[1] + $roww[0]); #read
+ $seen{$F[2]}->[2] = ($seen{$F[2]}->[2] + $roww[1]); #write
+ $seen{$F[2]}->[3] = ($seen{$F[2]}->[3] + $roww[2]); #tbscan
+ $seen{$F[2]}->[4] = ($seen{$F[2]}->[4] + $roww[3]); #query
+ }
+else { $seen{$F[2]} = [(1,@roww)] }
+END{
+ foreach $key (keys %seen) {
+ $seen{$key}->[1] = int($seen{$key}->[1] / $seen{$key}->[0]);
+ $seen{$key}->[2] = int($seen{$key}->[2] / $seen{$key}->[0]);
+ $seen{$key}->[3] = int($seen{$key}->[3] / $seen{$key}->[0]);
+ $seen{$key}->[4] = int($seen{$key}->[4] / $seen{$key}->[0]);
+ if($seen{$key}->[4] == 0) { $qcnt = 1 } else { $qcnt = $seen{$key}->[4] }
+ $seen{$key}->[9] = int($seen{$key}->[1] / $qcnt); #read per query
+ print "$key $seen{$key}->[0] $seen{$key}->[1] $seen{$key}->[2] $seen{$key}->[3] $seen{$key}->[4] $seen{$key}->[5] $seen{$key}->[6] $seen{$key}->[7] $seen{$key}->[8] $seen{$key}->[9]\n";
+ }
+}
+' |sort -k2 -n
+
+
