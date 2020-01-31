@@ -255,7 +255,8 @@ print "dbsecdiff: $snapdbtimediff tabsecdiff: $snaptabtimediff applsecdiff: $sna
 ## cpu
 $avmm = int($avm*4/1024);
 $frem = int($fre*4/1024);
-print "$adate CPU $cpu < R: $rq B: $bq AVM: $avmm FRE: $frem FI: $fi FO: $fo PI: $pi PO: $po IN: $in SC: $sc CS: $cs U: $us S: $sy W: $wa I: $id > : $gcpu\n";
+print "$adate CPU $cpu < R: $rq B: $bq AVM: $avmm FRE: $frem FI: $fi FO: $fo PI: $pi PO: $po IN: $in SC: $sc CS: $cs U: $us S: $sy W: $wa I: $id >\n";
+print "$adate CPU: $gcpu\n";
 ## lock
 print "$adate Lock_holder : @locks\n";
 if($loglockapinfo){
