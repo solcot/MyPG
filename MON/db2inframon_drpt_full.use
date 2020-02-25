@@ -2,33 +2,46 @@ cat > db2inframon.sh
 #!/usr/bin/ksh
 
 #### init
-export TERM=vt100 
-export LANG=KO_KR.UTF-8
+export TERM=ansi
+export LANG=C
 export DB2CODEPAGE=1208
 . ~db2i115/sqllib/db2profile
 
 #### db2 monitor
-while true 
-do  
-perl /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon_apinfo.pl -d sample -s 0 -q 10000000 -w 1000000 -e 10000000 -t 10 -a 0 -p 0 -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL -z -x -c
-perl /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon_drpt_full.pl -c 5 -u 2 -t 10 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -e -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL
-sleep 300
-done 
+cnt=0; while true 
+do
+perl /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon_apinfo.pl -d sample -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL -z -x -c
+cnt=`expr $cnt + 1` 
+sleep 5
 
+if [ `expr $cnt % 60` -eq 0 ];
+then
+        perl /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon_apinfo.pl -d sample -s 0 -q 10000000 -w 1000000 -e 10000000 -t 5 -a 0 -p 0 -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL -z -x -c
+        #sleep 5
+        if [ `expr $cnt % 120` -eq 0 ];
+        then
+                perl /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon_drpt_full.pl -c 5 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -e -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL
+                #sleep 5
+                cnt=0
+        fi
+        sleep 5
+fi
+done
+ 
 #### reset
 
 
 
 cat > package.sh
 db2 connect to sample > /dev/null
-db2 -x "select executable_id, num_exec_with_metrics, rows_read, stmt_exec_time, rows_returned, total_cpu_time
-from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>10</modified_within>',-2))"
+db2 -x "select executable_id, num_exec_with_metrics, rows_read, total_cpu_time, stmt_exec_time, rows_modified 
+from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>13</modified_within>',-2))"
 
 
 
 cat > package_header.sh
 perl -e '
-printf "%66s%25s%25s%25s%25s%25s\n", "exec_id","num_exec","rows_read","exec_time","rows_returned","total_cpu";
+printf "%66s%25s%25s%25s%25s%25s\n", "exec_id","num_exec","rows_read","total_cpu","exec_time","rows_modified";
 '
 
 
