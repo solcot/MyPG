@@ -8,7 +8,7 @@ export DB2CODEPAGE=1208
 . ~db2i115/sqllib/db2profile
 
 #### db2 monitor
-cnt=0; while true 
+cnt=0; rr=0; while true 
 do
 perl /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon_apinfo.pl -d sample -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL -z -x -c
 cnt=`expr $cnt + 1` 
@@ -20,7 +20,15 @@ then
         #sleep 5
         if [ `expr $cnt % 120` -eq 0 ];
         then
-                perl /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon_drpt_full.pl -c 5 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -e -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL
+                if [ $rr -eq 0 ];
+                then
+                        perl /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon_drpt_full.pl -c 5 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -e -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL
+                        rr=1
+                else
+                        perl /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon_drpt_full.pl -c 5 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL
+                        rr=0                            
+                fi
+                
                 #sleep 5
                 cnt=0
         fi
@@ -52,8 +60,6 @@ echo -e "\n!! $1 [ $2 ] !!" >> $2
 db2 "select varchar(object_type,10) type,varchar(object_schema,10) schema,varchar(object_module,10) module,varchar(object_name,30) name from table(mon_get_section_object($1,null,null,null,null,-2))" >> $2 2>&1
 db2 "call explain_from_section ($1, 'M', null, 0, null, ?, ?, ?, ?, ?)" > /dev/null 2>&1
 db2exfmt -d sample -1 >> $2 2>/dev/null
-
-
 
 
 

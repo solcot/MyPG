@@ -18,6 +18,7 @@ my $nfilenm = $options{n} if defined $options{n};
 my $logyn = $options{l} if defined $options{l};
 my $logcnt = $options{q} if defined $options{q};
 my $execdeltayn = $options{e} if defined $options{e};
+$execdeltayn = 0 if ! $execdeltayn;
 
 my $line;
 my @bdat;
@@ -104,7 +105,7 @@ foreach $Rb (@bdat) {
 }
 
 $size = $#rdat +1;
-print "**##### Time Delta : $timedelta sec [ $atime ] #####**\n";
+print "**##### Time Delta : $timedelta sec [ $atime ] [- $execdeltayn -] #####**\n";
 foreach $i (1..$sortcolnum) {
 print "***** [$i]th column sort report *****\n";
 if($nfilenm) {
