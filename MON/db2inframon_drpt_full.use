@@ -72,7 +72,7 @@ if($seen{$F[2]}) {
  $seen{$F[2]}->[1] = ($seen{$F[2]}->[1] + $roww[0]); #read
  $seen{$F[2]}->[2] = ($seen{$F[2]}->[2] + $roww[1]); #write
  $seen{$F[2]}->[3] = ($seen{$F[2]}->[3] + $roww[2]); #tbscan
- $seen{$F[2]}->[4] = ($seen{$F[2]}->[4] + $roww[3]); #query
+ $seen{$F[2]}->[4] = ($seen{$F[2]}->[4] + $roww[3]); #query, data/lob/index/pcnt
  $seen{$F[2]}->[9] = ($seen{$F[2]}->[9] + $roww[8]); #lock escal
  $seen{$F[2]}->[10] = ($seen{$F[2]}->[10] + $roww[9]); #lock wait
  }
@@ -93,5 +93,31 @@ END{
  }
 }
 ' |sort -k2 -n
+
+************************* trans anal
+cat db2inframon_20200226.log | grep "Trans " |perl -MData::Dumper -ane '
+@roww = ($F[2],$F[4],$F[5],$F[6],$F[7]);
+if($seen{$F[1]}) {
+ $cnt = $seen{$F[1]}->[0] + 1;
+ $seen{$F[1]}->[0] = $cnt; #seen cnt
+ $seen{$F[1]}->[1] = ($seen{$F[1]}->[1] + $roww[0]); #trans
+ $seen{$F[1]}->[2] = ($seen{$F[1]}->[2] + $roww[1]); #commit
+ $seen{$F[1]}->[3] = ($seen{$F[1]}->[3] + $roww[2]); #intcomm
+ $seen{$F[1]}->[4] = ($seen{$F[1]}->[4] + $roww[3]); #rollback
+ $seen{$F[1]}->[5] = ($seen{$F[1]}->[5] + $roww[4]); #introll
+ }
+else { $seen{$F[1]} = [(1,@roww)] }
+END{
+ foreach $key (keys %seen) {
+ $seen{$key}->[1] = int($seen{$key}->[1] / $seen{$key}->[0]);
+ $seen{$key}->[2] = int($seen{$key}->[2] / $seen{$key}->[0]);
+ $seen{$key}->[3] = int($seen{$key}->[3] / $seen{$key}->[0]);
+ $seen{$key}->[4] = int($seen{$key}->[4] / $seen{$key}->[0]);
+ $seen{$key}->[5] = int($seen{$key}->[5] / $seen{$key}->[0]);
+ 
+ print "$key $seen{$key}->[0] $seen{$key}->[1] $seen{$key}->[2] $seen{$key}->[3] $seen{$key}->[4] $seen{$key}->[5]\n";
+ }
+}
+'
 
 
