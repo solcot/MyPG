@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #use strict; 
-#use perl ./db2inframon_apinfo.pl -d sample -s 0 -q 10000000 -w 1000000 -e 10000000 -t 10 -a 0 -p 0 -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL -z -x -c 
+#use perl ./db2inframon_apinfo.pl -d npmsdb -s 0 -q 10000000 -w 1000000 -e 10000000 -t 10 -a 0 -p 0 -o /DB2/INSTANCE/INSHOME/IFR/MONITOR/LOG_PERL -z -x -c 
 
 use Getopt::Std; 
  
@@ -225,9 +225,10 @@ foreach $k1 (keys %aapplcnt1s) {
 ################ current calc
 ## cpu
 # cpu
-$vmstat = `vmstat -I 1 2 |tail -1`;
+$vmstat = `vmstat -I 1 2 |tail -1`;  # > aix 5.3
+#$vmstat = `vmstat 1 2 |tail -1`;  # >= linux 7
 $vmstat =~ s/^\s+|\s+$//g;
-#($rq,$bq,$pi,$po,$us,$sy,$id,$wa) = (split /\s+/, $vmstat)[0,1,6,7,-5,-4,-3,-2];  # linux
+#($rq,$bq,$swap,$free,$buff,$cache,$pi,$po,$fi,$fo,$in,$cs,$us,$sy,$id,$wa) = (split /\s+/, $vmstat)[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];  # >= linux 7
 ($rq,$bq,$avm,$fre,$fi,$fo,$pi,$po,$in,$sc,$cs,$us,$sy,$id,$wa) = (split /\s+/, $vmstat)[0,1,3,4,5,6,7,8,11,12,13,14,15,16,17];  # > aix 5.3
 #($rq,$bq,$pi,$po,$us,$sy,$id,$wa) = (split /\s+/, $vmstat)[0,1,7,8,-3,-2,-1,2];   # hp-ux
 $cpu = 100 - $id;
@@ -256,6 +257,7 @@ print "dbsecdiff: $snapdbtimediff tabsecdiff: $snaptabtimediff applsecdiff: $sna
 $avmm = int($avm*4/1024);
 $frem = int($fre*4/1024);
 print "$adate CPU $cpu < R: $rq B: $bq AVM: $avmm FRE: $frem FI: $fi FO: $fo PI: $pi PO: $po IN: $in SC: $sc CS: $cs U: $us S: $sy W: $wa I: $id >\n";
+#linux#print "$adate CPU $cpu < R: $rq B: $bq PG: $swap FRE: $free BUFF: $buff CACHE: $cache FI: $fi FO: $fo PI: $pi PO: $po IN: $in CS: $cs U: $us S: $sy W: $wa I: $id >\n";
 print "$adate CPU: $gcpu\n";
 ## lock
 print "$adate Lock_holder : @locks\n";
