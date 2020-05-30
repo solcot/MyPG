@@ -120,7 +120,7 @@ $loopcnt = 0;
 foreach $Rr (sort{$b->[$i] <=> $a->[$i]} @rdat) {
         foreach $j (0..$colnum) {
                 printf "%25s",$Rr->[$j];
-                system(qq{ksh $logyn "$Rr->[$j]" $logfile_apinfo}) if $j==0 && $logyn && $logcnt>$loopcnt;
+                system(qq{ksh $logyn "$Rr->[$j]" $atime $logfile_apinfo}) if $j==0 && $logyn && $logcnt>$loopcnt;
         }
         print "\n";
         $loopcnt++;
