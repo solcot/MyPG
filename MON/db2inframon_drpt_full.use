@@ -57,9 +57,12 @@ printf "%66s%25s%25s%25s%25s%25s\n", "exec_id","num_exec","rows_read","total_cpu
 cat > package_log.sh
 db2 connect to sample > /dev/null
 echo -e "\n!! $1 [ $2 ] !!" >> $3
-db2 "select varchar(object_type,10) type,varchar(object_schema,10) schema,varchar(object_module,10) module,varchar(object_name,30) name from table(mon_get_section_object($1,null,null,null,null,-2))" >> $3 2>&1
+db2 "select varchar(object_type,10) type,varchar(object_schema,10) schema,varchar(object_module,10) module,varchar(object_name,30) name from table(mon_get_section_object($1,null,null,null,null,-2)) with ur" >> $3 2>&1
 db2 "call explain_from_section ($1, 'M', null, 0, null, ?, ?, ?, ?, ?)" > /dev/null 2>&1
-db2exfmt -d sample -1 >> $3 2>/dev/null
+db2 -x "select max(explain_time) from systools.explain_statement with ur" >> $3 2>/dev/null
+#db2exfmt -d sample -1 >> $3 2>/dev/null
+##db2exfmt -d sample -e % -n % -s % -v % -w '2020-06-20-15.24.30.860389' '-#' 0 -o fmt
+##db2 "select statement_text from systools.explain_statement where explain_time = '2020-06-20-15.24.30.860389'"
 
 
 
