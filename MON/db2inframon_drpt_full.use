@@ -22,10 +22,10 @@ then
         then
                 if [ $rr -eq 0 ];
                 then
-                        perl /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon_drpt_full.pl -c 5 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -e -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL
+                        perl /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon_drpt_full.pl -c 6 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -e -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL
                         rr=1
                 else
-                        perl /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon_drpt_full.pl -c 5 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL
+                        perl /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon_drpt_full.pl -c 6 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -o /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/LOG_PERL
                         rr=0                            
                 fi
                 
@@ -42,14 +42,14 @@ done
 
 cat > package.sh
 db2 connect to sample > /dev/null
-db2 -x "select executable_id, num_exec_with_metrics, rows_read, total_cpu_time, stmt_exec_time, rows_modified 
+db2 -x "select executable_id, num_exec_with_metrics, rows_read, total_cpu_time, stmt_exec_time, rows_modified, lock_waits 
 from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>20</modified_within>',-2))"
 
 
 
 cat > package_header.sh
 perl -e '
-printf "%66s%25s%25s%25s%25s%25s\n", "exec_id","num_exec","rows_read","total_cpu","exec_time","rows_modified";
+printf "%66s%25s%25s%25s%25s%25s%25s\n", "exec_id","num_exec","rows_read","total_cpu","exec_time","rows_modified","lock_waits";
 '
 
 
