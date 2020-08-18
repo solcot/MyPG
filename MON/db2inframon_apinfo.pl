@@ -124,7 +124,7 @@ open(OUT, ">" . $logfile_dir . "/tmpdate"); print OUT "$adate"; close(OUT);
 $asnapdbts = `db2 -x "values current timestamp with ur"`;
 open(OUT, ">" . $logfile_dir . "/tmpdbts"); print OUT "$asnapdbts"; close(OUT);
 if($before) {
-   $tmpdb = `db2 -x "select rows_read,rows_deleted+rows_inserted+rows_updated,commit_sql_stmts+int_commits+rollback_sql_stmts+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,0,0,0,0,0,0,0,0,0,0,0,0 from sysibmadm.snapdb with ur"`;
+   $tmpdb = `db2 -x "select rows_read,rows_deleted+rows_inserted+rows_updated,commit_sql_stmts+int_commits+rollback_sql_stmts+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,0,0,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS,COMMIT_SQL_STMTS,INT_COMMITS,ROLLBACK_SQL_STMTS,INT_ROLLBACKS,LOCK_ESCALS from sysibmadm.snapdb with ur"`;
    open(OUT, ">" . $logfile_dir . "/tmpdb"); print OUT "$tmpdb"; close(OUT);
 } else {
    $tmpdb = `db2 -x "select rows_read,rows_modified,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS, total_app_commits,int_commits,total_app_rollbacks,int_rollbacks, LOCK_ESCALS from table(MON_GET_DATABASE(-2)) with ur"`;
@@ -137,7 +137,8 @@ if($tabtopcnt > 0) {
 $asnaptabts = `db2 -x "values current timestamp with ur"`;
 open(OUT, ">" . $logfile_dir . "/tmptabts"); print OUT "$asnaptabts"; close(OUT);
 if($before) {
-   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || trim(char(0)) || ':' || trim(char(0)) || ':' || trim(char(sum(COALESCE(DATA_OBJECT_PAGES,0)))) || ':' || trim(char(sum(COALESCE(LOB_OBJECT_PAGES,0)))) || ':' || trim(char(sum(COALESCE(INDEX_OBJECT_PAGES,0)))) || ':' || trim(char(count(*))) || ':' || trim(char(0)) || ':' || trim(char(0)) from sysibmadm.snaptab where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;   
+   #$atabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || trim(char(0)) || ':' || trim(char(0)) || ':' || trim(char(sum(COALESCE(DATA_OBJECT_PAGES,0)))) || ':' || trim(char(sum(COALESCE(LOB_OBJECT_PAGES,0)))) || ':' || trim(char(sum(COALESCE(INDEX_OBJECT_PAGES,0)))) || ':' || trim(char(count(*))) || ':' || trim(char(0)) || ':' || trim(char(0)) from sysibmadm.snaptab where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;  # <V9.7 
+   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_inserted+rows_updated+rows_deleted))) || ':' || varchar(sum(table_scans)) || ':' || trim(char(0)) || ':' || trim(char(sum(COALESCE(DATA_OBJECT_L_PAGES,0)))) || ':' || trim(char(sum(COALESCE(LOB_OBJECT_L_PAGES,0)))) || ':' || trim(char(sum(COALESCE(INDEX_OBJECT_L_PAGES,0)))) || ':' || trim(char(count(*))) || ':' || trim(char(0)) || ':' || trim(char(0)) from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;  # =V9.7
    open(OUT, ">" . $logfile_dir . "/tmptab"); print OUT "$atabcnt1"; close(OUT);
 } else {
    $atabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','') || '.' || replace(tabname,' ',''),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(max(section_exec_with_col_references)) || ':' || varchar(sum(COALESCE(DATA_OBJECT_L_PAGES,0))) || ':' || varchar(sum(COALESCE(LOB_OBJECT_L_PAGES,0))) || ':' || varchar(sum(COALESCE(INDEX_OBJECT_L_PAGES,0))) || ':' || varchar(count(*)) || ':' || varchar(sum(LOCK_ESCALS)) || ':' || varchar(sum(LOCK_WAITS)) from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
@@ -244,7 +245,7 @@ if($before) {
 @locks = split /\s+/, $lock;
 ## connection
 if($before) {
-   $conn = `db2 -x "select APPLS_CUR_CONS, APPLS_IN_DB2, 0,0 from sysibmadm.snapdb with ur"`;
+   $conn = `db2 -x "select APPLS_CUR_CONS, APPLS_IN_DB2, LOCKS_WAITING,ACTIVE_SORTS from sysibmadm.snapdb with ur"`;
 } else {
    $conn = `db2 -x "select APPLS_CUR_CONS, APPLS_IN_DB2, NUM_LOCKS_WAITING,ACTIVE_SORTS from table(MON_GET_DATABASE(-2)) with ur"`;
 }
