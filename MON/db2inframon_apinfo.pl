@@ -51,7 +51,7 @@ $logfile_apinfo = $flogfile_dir . "/db2apinfo_$logsdate.log";
 
 if($adaylogging) {
 if (!(-e "$logfile")) {
-$out = `db2 "select '$db' dbnm,rows_read,rows_modified,rows_inserted,rows_updated,rows_deleted,total_app_commits,int_commits,total_app_rollbacks,int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,LOCK_ESCALS,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS,current_timestamp ts from table(MON_GET_DATABASE(-2)) with ur"`;
+$out = `db2 "select '$db' dbnm,rows_read,rows_modified,rows_inserted,rows_updated,rows_deleted,total_app_commits,int_commits,total_app_rollbacks,int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,LOCK_ESCALS,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS,TOTAL_HASH_JOINS,HASH_JOIN_OVERFLOWS,current_timestamp ts from table(MON_GET_DATABASE(-2)) with ur"`;
 open(OUT, ">" . $logfile . "_db"); print OUT "$out"; close(OUT);
 $out = `db2 "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50) tabname, sum(rows_read) rr, sum(rows_inserted+rows_updated+rows_deleted) rm, sum(rows_inserted) ri, sum(rows_updated) ru, sum(rows_deleted) rd, sum(table_scans) ts, max(section_exec_with_col_references) sewcr, sum(COALESCE(DATA_OBJECT_L_PAGES,0)) datpag, sum(COALESCE(LOB_OBJECT_L_PAGES,0)) lobpg, sum(COALESCE(INDEX_OBJECT_L_PAGES,0)) idxpg, sum(LOCK_ESCALS) lock_escals,sum(LOCK_WAITS) lock_waits,count(*) pcnt,current_timestamp ts from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
 open(OUT, ">" . $logfile . "_tab"); print OUT "$out"; close(OUT);
@@ -124,10 +124,10 @@ open(OUT, ">" . $logfile_dir . "/tmpdate"); print OUT "$adate"; close(OUT);
 $asnapdbts = `db2 -x "values current timestamp with ur"`;
 open(OUT, ">" . $logfile_dir . "/tmpdbts"); print OUT "$asnapdbts"; close(OUT);
 if($before) {
-   $tmpdb = `db2 -x "select rows_read,rows_deleted+rows_inserted+rows_updated,commit_sql_stmts+int_commits+rollback_sql_stmts+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,0,0,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS,COMMIT_SQL_STMTS,INT_COMMITS,ROLLBACK_SQL_STMTS,INT_ROLLBACKS,LOCK_ESCALS from sysibmadm.snapdb with ur"`;
+   $tmpdb = `db2 -x "select rows_read,rows_deleted+rows_inserted+rows_updated,commit_sql_stmts+int_commits+rollback_sql_stmts+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,0,0,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS,COMMIT_SQL_STMTS,INT_COMMITS,ROLLBACK_SQL_STMTS,INT_ROLLBACKS,LOCK_ESCALS,TOTAL_HASH_JOINS,HASH_JOIN_OVERFLOWS from sysibmadm.snapdb with ur"`;
    open(OUT, ">" . $logfile_dir . "/tmpdb"); print OUT "$tmpdb"; close(OUT);
 } else {
-   $tmpdb = `db2 -x "select rows_read,rows_modified,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS, total_app_commits,int_commits,total_app_rollbacks,int_rollbacks, LOCK_ESCALS from table(MON_GET_DATABASE(-2)) with ur"`;
+   $tmpdb = `db2 -x "select rows_read,rows_modified,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS, total_app_commits,int_commits,total_app_rollbacks,int_rollbacks,LOCK_ESCALS,TOTAL_HASH_JOINS,HASH_JOIN_OVERFLOWS from table(MON_GET_DATABASE(-2)) with ur"`;
    open(OUT, ">" . $logfile_dir . "/tmpdb"); print OUT "$tmpdb"; close(OUT);
 }
 $tmpdb =~ s/^\s+|\s+$//g;
@@ -193,6 +193,8 @@ $ddbcnt19 = int(($adbcnt19-$bdbcnt19)/$snapdbtimediff);
 $ddbcnt20 = int(($adbcnt20-$bdbcnt20)/$snapdbtimediff);
 $ddbcnt21 = int(($adbcnt21-$bdbcnt21)/$snapdbtimediff);
 $ddbcnt22 = sprintf("%.2f", ($adbcnt22-$bdbcnt22)/$snapdbtimediff);
+$ddbcnt23 = sprintf("%.2f", ($adbcnt23-$bdbcnt23)/$snapdbtimediff);
+$ddbcnt24 = sprintf("%.2f", ($adbcnt24-$bdbcnt24)/$snapdbtimediff);
 #print "$ddbcnt1, $ddbcnt2, $ddbcnt3\n";
 ## snaptab
 if($tabtopcnt > 0) {
@@ -226,11 +228,11 @@ foreach $k1 (keys %aapplcnt1s) {
 ################ current calc
 ## cpu
 # cpu
-$vmstat = `vmstat -I 1 2 |tail -1`;  # > aix 5.3
+$vmstat = `vmstat -WI 1 2 |tail -1`;  # > aix 5.3
 #$vmstat = `vmstat 1 2 |tail -1`;  # >= linux 7
 $vmstat =~ s/^\s+|\s+$//g;
 #($rq,$bq,$swap,$free,$buff,$cache,$pi,$po,$fi,$fo,$in,$cs,$us,$sy,$id,$wa) = (split /\s+/, $vmstat)[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];  # >= linux 7
-($rq,$bq,$avm,$fre,$fi,$fo,$pi,$po,$in,$sc,$cs,$us,$sy,$id,$wa) = (split /\s+/, $vmstat)[0,1,3,4,5,6,7,8,11,12,13,14,15,16,17];  # > aix 5.3
+($rq,$bq,$pq,$wq,$avm,$fre,$fi,$fo,$pi,$po,$in,$sc,$cs,$us,$sy,$id,$wa) = (split /\s+/, $vmstat)[0,1,2,3,4,5,6,7,8,9,12,13,14,15,16,17,18];  # > aix 5.3
 #($rq,$bq,$pi,$po,$us,$sy,$id,$wa) = (split /\s+/, $vmstat)[0,1,7,8,-3,-2,-1,2];   # hp-ux
 $cpu = 100 - $id;
 $gcpu = "#" x ($cpu/2) . "-" x (50-$cpu/2);
@@ -245,9 +247,9 @@ if($before) {
 @locks = split /\s+/, $lock;
 ## connection
 if($before) {
-   $conn = `db2 -x "select APPLS_CUR_CONS, APPLS_IN_DB2, LOCKS_WAITING,ACTIVE_SORTS from sysibmadm.snapdb with ur"`;
+   $conn = `db2 -x "select APPLS_CUR_CONS, APPLS_IN_DB2, LOCKS_WAITING,ACTIVE_SORTS,ACTIVE_HASH_JOINS from sysibmadm.snapdb with ur"`;
 } else {
-   $conn = `db2 -x "select APPLS_CUR_CONS, APPLS_IN_DB2, NUM_LOCKS_WAITING,ACTIVE_SORTS from table(MON_GET_DATABASE(-2)) with ur"`;
+   $conn = `db2 -x "select APPLS_CUR_CONS, APPLS_IN_DB2, NUM_LOCKS_WAITING,ACTIVE_SORTS,ACTIVE_HASH_JOINS from table(MON_GET_DATABASE(-2)) with ur"`;
 }
 @conns = split /\s+/, $conn;
 
@@ -257,7 +259,7 @@ print "dbsecdiff: $snapdbtimediff tabsecdiff: $snaptabtimediff applsecdiff: $sna
 ## cpu
 $avmm = int($avm*4/1024);
 $frem = int($fre*4/1024);
-print "$adate CPU $cpu < R: $rq B: $bq AVM: $avmm FRE: $frem FI: $fi FO: $fo PI: $pi PO: $po IN: $in SC: $sc CS: $cs U: $us S: $sy W: $wa I: $id >\n";
+print "$adate CPU $cpu < R: $rq B: $bq P: $pq W: $wq AVM: $avmm FRE: $frem FI: $fi FO: $fo PI: $pi PO: $po IN: $in SC: $sc CS: $cs U: $us S: $sy W: $wa I: $id >\n";
 #linux#print "$adate CPU $cpu < R: $rq B: $bq PG: $swap FRE: $free BUFF: $buff CACHE: $cache FI: $fi FO: $fo PI: $pi PO: $po IN: $in CS: $cs U: $us S: $sy W: $wa I: $id >\n";
 print "$adate CPU: $gcpu\n";
 ## lock
@@ -273,6 +275,7 @@ while(defined($flockap = shift @locks)) {
 ## snapdb
 print "$adate Lock $ddbcnt22 $ddbcnt13 $ddbcnt14 $ddbcnt15 : $conns[3]\n"; #escal,dead,timeout,wait,waiting
 print "$adate Sort $ddbcnt16 $ddbcnt17 : $conns[4]\n"; #total,overflow,active
+print "$adate HSjoin $ddbcnt23 $ddbcnt24 : $conns[5]\n"; #total,overflow,active
 print "$adate CPU_time $ddbcnt11 : $ddbcnt12\n"; #time,latchwait
 print "$adate Connection $conns[1] $conns[2] : $ddbcnt4\n"; #total,active,nowconn
 print "$adate Trans $ddbcnt3 : $ddbcnt18 $ddbcnt19 $ddbcnt20 $ddbcnt21 : $gddbcnt3\n"; #tran,commit,intcomm,rollback,introll
