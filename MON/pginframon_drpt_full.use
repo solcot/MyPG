@@ -27,10 +27,10 @@ then
         then
                 if [ $rr -eq 0 ];
                 then
-                        perl /work3/pgcluster/IFR/MONITOR/db2inframon_drpt_full.pl -c 6 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 3 -e -o /work3/pgcluster/IFR/MONITOR/LOG_PERL
+                        perl /work3/pgcluster/IFR/MONITOR/db2inframon_drpt_full.pl -c 8 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 3 -e -o /work3/pgcluster/IFR/MONITOR/LOG_PERL
                         rr=1
                 else
-                        perl /work3/pgcluster/IFR/MONITOR/db2inframon_drpt_full.pl -c 6 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 3 -o /work3/pgcluster/IFR/MONITOR/LOG_PERL
+                        perl /work3/pgcluster/IFR/MONITOR/db2inframon_drpt_full.pl -c 8 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 3 -o /work3/pgcluster/IFR/MONITOR/LOG_PERL
                         rr=0                            
                 fi
                 
@@ -46,7 +46,7 @@ done
 
 
 cat > package.sh
-psql -F ' ' -A -t -c "select queryid, sum(calls) calls, sum(shared_blks_hit+shared_blks_read) all_blks_read, sum(rows) c_f_rows, sum(total_time) t_exec_time, sum(shared_blks_written) all_blks_mod, sum(temp_blks_read) tmp_blks_read
+psql -F ' ' -A -t -c "select queryid, sum(calls) calls, sum(shared_blks_hit+shared_blks_read) all_blks_read, sum(rows) c_f_rows, sum(total_time) t_exec_time, sum(shared_blks_written) all_blks_mod, sum(temp_blks_read) tmp_blks_read, sum(shared_blks_hit) blks_hit, sum(shared_blks_read) blks_read
 from pg_stat_statements
 where dbid = $PGDB
 group by queryid"
@@ -55,7 +55,7 @@ group by queryid"
 
 cat > package_header.sh
 perl -e '
-printf "%25s%25s%25s%25s%25s%25s%25s\n", "queryid","calls","all_blks_read","c_f_rows","t_exec_time","all_blks_mod","tmp_blks_read";
+printf "%25s%25s%25s%25s%25s%25s%25s%25s%25s\n", "queryid","calls","all_blks_read","c_f_rows","t_exec_time","all_blks_mod","tmp_blks_read","blks_hit","blks_read";
 '
 
 
