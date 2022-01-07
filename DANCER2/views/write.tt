@@ -26,9 +26,11 @@ function sendit()
 //-->
 </script>
 
-<form method="post" action="insert" name="myform" onsubmit="return sendit()">
+<form method="post" action="/myboard/insert" name="myform" onsubmit="return sendit()">
+<input type="text" id="thread" name="thread" value ="<% var1 %>" />
+<input type="text" id="depth" name="depth" value ="<% var2 %>" />
 
-<h1>글을 남겨주세요...</h1>
+<h1>Board Write</h1><br>
 
 <div class="form-group">
 <label for="title">제목</label>
@@ -46,13 +48,9 @@ function sendit()
 </div>
 
 <div class="form-group">
-<label for="url">사이트</label>
-<input type="url" class="form-control" placeholder="url" id="url" name="url">
-</div>
-
-<div class="form-group">
 <label for="memo">글</label>
 <textarea class="form-control" placeholder="memo" id="memo" rows="10" name="memo" required></textarea>
+</textarea>
 </div>
 
 <div class="form-group">

@@ -1,0 +1,73 @@
+<script language="javascript">
+<!--
+function sendit() 
+{
+  //제목
+  if (document.myform.title.value == "") {
+    alert("제목을 입력해 주십시오.");
+    document.myform.title.focus();
+    return false;
+  }
+  //이름
+  if (document.myform.name.value == "") {
+    alert("이름을 입력해 주십시오.");
+    document.myform.name.focus();
+    return false;
+  }
+  //글 내용
+  if (document.myform.memo.value == "" ) {
+    alert("글을 작성 안하셨습니다. 글을 작성해 주십시요");
+    document.myform.memo.focus();
+    return false;
+  } 
+  //document.myform.submit(); 
+}
+//-->
+</script>
+
+<form method="post" action="/myboard/update" name="myform" onsubmit="return sendit()">
+<input type="text" id="seq" name="seq" value ="<% var1.0 %>" />
+
+<div class="container-fluid">
+<h1>Board Update</h1><br>
+<table class="table table-hover">
+<thead class="thead-dark">
+<tr>
+  <th colspan="2">글 수정하기</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+  <td>이름</td>
+  <td><% var1.3 %></td>
+</tr>
+<tr>
+  <td>메일</td>
+  <td><input type="email" class="form-control" placeholder="mail" id="mail" name="mail" value="<% var1.4 %>"></td>
+</tr>
+<tr>
+  <td>제목</td>
+  <td><input type="text" class="form-control" placeholder="title" id="title" name="title" value="<% var1.5 %>" required></td>
+</tr>
+<tr>
+  <td colspan="2">내용</td>
+</tr>
+<tr>
+  <td colspan="2">
+  <textarea class="form-control" placeholder="memo" id="memo" rows="10" name="memo" required><% var1.10 %></textarea>
+  </td>
+</tr>
+<tr>
+  <td colspan="2">
+  <input type="button" onclick="window.location.href='/myboard/list'" value="List">
+  <button type="submit" class="btn btn-primary">Update</button>
+  </td>
+</tr>
+</tbody>
+
+</table>
+
+</form>
+</div>
+

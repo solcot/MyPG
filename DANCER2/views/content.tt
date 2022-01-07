@@ -1,0 +1,94 @@
+
+<script language="javascript">
+<!--
+ function getPost(mode) 
+ {
+ var theForm = document.myform;
+ if(mode == "01") { 
+    if (theForm.pwd.value == "") {
+    alert("암호를 입력해 주십시오.");
+    theForm.pwd.focus();
+    return false;
+    }
+    else {
+    theForm.method = "post"; 
+    theForm.target = "_self"; 
+    theForm.action = "/myboard/delete";
+    theForm.submit(); } 
+ }
+ else if(mode == "02")  { 
+    if (theForm.pwd.value == "") {
+    alert("암호를 입력해 주십시오.");
+    theForm.pwd.focus();
+    return false;
+    }
+    else {
+    theForm.method = "post";
+    theForm.target = "_self";
+    theForm.action = "/myboard/edit"; 
+    theForm.submit(); } 
+}
+}
+
+function checkpw() 
+{
+  alert('sdfs');
+  //암호
+  //document.myform.submit(); 
+}
+//-->
+</script>
+
+<form name="myform">
+<input type="text" id="seq" name="seq" value ="<% var1.0 %>" />
+
+<div class="container-fluid">
+<h1>Board Content</h1><br>
+<table class="table table-hover">
+<thead class="thead-dark">
+<tr>
+  <th colspan="2">글 내용보기</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+  <td>이름</td>
+  <td><% var1.3 %></td>
+</tr>
+<tr>
+  <td>작성일</td>
+  <td><% var1.9 %></td>
+</tr>
+<tr>
+  <td>읽음수</td>
+  <td><% var1.8 %></td>
+</tr>
+<tr>
+  <td>제목</td>
+  <td><% var1.5 %></td>
+</tr>
+<tr>
+  <td colspan="2">내용</td>
+</tr>
+<tr>
+  <td colspan="2">
+  <textarea class="form-control" placeholder="memo" id="memo" rows="10" name="memo" readonly><% var1.10 %></textarea>
+  </td>
+</tr>
+<tr>
+  <td colspan="2">
+  <input type="button" onclick="window.location.href='/myboard/list'" value="List">
+  <input type="button" onclick="window.location.href='/myboard/write?thread=<%var1.1%>&depth=<%var1.2%>'" value="Reply">
+  <input type="text" id="pwd" name="pwd" placeholder="pw">
+  <input type="button" onclick="getPost('02')" value="Edit">
+  <input type="button" onClick="getPost('01')" value="Delete">
+  </td>
+</tr>
+</tbody>
+
+</table>
+
+</form>
+</div>
+

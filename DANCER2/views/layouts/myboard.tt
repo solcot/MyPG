@@ -12,7 +12,7 @@
 <body>
 <% content %>
 <div id="footer">
-Powered by Solcot
+
 </div>
 </body>
 </html>

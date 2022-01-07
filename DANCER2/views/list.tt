@@ -1,26 +1,89 @@
+<script>
+window.onpageshow = function(event){
+    if (event.persisted || (window.performance && window.performance.navigation.type == 2)){
+        // 사파리 or 안드로이드에서 뒤로가기로 넘어온 경우(캐시)
+        window.location.reload();
+    }
+};
+</script>
+
 <div class="container-fluid">
 <h1>Board List</h1><br>
+<input type="button" onclick="window.location='/myboard/write'" value="Write">
 <table class="table table-hover">
 <thead class="thead-dark">
 <tr>
   <th>제&nbsp; 목</th>
-  <th><img src="images/clipw.gif"></th>
-  <th>글쓴이</th>
-  <th>읽음수</th>
-  <th>날짜</th>
+  <th><!-- <img src="images/clipw.gif"> --></th>
+  <th>작성자</th>
+  <th>작성일</th>
+  <th>읽음</th>
 </tr>
 </thead>
 
-<tbody>
+<tbody onbeforeunload="location.reload(true);">
 <% foreach var1 in vars1 %>
 <tr>
-  <td><a href="content?board_idx=<%var1.0%>&gotopage=<%%>"><% var1.2 %></a></td>
+  <td>
+    <% n = [0..var1.2] %>
+    <% foreach c in n %>
+      <% if c == 0 %>
+      <% else %>
+        ->
+      <% end %>
+    <% end %>
+  <a href="/myboard/content?board_idx=<%var1.0%>&gotopage=<%%>"><% var1.4 %></a>
+    <% if var1.7 <= 24 %>
+      -new-
+    <% end %>
+  </td>
   <td></td>
-  <td><% var1.1 %></td>
-  <td><% var1.6 %></td>
   <td><% var1.3 %></td>
+  <td><% var1.6 %></td>
+  <td><% var1.5 %></td>
 </tr>
 <% end %>
+<tr>
+<td colspan="5">
+
+
+
+<% if(pageNum <= 1) %> 
+  <font size=2  color=red>처음</font>
+<% else %>
+  <font size=2 ><a href="/myboard/list?pageNum=1">처음</a></font>
+<% end %>
+
+<% if(block <= 1) %>
+  <font> </font>
+<% else %>
+  <font size=2><a href="/myboard/list?pageNum=<%b_start_page - 1%>">이전</a></font>
+<% end %>
+
+<% foreach j in [b_start_page..b_end_page] %>
+  <% if(pageNum == j) %>
+      <font size=2 color=red><% j %></font>
+  <% else %>
+      <font size=2><a href="/myboard/list?pageNum=<% j %>"><% j %></a></font>
+  <% end %>
+<% end %>
+
+<% if(block >= total_block) %>
+	<font> </font>
+<% else %>
+  <font size=2><a href="/myboard/list?pageNum=<% b_end_page + 1 %>">다음</a></font>
+<% end %>
+
+<% if(pageNum >= total_page) %>
+  <font size=2  color=red>마지막</font> 
+<% else %>
+	<font size=2><a href="/myboard/list?pageNum=<% total_page %>">마지막</a></font>
+<% end %>
+
+
+
+</td>
+</tr>
 </tbody>
 
 </table>

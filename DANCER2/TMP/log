@@ -1,0 +1,112 @@
+Watching . bin/app.psgi for file updates.
+[DANCER2:27870] core @2022-01-01 18:52:10> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:27870)
+Successfully killed! Restarting the new server process.
+[DANCER2:28004] core @2022-01-01 18:52:12> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:28004)
+Successfully killed! Restarting the new server process.
+[DANCER2:28139] core @2022-01-01 18:52:14> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:28139)
+Successfully killed! Restarting the new server process.
+[DANCER2:28277] core @2022-01-01 18:52:16> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:28277)
+Successfully killed! Restarting the new server process.
+[DANCER2:28416] core @2022-01-01 18:52:18> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:28416)
+Successfully killed! Restarting the new server process.
+[DANCER2:28556] core @2022-01-01 18:52:20> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:28556)
+Successfully killed! Restarting the new server process.
+[DANCER2:28696] core @2022-01-01 18:52:22> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:28696)
+Successfully killed! Restarting the new server process.
+[DANCER2:28835] core @2022-01-01 18:52:24> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:28835)
+Successfully killed! Restarting the new server process.
+[DANCER2:28972] core @2022-01-01 18:52:26> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:28972)
+Successfully killed! Restarting the new server process.
+[DANCER2:29110] core @2022-01-01 18:52:28> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:29110)
+Successfully killed! Restarting the new server process.
+[DANCER2:29249] core @2022-01-01 18:52:30> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:29249)
+Successfully killed! Restarting the new server process.
+[DANCER2:29394] core @2022-01-01 18:52:32> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:29394)
+Successfully killed! Restarting the new server process.
+[DANCER2:29531] core @2022-01-01 18:52:34> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:29531)
+Successfully killed! Restarting the new server process.
+[DANCER2:29668] core @2022-01-01 18:52:36> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:29668)
+Successfully killed! Restarting the new server process.
+[DANCER2:29816] core @2022-01-01 18:52:38> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:29816)
+Successfully killed! Restarting the new server process.
+[DANCER2:29960] core @2022-01-01 18:52:40> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:29960)
+Successfully killed! Restarting the new server process.
+[DANCER2:30103] core @2022-01-01 18:52:42> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:30103)
+Successfully killed! Restarting the new server process.
+[DANCER2:30258] core @2022-01-01 18:52:44> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:30258)
+Successfully killed! Restarting the new server process.
+[DANCER2:30400] core @2022-01-01 18:52:46> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:30400)
+Successfully killed! Restarting the new server process.
+[DANCER2:30543] core @2022-01-01 18:52:49> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:30543)
+Successfully killed! Restarting the new server process.
+[DANCER2:30691] core @2022-01-01 18:52:51> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:30691)
+Successfully killed! Restarting the new server process.
+[DANCER2:30830] core @2022-01-01 18:52:53> Built config from files: /root/jhkim/GIT/MyPG/DANCER2/config.yml /root/jhkim/GIT/MyPG/DANCER2/environments/development.yml in (eval 361) l. 878
+HTTP::Server::PSGI: Accepting connections at http://115.71.42.17:9090/
+-- /root/jhkim/GIT/MyPG/DANCER2/TMP/log updated.
+Killing the existing server (pid:30830)
+Successfully killed! Restarting the new server process.
+Killing the existing server (pid:30976)
