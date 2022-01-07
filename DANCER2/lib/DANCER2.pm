@@ -264,6 +264,7 @@ EOF
 	, 'b_start_page'=>$b_start_page
 	, 'b_end_page'=>$b_end_page
    , 'total_block'=>$total_block
+	, 'total_page'=>$total_page
 
 	}, { 'layout'=>'myboard' };
 
