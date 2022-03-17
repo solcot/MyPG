@@ -4,33 +4,33 @@ cat > pginframon.sh
 #### init
 export TERM=ansi
 export LANG=C
-export PATH=/usr/pgsql-9.6/bin:$PATH
-export LD_LIBRARY_PATH=/usr/pgsql-9.6/lib:$LD_LIBRARY_PATH
-export PGDATA=/work3/pgcluster
-export PGPORT=5431
-export PGUSER=postgres
+export PATH=/usr/pgsql-11/bin:$PATH
+export LD_LIBRARY_PATH=/usr/pgsql-11/lib:$LD_LIBRARY_PATH
+export PGDATA=/work2/pg/pgdata1
+export PGPORT=5432
+export PGUSER=pgdba
 export PGDATABASE=postgres
-export PGDB=13325
+export PGDB=13881
 
 #### db2 monitor
 cnt=0; rr=0; while true 
 do
-perl /work3/pgcluster/IFR/MONITOR/pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o /work3/pgcluster/IFR/MONITOR/LOG_PERL_D -z -x -c -v
+perl /work2/pg/pgdata1/TMP/IFR/MONITOR/pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o /work2/pg/pgdata1/TMP/IFR/MONITOR/LOG_PERL_D -z -x -c -v -O
 cnt=`expr $cnt + 1` 
 sleep 5
 
-if [ `expr $cnt % 30` -eq 0 ];
+if [ `expr $cnt % 120` -eq 0 ];
 then
-        perl /work3/pgcluster/IFR/MONITOR/pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 5 -a 0 -p 0 -o /work3/pgcluster/IFR/MONITOR/LOG_PERL -z -x -c -v #-O
+        perl /work2/pg/pgdata1/TMP/IFR/MONITOR/pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 5 -a 0 -p 0 -o /work2/pg/pgdata1/TMP/IFR/MONITOR/LOG_PERL -z -x -c -v #-O
         #sleep 5
-        if [ `expr $cnt % 60` -eq 0 ];
+        if [ `expr $cnt % 240` -eq 0 ];
         then
                 if [ $rr -eq 0 ];
                 then
-                        perl /work3/pgcluster/IFR/MONITOR/db2inframon_drpt_full.pl -c 8 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 3 -e -o /work3/pgcluster/IFR/MONITOR/LOG_PERL
+                        #perl /work2/pg/pgdata1/TMP/IFR/MONITOR/db2inframon_drpt_full.pl -c 8 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 3 -e -o /work2/pg/pgdata1/TMP/IFR/MONITOR/LOG_PERL
                         rr=1
                 else
-                        perl /work3/pgcluster/IFR/MONITOR/db2inframon_drpt_full.pl -c 8 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 3 -o /work3/pgcluster/IFR/MONITOR/LOG_PERL
+                        #perl /work2/pg/pgdata1/TMP/IFR/MONITOR/db2inframon_drpt_full.pl -c 8 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 3 -o /work2/pg/pgdata1/TMP/IFR/MONITOR/LOG_PERL
                         rr=0                            
                 fi
                 
@@ -125,4 +125,5 @@ END{
  }
 }
 '
+
 

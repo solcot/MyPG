@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #use strict; 
-#use perl ./db2inframon_apinfo.pl -d tdb -s 0 -q 10000000 -w 1000000 -e 10000000 -t 10 -a 0 -p 0 -o /work2/db2/V11.5/jhkim/MONITOR/LOG_PERL -z -x -c -O
+#use perl /work2/pg/pgdata1/TMP/IFR/MONITOR/pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o /work2/pg/pgdata1/TMP/IFR/MONITOR/LOG_PERL_D -z -x -c -v -O
 
 use Getopt::Std; 
  
@@ -51,12 +51,14 @@ $logfile_apinfo = $flogfile_dir . "/db2apinfo_$logsdate.log";
 
 if($adaylogging) {
 if (!(-e "$logfile")) {
-$out = `db2 "select '$db' dbnm,rows_read,rows_modified,rows_inserted,rows_updated,rows_deleted,total_app_commits,int_commits,total_app_rollbacks,int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,LOCK_ESCALS,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS,TOTAL_HASH_JOINS,HASH_JOIN_OVERFLOWS,current_timestamp ts from table(MON_GET_DATABASE(-2)) with ur"`;
+$out = qx{ psql -c "select to_char(current_timestamp,'YYYY-MM-DD-HH24.MI.SS') snap_date, * from pg_stat_database" };
 open(OUT, ">" . $logfile . "_db"); print OUT "$out"; close(OUT);
-$out = `db2 "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50) tabname, sum(rows_read) rr, sum(rows_inserted+rows_updated+rows_deleted) rm, sum(rows_inserted) ri, sum(rows_updated) ru, sum(rows_deleted) rd, sum(table_scans) ts, max(section_exec_with_col_references) sewcr, sum(COALESCE(DATA_OBJECT_L_PAGES,0)) datpag, sum(COALESCE(LOB_OBJECT_L_PAGES,0)) lobpg, sum(COALESCE(INDEX_OBJECT_L_PAGES,0)) idxpg, sum(LOCK_ESCALS) lock_escals,sum(LOCK_WAITS) lock_waits,count(*) pcnt,current_timestamp ts from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
-open(OUT, ">" . $logfile . "_tab"); print OUT "$out"; close(OUT);
-$out = `db2 +w "select executable_id, num_exec_with_metrics, stmt_exec_time, rows_read, rows_modified, rows_returned, total_cpu_time, total_sorts, SORT_OVERFLOWS,LOCK_ESCALS,LOCK_WAITS,DEADLOCKS,LOCK_TIMEOUTS,PACKAGE_SCHEMA,PACKAGE_NAME,EFFECTIVE_ISOLATION,varchar(stmt_text,250) stmt_text,current_timestamp ts from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>1440</modified_within>',-2))"`;
-open(OUT, ">" . $logfile . "_pcache"); print OUT "$out"; close(OUT);
+#$out = `db2 "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50) tabname, sum(rows_read) rr, sum(rows_inserted+rows_updated+rows_deleted) rm, sum(rows_inserted) ri, sum(rows_updated) ru, sum(rows_deleted) rd, sum(table_scans) ts, max(section_exec_with_col_references) sewcr, sum(COALESCE(DATA_OBJECT_L_PAGES,0)) datpag, sum(COALESCE(LOB_OBJECT_L_PAGES,0)) lobpg, sum(COALESCE(INDEX_OBJECT_L_PAGES,0)) idxpg, sum(LOCK_ESCALS) lock_escals,sum(LOCK_WAITS) lock_waits,count(*) pcnt,current_timestamp ts from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
+#open(OUT, ">" . $logfile . "_tab"); print OUT "$out"; close(OUT);
+#$out = `db2 +w "select executable_id, num_exec_with_metrics, stmt_exec_time, rows_read, rows_modified, rows_returned, total_cpu_time, total_sorts, SORT_OVERFLOWS,LOCK_ESCALS,LOCK_WAITS,DEADLOCKS,LOCK_TIMEOUTS,PACKAGE_SCHEMA,PACKAGE_NAME,EFFECTIVE_ISOLATION,varchar(stmt_text,250) stmt_text,current_timestamp ts from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>1440</modified_within>',-2))"`;
+#open(OUT, ">" . $logfile . "_pcache"); print OUT "$out"; close(OUT);
+$out = qx{ psql -c "select to_char(current_timestamp,'YYYY-MM-DD-HH24.MI.SS') snap_date, * from pg_stat_archiver" };
+open(OUT, ">" . $logfile . "_archiver"); print OUT "$out"; close(OUT);
 }
 }
 
@@ -82,8 +84,7 @@ if($before) {
    open(IN, $logfile_dir . "/tmpdb"); $tmpdb = <IN>; close(IN);
 }
 $tmpdb =~ s/^\s+|\s+$//g;
-($bdb_trans, $bdb_commits, $bdb_rollbacks, $bdb_blksall, $bdb_blkshits, $bdb_blksreads, $bdb_tupreturned, $bdb_tupfetched, $bdb_tupmods, $bdb_tempfiles, $bdb_tempbytes, $bdb_deadlocks) = split /\s+/, $tmpdb;
-#print "$bdbcnt1, $bdbcnt2, $bdbcnt3\n";
+($bdb_trans, $bdb_commits, $bdb_rollbacks, $bdb_blksall, $bdb_blkshits, $bdb_blksreads, $bdb_tupreturned, $bdb_tupfetched, $bdb_tupmods, $bdb_tempfiles, $bdb_tempbytes, $bdb_deadlocks) = split /\s+/, $tmpdb;#print "$bdbcnt1, $bdbcnt2, $bdbcnt3\n";
 ## snaptab
 if($tabtopcnt > 0) {
 #$bsnaptabts = qx{psql -F ' ' -A -t -c "select current_timestamp"};
@@ -124,7 +125,8 @@ open(OUT, ">" . $logfile_dir . "/tmpdate"); print OUT "$adate"; close(OUT);
 $asnapdbts = qx{psql -F ' ' -A -t -c "select current_timestamp"};
 open(OUT, ">" . $logfile_dir . "/tmpdbts"); print OUT "$asnapdbts"; close(OUT);
 if($before) {
-   $tmpdb = qx{psql -F ' ' -A -t -c "select xact_commit+xact_rollback trnas, xact_commit, xact_rollback, blks_hit+blks_read blks_all, blks_hit, blks_read, tup_returned, tup_fetched, tup_inserted+tup_updated+tup_deleted tup_mod, temp_files, temp_bytes, deadlocks from pg_stat_database where datid = $db"};
+   #dblevel $tmpdb = qx{psql -F ' ' -A -t -c "select xact_commit+xact_rollback trnas, xact_commit, xact_rollback, blks_hit+blks_read blks_all, blks_hit, blks_read, tup_returned, tup_fetched, tup_inserted+tup_updated+tup_deleted tup_mod, temp_files, temp_bytes, deadlocks from pg_stat_database where datid = $db"};
+   $tmpdb = qx{psql -F ' ' -A -t -c "select sum(xact_commit+xact_rollback) trnas, sum(xact_commit), sum(xact_rollback), sum(blks_hit+blks_read) blks_all, sum(blks_hit), sum(blks_read), sum(tup_returned), sum(tup_fetched), sum(tup_inserted+tup_updated+tup_deleted) tup_mod, sum(temp_files), sum(temp_bytes), sum(deadlocks) from pg_stat_database"};
    open(OUT, ">" . $logfile_dir . "/tmpdb"); print OUT "$tmpdb"; close(OUT);
 } else {
    $tmpdb = `db2 -x "select rows_read,rows_modified,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS, total_app_commits,int_commits,total_app_rollbacks,int_rollbacks,LOCK_ESCALS,TOTAL_HASH_JOINS,HASH_JOIN_OVERFLOWS from table(MON_GET_DATABASE(-2)) with ur"`;
@@ -233,7 +235,16 @@ $cpu = 100 - $id;
 $gcpu = "#" x ($cpu/2) . "-" x (50-$cpu/2);
 ## lock
 if($before) {
-   $lock = qx{psql -F ' ' -A -t -c "select (pg_blocking_pids(pid))[1], (pg_blocking_pids(pid))[2], (pg_blocking_pids(pid))[3], (pg_blocking_pids(pid))[4] from pg_stat_activity where CARDINALITY(pg_blocking_pids(pid)) > 0"};
+   #$lock = qx{psql -F ' ' -A -t -c "select (pg_blocking_pids(pid))[1], (pg_blocking_pids(pid))[2], (pg_blocking_pids(pid))[3], (pg_blocking_pids(pid))[4] from pg_stat_activity where CARDINALITY(pg_blocking_pids(pid)) > 0"};
+   $lock = qx{psql -F ' ' -A -t -c "select pid 
+				from pg_stat_activity 
+				where pid <> pg_backend_pid()
+				and cardinality(pg_blocking_pids(pid)) = 0
+				and ( 
+				pid in (select (pg_blocking_pids(pid))[1] from pg_stat_activity where (pg_blocking_pids(pid))[1] is not null)
+				or 
+				pid in (select (pg_blocking_pids(pid))[2] from pg_stat_activity where (pg_blocking_pids(pid))[2] is not null)
+				)"};
 } else {
    $lock = `db2 -x "select a.hld_application_handle, a.tabname from sysibmadm.mon_lockwaits a
         where a.hld_application_handle not in (select req_application_handle from sysibmadm.mon_lockwaits) group by a.hld_application_handle, a.tabname with ur"`;
@@ -241,9 +252,13 @@ if($before) {
 @locks = split /\s+/, $lock;
 ## connection
 if($before) {
+#dblevel   $conn = qx{psql -F ' ' -A -t -c "select 
+#dblevel						(select numbackends from pg_stat_database where datid = $db) cur_cons,
+#dblevel						(select count(*) from pg_stat_activity where state = 'active' and pid <> pg_backend_pid() and datid = $db) act_cons,
+#dblevel						(select count(*) from pg_stat_activity where CARDINALITY(pg_blocking_pids(pid)) > 0 and datid = $db) lock_wait_cons"};
    $conn = qx{psql -F ' ' -A -t -c "select 
-						(select numbackends from pg_stat_database where datid = $db) cur_cons,
-						(select count(*) from pg_stat_activity where state = 'active' and pid <> pg_backend_pid() and datid = $db) act_cons,
+						(select sum(numbackends) from pg_stat_database) cur_cons,
+						(select count(*) from pg_stat_activity where state = 'active' and pid <> pg_backend_pid()) act_cons,
 						(select count(*) from pg_stat_activity where CARDINALITY(pg_blocking_pids(pid)) > 0) lock_wait_cons"};
 } else {
    $conn = `db2 -x "select APPLS_CUR_CONS, APPLS_IN_DB2, NUM_LOCKS_WAITING,ACTIVE_SORTS,ACTIVE_HASH_JOINS from table(MON_GET_DATABASE(-2)) with ur"`;
@@ -264,7 +279,7 @@ print "$adate Lock_holder : @locks\n";
 if($loglockapinfo){
 while(defined($flockap = shift @locks)) {
         if(($flockap+0) eq $flockap) {
-           $flockapinfo = qx{psql -F ' ' -A -t -c "select * from pg_stat_activity where pid = $flockap"};
+		   $flockapinfo = qx{psql -F ' ' -A -t -c "select * from pg_stat_activity where pid = $flockap"};
            print LOG_APINFO "$adate flockapinfo $flockapinfo";
         }
 }
@@ -376,4 +391,5 @@ EOF
     print "$help\n"; 
     exit; 
 }
+
 
