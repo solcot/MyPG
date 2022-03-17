@@ -126,6 +126,27 @@ END{
 }
 '
 
+************************* CPU / Trans / Rows_read / Rows_write anal
+find /work2/pg/pgdata1/TMP/IFR/MONITOR/LOG_PERL -name "db2inframon_*.log" -mtime -28 |xargs grep -Ee "CPU |Trans |Rows_read |Rows_write " |perl -MData::Dumper -ane '
+@roww = ($F[2]);
+if($seen{$F[1]}) {
+ $cnt = $seen{$F[1]}->[0] + 1;
+ $seen{$F[1]}->[0] = $cnt; #seen cnt
+ $seen{$F[1]}->[1] = ($seen{$F[1]}->[1] + $roww[0]); #cpu or trans or read or write
+ }
+else { $seen{$F[1]} = [(1,@roww)] }
+END{
+ foreach $key (keys %seen) {
+ $seen{$key}->[1] = int($seen{$key}->[1] / $seen{$key}->[0]);
+ 
+ print "$key $seen{$key}->[0] $seen{$key}->[1]\n";
+ }
+}
+'
+
+
+
+
 
 ************************* check pginframon porcess
 0,10,20,30,40,50 * * * * sh /work2/pg/pgdata1/TMP/IFR/MONITOR/infrapgmon_check.sh >> /work2/pg/pgdata1/TMP/IFR/MONITOR/infrapgmon_check.log 2>&1
