@@ -1,3 +1,5 @@
+
+
 #!/usr/bin/perl
 #use strict;
 use warnings;
@@ -44,14 +46,14 @@ my $numexec;
 open FR, "sh $ffilenm|" || die("Cannot open the file $!");
 if($time1) {
         # $btime = $time1;
-		chomp($btime = qx(sh $time1));
+        chomp($btime = qx(sh $time1));
 }
 else {
         chomp( $btime = `date +'%Y-%m-%d-%H.%M.%S'` );
 }
 while ($line=<FR>)
 {
-        push @bdat, [ split(m/\s+/,$line) ];
+        $line=~s/^\s+//; push @bdat, [ split(m/\s+/,$line) ];
 }
 close FR;
 
@@ -61,14 +63,14 @@ sleep $sleepsec;
 open FR, "sh $sfilenm|" || die("Cannot open the file $!");
 if($time2) {
         # $atime = $time2;
-		chomp($atime = qx(sh $time2));
+        chomp($atime = qx(sh $time2));
 }
 else {
         chomp( $atime = `date +'%Y-%m-%d-%H.%M.%S'` );
 }
 while ($line=<FR>)
 {
-        push @adat, [ split(m/\s+/,$line) ];
+        $line=~s/^\s+//; push @adat, [ split(m/\s+/,$line) ];
 }
 close FR;
 
@@ -143,6 +145,7 @@ exit;
 
 sub timediff {
 use Time::Local;
+$_[0] =~ s/\s+//; $_[1] =~ s/\s+//;
 ($year,$month,$day,$hour,$min,$sec) = (substr($_[0],0,4),substr($_[0],5,2),substr($_[0],8,2),substr($_[0],11,2),substr($_[0],14,2),substr($_[0],17,2));
 ($year2,$month2,$day2,$hour2,$min2,$sec2) = (substr($_[1],0,4),substr($_[1],5,2),substr($_[1],8,2),substr($_[1],11,2),substr($_[1],14,2),substr($_[1],17,2));
 $btimesec = timelocal($sec,$min,$hour,$day,$month-1,$year);
