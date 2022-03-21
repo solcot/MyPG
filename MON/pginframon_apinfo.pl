@@ -236,15 +236,12 @@ $gcpu = "#" x ($cpu/2) . "-" x (50-$cpu/2);
 ## lock
 if($before) {
    #$lock = qx{psql -F ' ' -A -t -c "select (pg_blocking_pids(pid))[1], (pg_blocking_pids(pid))[2], (pg_blocking_pids(pid))[3], (pg_blocking_pids(pid))[4] from pg_stat_activity where CARDINALITY(pg_blocking_pids(pid)) > 0"};
-   $lock = qx{psql -F ' ' -A -t -c "select pid 
-				from pg_stat_activity 
-				where pid <> pg_backend_pid()
-				and cardinality(pg_blocking_pids(pid)) = 0
-				and ( 
-				pid in (select (pg_blocking_pids(pid))[1] from pg_stat_activity where (pg_blocking_pids(pid))[1] is not null)
-				or 
-				pid in (select (pg_blocking_pids(pid))[2] from pg_stat_activity where (pg_blocking_pids(pid))[2] is not null)
-				)"};
+   $lock = qx{psql -F ' ' -A -t -c "select pid
+                        from pg_stat_activity
+                        where pid <> pg_backend_pid()
+                        and cardinality(pg_blocking_pids(pid)) = 0
+                        and pid in (select unnest(pg_blocking_pids(pid)) from pg_stat_activity where cardinality(pg_blocking_pids(pid)) > 0)
+                        "};
 } else {
    $lock = `db2 -x "select a.hld_application_handle, a.tabname from sysibmadm.mon_lockwaits a
         where a.hld_application_handle not in (select req_application_handle from sysibmadm.mon_lockwaits) group by a.hld_application_handle, a.tabname with ur"`;
