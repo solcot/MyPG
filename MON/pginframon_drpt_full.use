@@ -11,26 +11,27 @@ export PGPORT=5432
 export PGUSER=pgdba
 export PGDATABASE=postgres
 export PGDB=13881
+cd /work2/pg/pgdata1/TMP/IFR/MONITOR
 
 #### db2 monitor
 cnt=0; rr=0; while true 
 do
-perl /work2/pg/pgdata1/TMP/IFR/MONITOR/pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o /work2/pg/pgdata1/TMP/IFR/MONITOR/LOG_PERL_D -z -x -c -v -O
+perl ./pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o ./LOG_PERL_D -z -x -c -v -O
 cnt=`expr $cnt + 1` 
 sleep 5
 
 if [ `expr $cnt % 120` -eq 0 ];
 then
-        perl /work2/pg/pgdata1/TMP/IFR/MONITOR/pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 5 -a 0 -p 0 -o /work2/pg/pgdata1/TMP/IFR/MONITOR/LOG_PERL -z -x -c -v #-O
+        perl ./pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 5 -a 0 -p 0 -o ./LOG_PERL -z -x -c -v #-O
         #sleep 5
         if [ `expr $cnt % 240` -eq 0 ];
         then
                 if [ $rr -eq 0 ];
                 then
-                        #perl /work2/pg/pgdata1/TMP/IFR/MONITOR/db2inframon_drpt_full.pl -c 8 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 3 -e -o /work2/pg/pgdata1/TMP/IFR/MONITOR/LOG_PERL
+                        #perl ./inframon_drpt_full.pl -c 8 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 3 -e -o ./LOG_PERL
                         rr=1
                 else
-                        #perl /work2/pg/pgdata1/TMP/IFR/MONITOR/db2inframon_drpt_full.pl -c 8 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 3 -o /work2/pg/pgdata1/TMP/IFR/MONITOR/LOG_PERL
+                        #perl ./inframon_drpt_full.pl -c 8 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 3 -o ./LOG_PERL
                         rr=0                            
                 fi
                 
