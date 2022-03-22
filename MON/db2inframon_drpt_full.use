@@ -123,3 +123,25 @@ END{
 }
 '
 
+
+
+
+************************* check db2inframon porcess
+1 * * * * sh /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/infradb2mon_check.sh > /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/infradb2mon_check.log 2>&1
+
+$ cat > /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/infradb2mon_check.sh
+#!/usr/bin/sh
+export LANG=C
+export TERM=vt100
+perl /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/infradb2mon_check.pl
+
+$ cat > /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/infradb2mon_check.pl
+system("ps -ef | grep -i /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon.sh | grep -v grep");
+$ret = $?;
+if($ret != 0) {
+system("nohup sh /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon.sh > /work3/db2/V11.5.dc_inshome/jhkim/MONITOR/db2inframon.sh.log 2>&1 &");
+$restartdate = localtime;
+print "$restartdate --> restart \n";
+}
+
+
