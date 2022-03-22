@@ -82,7 +82,7 @@ if($before) {
    open(IN, $logfile_dir . "/tmpdb"); $tmpdb = <IN>; close(IN);
 }
 $tmpdb =~ s/^\s+|\s+$//g;
-($bdbcnt1, $bdbcnt2, $bdbcnt3, $bdbcnt4, $bdbcnt5, $bdbcnt6, $bdbcnt7, $bdbcnt8, $bdbcnt9, $bdbcnt10, $bdbcnt11, $bdbcnt12, $bdbcnt13,$bdbcnt14,$bdbcnt15,$bdbcnt16,$bdbcnt17, $bdbcnt18,$bdbcnt19,$bdbcnt20,$bdbcnt21, $bdbcnt22) = split /\s+/, $tmpdb;
+($bdbcnt1, $bdbcnt2, $bdbcnt3, $bdbcnt4, $bdbcnt5, $bdbcnt6, $bdbcnt7, $bdbcnt8, $bdbcnt9, $bdbcnt10, $bdbcnt11, $bdbcnt12, $bdbcnt13,$bdbcnt14,$bdbcnt15,$bdbcnt16,$bdbcnt17, $bdbcnt18,$bdbcnt19,$bdbcnt20,$bdbcnt21,$bdbcnt22, $bdbcnt23,$bdbcnt24,$bdbcnt25,$bdbcnt26,$bdbcnt27,$bdbcnt28,$bdbcnt29) = split /\s+/, $tmpdb;
 #print "$bdbcnt1, $bdbcnt2, $bdbcnt3\n";
 ## snaptab
 if($tabtopcnt > 0) {
@@ -124,14 +124,18 @@ open(OUT, ">" . $logfile_dir . "/tmpdate"); print OUT "$adate"; close(OUT);
 $asnapdbts = `db2 -x "values current timestamp with ur"`;
 open(OUT, ">" . $logfile_dir . "/tmpdbts"); print OUT "$asnapdbts"; close(OUT);
 if($before) {
-   $tmpdb = `db2 -x "select rows_read,rows_deleted+rows_inserted+rows_updated,commit_sql_stmts+int_commits+rollback_sql_stmts+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,0,0,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS,COMMIT_SQL_STMTS,INT_COMMITS,ROLLBACK_SQL_STMTS,INT_ROLLBACKS,LOCK_ESCALS,TOTAL_HASH_JOINS,HASH_JOIN_OVERFLOWS from sysibmadm.snapdb with ur"`;
+   $tmpdb = `db2 -x "select rows_read,rows_deleted+rows_inserted+rows_updated,commit_sql_stmts+int_commits+rollback_sql_stmts+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,0,0,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS,COMMIT_SQL_STMTS,INT_COMMITS,ROLLBACK_SQL_STMTS,INT_ROLLBACKS,LOCK_ESCALS,TOTAL_HASH_JOINS,HASH_JOIN_OVERFLOWS 
+   ,0,rows_inserted,rows_updated,rows_deleted,rows_selected
+   from sysibmadm.snapdb with ur"`;
    open(OUT, ">" . $logfile_dir . "/tmpdb"); print OUT "$tmpdb"; close(OUT);
 } else {
-   $tmpdb = `db2 -x "select rows_read,rows_modified,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS, total_app_commits,int_commits,total_app_rollbacks,int_rollbacks,LOCK_ESCALS,TOTAL_HASH_JOINS,HASH_JOIN_OVERFLOWS from table(MON_GET_DATABASE(-2)) with ur"`;
+   $tmpdb = `db2 -x "select rows_read,rows_deleted+rows_inserted+rows_updated,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS, total_app_commits,int_commits,total_app_rollbacks,int_rollbacks,LOCK_ESCALS,TOTAL_HASH_JOINS,HASH_JOIN_OVERFLOWS 
+   ,rows_modified,rows_inserted,rows_updated,rows_deleted,rows_returned
+   from table(MON_GET_DATABASE(-2)) with ur"`;
    open(OUT, ">" . $logfile_dir . "/tmpdb"); print OUT "$tmpdb"; close(OUT);
 }
 $tmpdb =~ s/^\s+|\s+$//g;
-($adbcnt1, $adbcnt2, $adbcnt3, $adbcnt4, $adbcnt5, $adbcnt6, $adbcnt7, $adbcnt8, $adbcnt9, $adbcnt10, $adbcnt11, $adbcnt12, $adbcnt13,$adbcnt14,$adbcnt15,$adbcnt16,$adbcnt17, $adbcnt18,$adbcnt19,$adbcnt20,$adbcnt21, $adbcnt22) = split /\s+/, $tmpdb;
+($adbcnt1, $adbcnt2, $adbcnt3, $adbcnt4, $adbcnt5, $adbcnt6, $adbcnt7, $adbcnt8, $adbcnt9, $adbcnt10, $adbcnt11, $adbcnt12, $adbcnt13,$adbcnt14,$adbcnt15,$adbcnt16,$adbcnt17, $adbcnt18,$adbcnt19,$adbcnt20,$adbcnt21,$adbcnt22, $adbcnt23,$adbcnt24,$adbcnt25,$adbcnt26,$adbcnt27,$adbcnt28,$adbcnt29) = split /\s+/, $tmpdb;
 ## snaptab
 if($tabtopcnt > 0) {
 $asnaptabts = `db2 -x "values current timestamp with ur"`;
@@ -195,6 +199,13 @@ $ddbcnt21 = int(($adbcnt21-$bdbcnt21)/$snapdbtimediff);
 $ddbcnt22 = sprintf("%.2f", ($adbcnt22-$bdbcnt22)/$snapdbtimediff);
 $ddbcnt23 = sprintf("%.2f", ($adbcnt23-$bdbcnt23)/$snapdbtimediff);
 $ddbcnt24 = sprintf("%.2f", ($adbcnt24-$bdbcnt24)/$snapdbtimediff);
+
+$ddbcnt25 = sprintf("%.2f", ($adbcnt25-$bdbcnt25)/$snapdbtimediff);
+$ddbcnt26 = sprintf("%.2f", ($adbcnt26-$bdbcnt26)/$snapdbtimediff);
+$ddbcnt27 = sprintf("%.2f", ($adbcnt27-$bdbcnt27)/$snapdbtimediff);
+$ddbcnt28 = sprintf("%.2f", ($adbcnt28-$bdbcnt28)/$snapdbtimediff);
+$ddbcnt29 = sprintf("%.2f", ($adbcnt29-$bdbcnt29)/$snapdbtimediff);
+
 #print "$ddbcnt1, $ddbcnt2, $ddbcnt3\n";
 ## snaptab
 if($tabtopcnt > 0) {
@@ -276,12 +287,12 @@ while(defined($flockap = shift @locks)) {
 print "$adate Lock $ddbcnt22 $ddbcnt13 $ddbcnt14 $ddbcnt15 : $conns[3]\n"; #escal,dead,timeout,wait,waiting
 print "$adate Sort $ddbcnt16 $ddbcnt17 : $conns[4]\n"; #total,overflow,active
 print "$adate HSjoin $ddbcnt23 $ddbcnt24 : $conns[5]\n"; #total,overflow,active
-print "$adate CPU_time $ddbcnt11 : $ddbcnt12\n"; #time,latchwait
-print "$adate Connection $conns[1] $conns[2] : $ddbcnt4\n"; #total,active,nowconn
-print "$adate Trans $ddbcnt3 : $ddbcnt18 $ddbcnt19 $ddbcnt20 $ddbcnt21 : $gddbcnt3\n"; #tran,commit,intcomm,rollback,introll
-print "$adate Throughput $ddbthrouput : $ddbcnt5 $ddbcnt6 $ddbcnt7 : $ddbcnt8 $ddbcnt9 $ddbcnt10\n"; #8+9+10,static,dynamic,failed,select,iud,ddl
-print "$adate Rows_read $ddbcnt1 : $gddbcnt1\n";
-print "$adate Rows_write $ddbcnt2 : $gddbcnt2\n";
+print "$adate CPU_time $ddbcnt11 $ddbcnt12\n"; #time,latchwait
+print "$adate Connection $ddbcnt4 : $conns[1] $conns[2]\n"; #newcon,total,active
+print "$adate Trans $ddbcnt3 ( $ddbcnt18 $ddbcnt19 $ddbcnt20 $ddbcnt21 ) > $gddbcnt3\n"; #tran,commit,intcomm,rollback,introll
+print "$adate Throughput $ddbthrouput ( $ddbcnt8 $ddbcnt9 $ddbcnt10 ) ( $ddbcnt5 $ddbcnt6 $ddbcnt7 )\n"; #S+IUD+ddl,select,iud,ddl,static,dynamic,failed
+print "$adate Rows_read $ddbcnt1 ( $ddbcnt29 ) > $gddbcnt1\n"; #rows_read ( rows_returned )
+print "$adate Rows_write $ddbcnt2 ( $ddbcnt26 $ddbcnt27 $ddbcnt28 ) $ddbcnt25 > $gddbcnt2\n"; #i+u+d ( i u d) rows_modified
 print "-" x 20 . "\n";
 ## snaptab : read,write,tbscan,qrycnt,data,lob,index,pcnt,escal,wait
 if($tabtopcnt > 0) {
@@ -378,4 +389,5 @@ EOF
     print "$help\n"; 
     exit; 
 }
+
 
