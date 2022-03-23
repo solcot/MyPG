@@ -49,7 +49,7 @@ done
 cat > package.sh
 psql -F ' ' -A -t -c "select queryid, sum(calls) calls, sum(shared_blks_hit+shared_blks_read) all_blks_read, sum(rows) c_f_rows, sum(total_time) t_exec_time, sum(shared_blks_written) all_blks_mod, sum(temp_blks_read) tmp_blks_read, sum(shared_blks_hit) blks_hit, sum(shared_blks_read) blks_read
 from pg_stat_statements
-where dbid = $PGDB
+#where dbid = $PGDB
 group by queryid"
 
 
@@ -65,7 +65,7 @@ cat > package_log.sh
 echo -e "\n!! $1 [ $2 ] !!" >> $3 2>&1
 psql -F ' ' -A -t -c "select query
 from pg_stat_statements
-where dbid = $PGDB
+#where dbid = $PGDB
 and queryid = $1" >> $3 2>&1
 
 
