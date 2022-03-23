@@ -1,0 +1,19 @@
+************************************************* postgresql archived count during 28 days
+cd /work2/pg/pgdata1/TMP/IFR/MONITOR
+perl ./inframon_drpt.pl -c 1 -u 1 -s 0 -t 1 -x ./archive_b.sh -y ./archive_a.sh -n ./archive_h.sh -e
+
+cat archive_b.sh <<'EOF'
+find /work2/pg/pgdata1/TMP/IFR/MONITOR/LOG_PERL_D -name "db2inframon_*.log_archiver" -mtime -28 |sort |head -1 |xargs cat |head -3 |tail -1 |perl -F/\\\|/ -ane 'print "    archive_cnt  $F[1]\n"'
+EOF
+
+ cat > archive_a.sh <<'EOF'
+find /work2/pg/pgdata1/TMP/IFR/MONITOR/LOG_PERL_D -name "db2inframon_*.log_archiver" -mtime -28 |sort -r |head -1 |xargs cat |head -3 |tail -1 |perl -F/\\\|/ -ane 'print "   archive_cnt  $F[1]\n"'
+EOF
+
+cat > archive_h.sh <<'EOF'
+perl -e '
+printf "%25s%25s\n", "archive","archive_cnt";
+'
+EOF
+
+
