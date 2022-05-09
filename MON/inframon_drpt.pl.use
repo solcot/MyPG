@@ -16,4 +16,11 @@ printf "%25s%25s\n", "archive","archive_cnt";
 '
 EOF
 
+-- daily archive count
+find /work2/pg/pgdata1/TMP/IFR/MONITOR/LOG_PERL_D -name "db2inframon_*.log_archiver" -mtime -28 |sort |xargs cat |grep 2022 |perl -ane '
+$diff = $F[2] - $bbb;
+print "$F[0] --- $F[2] --- $diff\n";
+$bbb = $F[2];
+'
+
 
