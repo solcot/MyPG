@@ -82,7 +82,7 @@ if($before) {
    open(IN, $logfile_dir . "/tmpdb"); $tmpdb = <IN>; close(IN);
 }
 $tmpdb =~ s/^\s+|\s+$//g;
-($bdbcnt1, $bdbcnt2, $bdbcnt3, $bdbcnt4, $bdbcnt5, $bdbcnt6, $bdbcnt7, $bdbcnt8, $bdbcnt9, $bdbcnt10, $bdbcnt11, $bdbcnt12, $bdbcnt13,$bdbcnt14,$bdbcnt15,$bdbcnt16,$bdbcnt17, $bdbcnt18,$bdbcnt19,$bdbcnt20,$bdbcnt21,$bdbcnt22, $bdbcnt23,$bdbcnt24,$bdbcnt25,$bdbcnt26,$bdbcnt27,$bdbcnt28,$bdbcnt29) = split /\s+/, $tmpdb;
+($bdbcnt1, $bdbcnt2, $bdbcnt3, $bdbcnt4, $bdbcnt5, $bdbcnt6, $bdbcnt7, $bdbcnt8, $bdbcnt9, $bdbcnt10, $bdbcnt11, $bdbcnt12, $bdbcnt13,$bdbcnt14,$bdbcnt15,$bdbcnt16,$bdbcnt17, $bdbcnt18,$bdbcnt19,$bdbcnt20,$bdbcnt21,$bdbcnt22, $bdbcnt23,$bdbcnt24,$bdbcnt25,$bdbcnt26,$bdbcnt27,$bdbcnt28,$bdbcnt29,$bdbcnt30) = split /\s+/, $tmpdb;
 #print "$bdbcnt1, $bdbcnt2, $bdbcnt3\n";
 ## snaptab
 if($tabtopcnt > 0) {
@@ -135,7 +135,7 @@ if($before) {
    open(OUT, ">" . $logfile_dir . "/tmpdb"); print OUT "$tmpdb"; close(OUT);
 }
 $tmpdb =~ s/^\s+|\s+$//g;
-($adbcnt1, $adbcnt2, $adbcnt3, $adbcnt4, $adbcnt5, $adbcnt6, $adbcnt7, $adbcnt8, $adbcnt9, $adbcnt10, $adbcnt11, $adbcnt12, $adbcnt13,$adbcnt14,$adbcnt15,$adbcnt16,$adbcnt17, $adbcnt18,$adbcnt19,$adbcnt20,$adbcnt21,$adbcnt22, $adbcnt23,$adbcnt24,$adbcnt25,$adbcnt26,$adbcnt27,$adbcnt28,$adbcnt29) = split /\s+/, $tmpdb;
+($adbcnt1, $adbcnt2, $adbcnt3, $adbcnt4, $adbcnt5, $adbcnt6, $adbcnt7, $adbcnt8, $adbcnt9, $adbcnt10, $adbcnt11, $adbcnt12, $adbcnt13,$adbcnt14,$adbcnt15,$adbcnt16,$adbcnt17, $adbcnt18,$adbcnt19,$adbcnt20,$adbcnt21,$adbcnt22, $adbcnt23,$adbcnt24,$adbcnt25,$adbcnt26,$adbcnt27,$adbcnt28,$adbcnt29,$adbcnt30) = split /\s+/, $tmpdb;
 ## snaptab
 if($tabtopcnt > 0) {
 $asnaptabts = `db2 -x "values current timestamp with ur"`;
