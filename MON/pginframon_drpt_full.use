@@ -127,13 +127,19 @@ END{
 }
 '
 
-************************* CPU / Trans / Rows_read / Rows_write anal
-find /work2/pg/pgdata1/TMP/IFR/MONITOR/LOG_PERL -name "db2inframon_*.log" -mtime -28 |xargs grep -Ee "CPU |Trans |Rows_read |Rows_write " |perl -MData::Dumper -ane '
-#$date = substr((split(/:/,$F[0]))[1], 0, 8);
-#$mykey = $date . $F[1];
+************************* CPU / Rqsttime / Trans / Rows_read / Rows_write anal
+find ~/IFR/MONITOR/LOG_PERL_D -name "db2inframon_*.log" -mtime -28 |xargs grep -Ee "CPU | Rqsttime |Trans |Rows_read |Rows_write " |perl -MData::Dumper -ane '
+if ( $F[0] + 0 eq $F[0] ) {
+    $date = substr($F[0], 0, 8);
+	$time = substr($F[0], 8);
+} else {
+	$date = substr((split(/:/,$F[0]))[1], 0, 8);
+    $time = substr((split(/:/,$F[0]))[1], 8);
+}
+
+#$mykey = $date . '_' . $F[1];
 $mykey = $F[1];
 
-$time = substr((split(/:/,$F[0]))[1], 8);
 if ($time ge "090000" and $time le "180000") {
 @roww = ($F[2]);
 if($seen{$mykey}) {
@@ -145,13 +151,12 @@ else { $seen{$mykey} = [(1,@roww)] }
 }
 END{
  foreach $key (keys %seen) {
- $seen{$key}->[1] = int($seen{$key}->[1] / $seen{$key}->[0]);
+ $seen{$key}->[1] = int(($seen{$key}->[1] / $seen{$key}->[0]) + 0.5);
 
  print "$key $seen{$key}->[0] $seen{$key}->[1]\n";
  }
 }
 ' | sort -k 1 | grep CPU
-
 
 
 
