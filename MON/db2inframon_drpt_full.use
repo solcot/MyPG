@@ -1,3 +1,5 @@
+alias taildb2mon='tail -100f ~/IFR/MONITOR/LOG_PERL_D/`date +%Y%m`/db2inframon_`date +%Y%m%d`.log'
+
 cat > db2inframon.sh
 #!/usr/bin/ksh
 
