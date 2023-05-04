@@ -161,19 +161,19 @@ END{
 
 
 ************************* check pginframon porcess
-1 * * * * sh /work2/pg/pgdata1/TMP/IFR/MONITOR/infrapgmon_check.sh > /work2/pg/pgdata1/TMP/IFR/MONITOR/infrapgmon_check.log 2>&1
+1 * * * * sh ~/IFR/MONITOR/infrapgmon_check.sh > ~/IFR/MONITOR/infrapgmon_check.log 2>&1
 
-$ cat > /work2/pg/pgdata1/TMP/IFR/MONITOR/infrapgmon_check.sh
+$ cat > ~/IFR/MONITOR/infrapgmon_check.sh
 #!/usr/bin/sh
 export LANG=C
 export TERM=vt100
-perl /work2/pg/pgdata1/TMP/IFR/MONITOR/infrapgmon_check.pl
+perl ~/IFR/MONITOR/infrapgmon_check.pl
 
-$ cat > /work2/pg/pgdata1/TMP/IFR/MONITOR/infrapgmon_check.pl
-system("ps -ef | grep -i /work2/pg/pgdata1/TMP/IFR/MONITOR/pginframon.sh | grep -v grep");
+$ cat > ~/IFR/MONITOR/infrapgmon_check.pl
+system("ps -ef | grep pginframon.sh | grep -v grep");
 $ret = $?;
 if($ret != 0) {
-system("nohup sh /work2/pg/pgdata1/TMP/IFR/MONITOR/pginframon.sh > /work2/pg/pgdata1/TMP/IFR/MONITOR/pginframon.sh.log 2>&1 &");
+system("nohup sh ~/IFR/MONITOR/pginframon.sh > ~/IFR/MONITOR/pginframon.sh.log 2>&1 &");
 $restartdate = localtime;
 print "$restartdate --> restart \n";
 }
