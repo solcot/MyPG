@@ -17,16 +17,17 @@ sleep 5
 
 if [ `expr $cnt % 60` -eq 0 ];
 then
-        perl ./db2inframon_apinfo.pl -d mydb -s 0 -q 10000000 -w 1000000 -e 10000000 -t 5 -a 0 -p 0 -o ./LOG_PERL -z -x -c -O
+#        perl ./db2inframon_apinfo.pl -d mydb -s 0 -q 10000000 -w 1000000 -e 10000000 -t 5 -a 0 -p 0 -o ./LOG_PERL -z -x -c -O
+        perl ./db2inframon_apinfo.pl -d mydb -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o ./LOG_PERL -z -x -c -O
         #sleep 5
         if [ `expr $cnt % 120` -eq 0 ];
         then
                 if [ $rr -eq 0 ];
                 then
-                        perl ./inframon_drpt_full.pl -c 6 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -e -o ./LOG_PERL
+#                        perl ./inframon_drpt_full.pl -c 6 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -e -o ./LOG_PERL
                         rr=1
                 else
-                        perl ./inframon_drpt_full.pl -c 6 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -o ./LOG_PERL
+#                        perl ./inframon_drpt_full.pl -c 6 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -o ./LOG_PERL
                         rr=0
                 fi
 
