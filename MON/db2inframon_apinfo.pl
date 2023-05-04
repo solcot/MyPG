@@ -64,7 +64,7 @@ if (!(-e "$logfile")) {
 $out = qx{ db2 prune history `date -d '8 day ago' +%Y%m%d` };  # linux
 open(OUT, ">" . $logfile . "_prune"); print OUT "$out"; close(OUT);
 
-$out = qx{ db2pd -d $db -logs };
+$out = qx{ db2pd -d $db -logs |head -25 };
 open(OUT, ">" . $logfile . "_logs"); print OUT "$out"; close(OUT);
 
 #system(qq{ sh ~/IFR/RUNSTATS/thread_main.sh > ~/IFR/RUNSTATS/thread_main.sh.log 2>&1 });
