@@ -293,7 +293,7 @@ print "$adate Lock_holder : @locks\n";
 if($loglockapinfo){
 while(defined($flockap = shift @locks)) {
         if(($flockap+0) eq $flockap) {
-           $flockapinfo = `db2pd -d $db -apinfo $flockap`;
+           $flockapinfo = `db2pd -d $db -apinfo $flockap|head -150`;
            print LOG_APINFO "$adate flockapinfo $flockapinfo";
         }
 }
