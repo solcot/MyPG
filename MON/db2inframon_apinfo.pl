@@ -67,6 +67,9 @@ open(OUT, ">" . $logfile . "_prune"); print OUT "$out"; close(OUT);
 $out = qx{ db2pd -d $db -logs |head -25 };
 open(OUT, ">" . $logfile . "_logs"); print OUT "$out"; close(OUT);
 
+$out = qx{ (db2audit flush; db2audit archive database $db) };
+open(OUT, ">" . $logfile . "_audit"); print OUT "$out"; close(OUT);
+
 #system(qq{ sh ~/IFR/RUNSTATS/thread_main.sh > ~/IFR/RUNSTATS/thread_main.sh.log 2>&1 });
 }
 }
