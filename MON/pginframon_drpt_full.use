@@ -127,6 +127,17 @@ END{
 }
 '
 
+************************* archive log count anal
+find ~/IFR/MONITOR/LOG_PERL -name "db2inframon_????????.log_logs" -mtime -28 |sort |xargs grep -Ee "Method 1 Next Log to Archive" |perl -ane '
+push(@ars, $F[-1]);
+END { 
+$ar1 = $ars[0];
+$ar2 = $ars[-1];
+$diff = $ar2 - $ar1;
+print "F: $ar1 -- E: $ar2 -- Diff: $diff \n";
+}
+'
+
 ************************* CPU / Rqsttime / Trans / Rows_read / Rows_write anal
 find ~/IFR/MONITOR/LOG_PERL_D -name "db2inframon_*.log" -mtime -28 |xargs grep -Ee "CPU | Rqsttime |Trans |Rows_read |Rows_write " |perl -MData::Dumper -ane '
 if ( $F[0] + 0 eq $F[0] ) {
