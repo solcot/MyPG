@@ -131,8 +131,9 @@ END{
 
 
 
-************************* check db2inframon porcess
+############################## infra db2 mon start #########################################
 1 * * * * sh ~/IFR/MONITOR/infradb2mon_check.sh > ~/IFR/MONITOR/infradb2mon_check.log 2>&1
+############################## infra db2 mon end ###########################################
 
 $ cat > ~/IFR/MONITOR/infradb2mon_check.sh
 #!/usr/bin/sh
