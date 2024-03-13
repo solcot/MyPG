@@ -57,7 +57,7 @@ open(OUT, ">" . $logfile . "_db"); print OUT "$out"; close(OUT);
 #open(OUT, ">" . $logfile . "_tab"); print OUT "$out"; close(OUT);
 #$out = `db2 +w "select executable_id, num_exec_with_metrics, stmt_exec_time, rows_read, rows_modified, rows_returned, total_cpu_time, total_sorts, SORT_OVERFLOWS,LOCK_ESCALS,LOCK_WAITS,DEADLOCKS,LOCK_TIMEOUTS,PACKAGE_SCHEMA,PACKAGE_NAME,EFFECTIVE_ISOLATION,varchar(stmt_text,250) stmt_text,current_timestamp ts from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>1440</modified_within>',-2))"`;
 #open(OUT, ">" . $logfile . "_pcache"); print OUT "$out"; close(OUT);
-$out = qx{ psql -c "select to_char(current_timestamp,'YYYY-MM-DD-HH24.MI.SS') snap_date, * from pg_stat_archiver" };
+$out = qx{ psql -x -c "select to_char(current_timestamp,'YYYY-MM-DD-HH24.MI.SS') snap_date, * from pg_stat_archiver" };
 open(OUT, ">" . $logfile . "_archiver"); print OUT "$out"; close(OUT);
 }
 }
