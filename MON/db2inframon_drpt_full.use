@@ -128,7 +128,16 @@ END{
 }
 '
 
-
+************************* archive log count anal
+find ~/IFR/MONITOR/LOG_PERL -name "db2inframon_????????.log_logs" -mtime -28 |sort |xargs grep -Ee "Method 1 Next Log to Archive" |perl -ane '
+push(@ars, $F[-1]);
+END { 
+$ar1 = $ars[0];
+$ar2 = $ars[-1];
+$diff = $ar2 - $ar1;
+print "F: $ar1 -- E: $ar2 -- Diff: $diff \n";
+}
+'
 
 
 ############################## infra db2 mon start #########################################
