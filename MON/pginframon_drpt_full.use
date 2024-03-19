@@ -128,8 +128,8 @@ END{
 '
 
 ************************* archive log count anal
-find ~/IFR/MONITOR/LOG_PERL -name "db2inframon_????????.log_logs" -mtime -28 |sort |xargs grep -Ee "Method 1 Next Log to Archive" |perl -ane '
-push(@ars, $F[-1]);
+find ~/15/IFR/MONITOR/LOG_PERL_D -name "db2inframon_????????.log_archiver" -mtime -28 |sort |xargs grep -Ee "last_archived_wal" |perl -ane '
+push(@ars, hex(substr(substr($F[-1],0,24),8,16)));
 END { 
 $ar1 = $ars[0];
 $ar2 = $ars[-1];
