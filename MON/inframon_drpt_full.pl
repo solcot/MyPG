@@ -62,7 +62,7 @@ close FR;
 
 chomp( $atime = `date +'%Y-%m-%d-%H.%M.%S'` );
 open(OUT, ">" . $logfile_dir . "/tmpdrptdate"); print OUT "$atime"; close(OUT);
-$tmpdrptdata = `ksh $sfilenm`;
+$tmpdrptdata = `sh $sfilenm`;
 open(OUT, ">" . $logfile_dir . "/tmpdrptdata"); print OUT "$tmpdrptdata"; close(OUT);
 open(FR, "<", \$tmpdrptdata);
 while ($line=<FR>)
@@ -110,7 +110,7 @@ print "**##### Time Delta : $timedelta sec [ $atime ] [- $execdeltayn -] #####**
 foreach $i (1..$sortcolnum) {
 print "***** [$i]th column sort report *****\n";
 if($nfilenm) {
-        open FR, "ksh $nfilenm|" || die("Cannot open the file $!");
+        open FR, "sh $nfilenm|" || die("Cannot open the file $!");
         while ($line=<FR>)
         {
                 print "$line";
@@ -121,7 +121,7 @@ $loopcnt = 0;
 foreach $Rr (sort{$b->[$i] <=> $a->[$i]} @rdat) {
         foreach $j (0..$colnum) {
                 printf "%25s",$Rr->[$j];
-                system(qq{ksh $logyn "$Rr->[$j]" $atime $logfile_apinfo}) if $j==0 && $logyn && $logcnt>$loopcnt;
+                system(qq{sh $logyn "$Rr->[$j]" $atime $logfile_apinfo}) if $j==0 && $logyn && $logcnt>$loopcnt;
         }
         print "\n";
         $loopcnt++;
