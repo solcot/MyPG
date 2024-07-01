@@ -42,8 +42,8 @@ my $numexec;
 chomp( $logsdate = `date +"%Y%m%d"` );
 $flogfile_dir = $logfile_dir . "/" . substr($logsdate, 0, 6);
 `mkdir $flogfile_dir` if !(-d "$flogfile_dir");
-$logfile = $flogfile_dir . "/db2drpt_$logsdate.log";
-$logfile_apinfo = $flogfile_dir . "/db2drptlog_$logsdate.log";
+$logfile = $flogfile_dir . "/drpt_$logsdate.log";
+$logfile_apinfo = $flogfile_dir . "/drptlog_$logsdate.log";
 
 open STDOUT, ">> $logfile" or die "error $!";
 open STDERR, ">> $logfile" or die "error $!";
@@ -135,8 +135,8 @@ last if ($size == 1);
 
 sub do_help {
 $helpstr = <<EOF;
-*** usage: perl ./db2inframon_drpt.pl -c <column count> -u <sort column count> -t <top result> -x <first file name> -y <second file name> [-n <header file name>] [-l <log file name> [-q <log top cnt>]] [-e:execution delta yn] -o <directory>
-*** help: perl ./db2inframon_drpt.pl -h
+*** usage: perl ./inframon_drpt_full.pl -c <column count> -u <sort column count> -t <top result> -x <first file name> -y <second file name> [-n <header file name>] [-l <log file name> [-q <log top cnt>]] [-e:execution delta yn] -o <directory>
+*** help: perl ./inframon_drpt_full.pl -h
 EOF
 print "$helpstr\n";
 exit;
