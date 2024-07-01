@@ -41,22 +41,16 @@ return $timediff;
 }
 #--------------------------------------------------------
 
-#`db2 connect to $db`;
-
 chomp( $logsdate = `date +"%Y%m%d"` );
 $flogfile_dir = $logfile_dir . "/" . substr($logsdate, 0, 6);
 `mkdir $flogfile_dir` if !(-d "$flogfile_dir");
-$logfile = $flogfile_dir . "/db2inframon_$logsdate.log";
-$logfile_apinfo = $flogfile_dir . "/db2apinfo_$logsdate.log";
+$logfile = $flogfile_dir . "/pginframon_$logsdate.log";
+$logfile_apinfo = $flogfile_dir . "/pgapinfo_$logsdate.log";
 
 if($adaylogging) {
 if (!(-e "$logfile")) {
 $out = qx{ psql -c "select to_char(current_timestamp,'YYYY-MM-DD-HH24.MI.SS') snap_date, * from pg_stat_database" };
 open(OUT, ">" . $logfile . "_db"); print OUT "$out"; close(OUT);
-#$out = `db2 "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50) tabname, sum(rows_read) rr, sum(rows_inserted+rows_updated+rows_deleted) rm, sum(rows_inserted) ri, sum(rows_updated) ru, sum(rows_deleted) rd, sum(table_scans) ts, max(section_exec_with_col_references) sewcr, sum(COALESCE(DATA_OBJECT_L_PAGES,0)) datpag, sum(COALESCE(LOB_OBJECT_L_PAGES,0)) lobpg, sum(COALESCE(INDEX_OBJECT_L_PAGES,0)) idxpg, sum(LOCK_ESCALS) lock_escals,sum(LOCK_WAITS) lock_waits,count(*) pcnt,current_timestamp ts from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
-#open(OUT, ">" . $logfile . "_tab"); print OUT "$out"; close(OUT);
-#$out = `db2 +w "select executable_id, num_exec_with_metrics, stmt_exec_time, rows_read, rows_modified, rows_returned, total_cpu_time, total_sorts, SORT_OVERFLOWS,LOCK_ESCALS,LOCK_WAITS,DEADLOCKS,LOCK_TIMEOUTS,PACKAGE_SCHEMA,PACKAGE_NAME,EFFECTIVE_ISOLATION,varchar(stmt_text,250) stmt_text,current_timestamp ts from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>1440</modified_within>',-2))"`;
-#open(OUT, ">" . $logfile . "_pcache"); print OUT "$out"; close(OUT);
 $out = qx{ psql -x -c "select to_char(current_timestamp,'YYYY-MM-DD-HH24.MI.SS') snap_date, * from pg_stat_archiver" };
 open(OUT, ">" . $logfile . "_archiver"); print OUT "$out"; close(OUT);
 }
@@ -71,33 +65,29 @@ if($logappapinfo or $loglockapinfo) { open LOG_APINFO, ">> $logfile_apinfo" or d
 #----------------------------------------------------------
 
 ################ delta1
-#chomp( $bdate = `date +%Y%m%d%H%M%S` );
 open(IN, $logfile_dir . "/tmpdate"); $bdate = <IN>; close(IN);
+
 ## snapdb
-#$bsnapdbts = qx{psql -F ' ' -A -t -c "select current_timestamp"};
 open(IN, $logfile_dir . "/tmpdbts"); $bsnapdbts = <IN>; close(IN);
 if($before) {
-#   $tmpdb = `db2 -x "select rows_read,rows_deleted+rows_inserted+rows_updated,commit_sql_stmts+int_commits+rollback_sql_stmts+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,0,0 from sysibmadm.snapdb with ur"`;
    open(IN, $logfile_dir . "/tmpdb"); $tmpdb = <IN>; close(IN);
 } else {
-#   $tmpdb = `db2 -x "select rows_read,rows_modified,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS from table(MON_GET_DATABASE(-2)) with ur"`;
    open(IN, $logfile_dir . "/tmpdb"); $tmpdb = <IN>; close(IN);
 }
 $tmpdb =~ s/^\s+|\s+$//g;
-($bdb_trans, $bdb_commits, $bdb_rollbacks, $bdb_blksall, $bdb_blkshits, $bdb_blksreads, $bdb_tupreturned, $bdb_tupfetched, $bdb_tupmods, $bdb_tempfiles, $bdb_tempbytes, $bdb_deadlocks) = split /\s+/, $tmpdb;#print "$bdbcnt1, $bdbcnt2, $bdbcnt3\n";
+($bdb_trans, $bdb_commits, $bdb_rollbacks, $bdb_blksall, $bdb_blkshits, $bdb_blksreads, $bdb_tupreturned, $bdb_tupfetched, $bdb_tupmods, $bdb_tempfiles, $bdb_tempbytes, $bdb_deadlocks) = split /\s+/, $tmpdb;
+
 ## snaptab
 if($tabtopcnt > 0) {
-#$bsnaptabts = qx{psql -F ' ' -A -t -c "select current_timestamp"};
 open(IN, $logfile_dir . "/tmptabts"); $bsnaptabts = <IN>; close(IN);
 if($before) {
-#   $btabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || char(0) || ':' || char(0) from sysibmadm.snaptab group by tabschema, tabname with ur"`;   
    open(IN, $logfile_dir . "/tmptab"); $btabcnt1 = do{local $/; <IN>}; close(IN);
 } else {
-#   $btabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(max(section_exec_with_col_references)) from table(MON_GET_TABLE(null,null,-2)) group by tabschema, tabname with ur"`;
    open(IN, $logfile_dir . "/tmptab"); $btabcnt1 = do{local $/; <IN>}; close(IN);
 }
 %btabcnt1s = split /\s+/, $btabcnt1;
 }
+
 ## snapappl
 if($apptopcnt > 0) {
 if($scnt > 0)
@@ -105,11 +95,11 @@ if($scnt > 0)
 { open(IN, $logfile_dir . "/tmpapplts"); $bsnapapplts = <IN>; close(IN); }
 if($before) {
    if($scnt > 0)
-   { $bapplcnt1 = `db2 -x "select varchar(replace(b.appl_name,' ','')||'.'||replace(char(b.AGENT_ID),' ',''),50), trim(char(a.rows_read)) || ':' || trim(char(a.rows_written)) from sysibmadm.snapappl a join sysibmadm.applications b on a.agent_id = b.agent_id with ur"`; } else
+   { $bapplcnt1 = qx{psql -F ' ' -A -t -c "select 'Detailed implementation required...'"; }; } else
    { open(IN, $logfile_dir . "/tmpappl"); $bapplcnt1 = do{local $/; <IN>}; close(IN); }
 } else {
    if($scnt > 0)
-   { $bapplcnt1 = `db2 -x "select varchar(replace(a.application_name,' ','')||'.'||replace(char(a.application_handle),' ',''),50), varchar(rows_read) || ':' || varchar(rows_modified) from table(MON_GET_CONNECTION(null,-2)) a with ur"`; } else
+   { $bapplcnt1 = qx{psql -F ' ' -A -t -c "select 'Detailed implementation required...'"; }; } else
    { open(IN, $logfile_dir . "/tmpappl"); $bapplcnt1 = do{local $/; <IN>}; close(IN); }
 }
 %bapplcnt1s = split /\s+/, $bapplcnt1;
@@ -121,42 +111,43 @@ sleep $scnt-$sdiff;
 ################ delta2
 chomp( $adate = `date +%Y%m%d%H%M%S` );
 open(OUT, ">" . $logfile_dir . "/tmpdate"); print OUT "$adate"; close(OUT);
+
 ## snapdb
 $asnapdbts = qx{psql -F ' ' -A -t -c "select current_timestamp"};
 open(OUT, ">" . $logfile_dir . "/tmpdbts"); print OUT "$asnapdbts"; close(OUT);
 if($before) {
-   #dblevel $tmpdb = qx{psql -F ' ' -A -t -c "select xact_commit+xact_rollback trnas, xact_commit, xact_rollback, blks_hit+blks_read blks_all, blks_hit, blks_read, tup_returned, tup_fetched, tup_inserted+tup_updated+tup_deleted tup_mod, temp_files, temp_bytes, deadlocks from pg_stat_database where datid = $db"};
    $tmpdb = qx{psql -F ' ' -A -t -c "select sum(xact_commit+xact_rollback) trnas, sum(xact_commit), sum(xact_rollback), sum(blks_hit+blks_read) blks_all, sum(blks_hit), sum(blks_read), sum(tup_returned), sum(tup_fetched), sum(tup_inserted+tup_updated+tup_deleted) tup_mod, sum(temp_files), sum(temp_bytes), sum(deadlocks) from pg_stat_database"};
    open(OUT, ">" . $logfile_dir . "/tmpdb"); print OUT "$tmpdb"; close(OUT);
 } else {
-   $tmpdb = `db2 -x "select rows_read,rows_modified,total_app_commits+int_commits+total_app_rollbacks+int_rollbacks,total_cons,STATIC_SQL_STMTS,DYNAMIC_SQL_STMTS,FAILED_SQL_STMTS,SELECT_SQL_STMTS,UID_SQL_STMTS,DDL_SQL_STMTS,TOTAL_CPU_TIME,TOTAL_EXTENDED_LATCH_WAITS,DEADLOCKS,LOCK_TIMEOUTS,LOCK_WAITS,TOTAL_SORTS,SORT_OVERFLOWS, total_app_commits,int_commits,total_app_rollbacks,int_rollbacks,LOCK_ESCALS,TOTAL_HASH_JOINS,HASH_JOIN_OVERFLOWS from table(MON_GET_DATABASE(-2)) with ur"`;
+   $tmpdb = qx{psql -F ' ' -A -t -c "select 'Detailed implementation required...'"; };
    open(OUT, ">" . $logfile_dir . "/tmpdb"); print OUT "$tmpdb"; close(OUT);
 }
 $tmpdb =~ s/^\s+|\s+$//g;
 ($adb_trans, $adb_commits, $adb_rollbacks, $adb_blksall, $adb_blkshits, $adb_blksreads, $adb_tupreturned, $adb_tupfetched, $adb_tupmods, $adb_tempfiles, $adb_tempbytes, $adb_deadlocks) = split /\s+/, $tmpdb;
+
 ## snaptab
 if($tabtopcnt > 0) {
 $asnaptabts = qx{psql -F ' ' -A -t -c "select current_timestamp"};
 open(OUT, ">" . $logfile_dir . "/tmptabts"); print OUT "$asnaptabts"; close(OUT);
 if($before) {
-   #$atabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','')||'.'||replace(tabname,' ',''),50), trim(char(sum(rows_read))) || ':' || trim(char(sum(rows_written))) || ':' || trim(char(0)) || ':' || trim(char(0)) || ':' || trim(char(sum(COALESCE(DATA_OBJECT_PAGES,0)))) || ':' || trim(char(sum(COALESCE(LOB_OBJECT_PAGES,0)))) || ':' || trim(char(sum(COALESCE(INDEX_OBJECT_PAGES,0)))) || ':' || trim(char(count(*))) || ':' || trim(char(0)) || ':' || trim(char(0)) from sysibmadm.snaptab where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;  # <V9.7 
    $atabcnt1 = qx{psql -F ' ' -A -t -c "select schemaname||'.'||relname relname, coalesce(seq_scan,0)+coalesce(idx_scan,0) ||':'|| coalesce(seq_tup_read,0)+coalesce(idx_tup_fetch,0) ||':'|| coalesce(seq_scan,0) ||':'|| coalesce(seq_tup_read,0) ||':'|| coalesce(idx_scan,0) ||':'|| coalesce(idx_tup_fetch,0) ||':'|| coalesce(n_tup_ins+n_tup_upd+n_tup_del,0) ||':'|| coalesce(n_live_tup,0) ||':'|| coalesce(n_dead_tup,0) rel_others from pg_stat_user_tables"};  # =V9.7
    open(OUT, ">" . $logfile_dir . "/tmptab"); print OUT "$atabcnt1"; close(OUT);
 } else {
-   $atabcnt1 = `db2 -x "select varchar(replace(tabschema,' ','') || '.' || replace(tabname,' ',''),50), varchar(sum(rows_read)) || ':' || varchar(sum(rows_inserted+rows_updated+rows_deleted)) || ':' || varchar(sum(table_scans)) || ':' || varchar(max(section_exec_with_col_references)) || ':' || varchar(sum(COALESCE(DATA_OBJECT_L_PAGES,0))) || ':' || varchar(sum(COALESCE(LOB_OBJECT_L_PAGES,0))) || ':' || varchar(sum(COALESCE(INDEX_OBJECT_L_PAGES,0))) || ':' || varchar(count(*)) || ':' || varchar(sum(LOCK_ESCALS)) || ':' || varchar(sum(LOCK_WAITS)) from table(MON_GET_TABLE(null,null,-2)) where tabschema not like 'SYS%' and tabschema not like 'IDBA%' group by tabschema, tabname with ur"`;
+   $atabcnt1 = qx{psql -F ' ' -A -t -c "select 'Detailed implementation required...'"; };
    open(OUT, ">" . $logfile_dir . "/tmptab"); print OUT "$atabcnt1"; close(OUT);
 }
 %atabcnt1s = split /\s+/, $atabcnt1;
 }
+
 ## snapappl
 if($apptopcnt > 0) {
 $asnapapplts = qx{psql -F ' ' -A -t -c "select current_timestamp"};
 if($scnt == 0) { open(OUT, ">" . $logfile_dir . "/tmpapplts"); print OUT "$asnapapplts"; close(OUT); }
 if($before) {
-   $aapplcnt1 = `db2 -x "select varchar(replace(b.appl_name,' ','')||'.'||replace(char(b.AGENT_ID),' ',''),50), trim(char(a.rows_read)) || ':' || trim(char(a.rows_written)) from sysibmadm.snapappl a join sysibmadm.applications b on a.agent_id = b.agent_id with ur"`;
+   $aapplcnt1 = qx{psql -F ' ' -A -t -c "select 'Detailed implementation required...'"; };
    if($scnt == 0) { open(OUT, ">" . $logfile_dir . "/tmpappl"); print OUT "$aapplcnt1"; close(OUT); }
 } else {
-   $aapplcnt1 = `db2 -x "select varchar(replace(a.application_name,' ','')||'.'||replace(char(a.application_handle),' ',''),50), varchar(rows_read) || ':' || varchar(rows_modified) from table(MON_GET_CONNECTION(null,-2)) a with ur"`;
+   $aapplcnt1 = qx{psql -F ' ' -A -t -c "select 'Detailed implementation required...'"; };
    if($scnt == 0) { open(OUT, ">" . $logfile_dir . "/tmpappl"); print OUT "$aapplcnt1"; close(OUT); }
 }
 %aapplcnt1s = split /\s+/, $aapplcnt1;
@@ -184,7 +175,7 @@ $gddbcnt2 = "#" x ($ddbcnt2/$sd2);
 $ddb_tempfiles = sprintf("%.2f", ($adb_tempfiles-$bdb_tempfiles)/$snapdbtimediff);
 $ddb_tempbytes = sprintf("%.2f", ($adb_tempbytes-$bdb_tempbytes)/$snapdbtimediff);
 $ddb_deadlocks = sprintf("%.2f", ($adb_deadlocks-$bdb_deadlocks)/$snapdbtimediff);
-#$ddbcnt1 = int(($adbcnt1-$bdbcnt1)/$snapdbtimediff);
+
 ## snaptab
 if($tabtopcnt > 0) {
 %dtabcnt1 = ();
@@ -207,6 +198,7 @@ foreach $k1 (keys %atabcnt1s) {
         }
 }
 }
+
 ## snapappl
 if($apptopcnt > 0) {
 %dapplcnt1 = ();
@@ -224,18 +216,14 @@ foreach $k1 (keys %aapplcnt1s) {
 
 ################ current calc
 ## cpu
-# cpu
-#$vmstat = `vmstat -WI 1 2 |tail -1`;  # > aix 5.3
 $vmstat = `vmstat 1 2 |tail -1`;  # >= linux 7
 $vmstat =~ s/^\s+|\s+$//g;
 ($rq,$bq,$swap,$free,$buff,$cache,$pi,$po,$fi,$fo,$in,$cs,$us,$sy,$id,$wa) = (split /\s+/, $vmstat)[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];  # >= linux 7
-#($rq,$bq,$pq,$wq,$avm,$fre,$fi,$fo,$pi,$po,$in,$sc,$cs,$us,$sy,$id,$wa) = (split /\s+/, $vmstat)[0,1,2,3,4,5,6,7,8,9,12,13,14,15,16,17,18];  # > aix 5.3
-#($rq,$bq,$pi,$po,$us,$sy,$id,$wa) = (split /\s+/, $vmstat)[0,1,7,8,-3,-2,-1,2];   # hp-ux
 $cpu = 100 - $id;
 $gcpu = "#" x ($cpu/2) . "-" x (50-$cpu/2);
+
 ## lock
 if($before) {
-   #$lock = qx{psql -F ' ' -A -t -c "select (pg_blocking_pids(pid))[1], (pg_blocking_pids(pid))[2], (pg_blocking_pids(pid))[3], (pg_blocking_pids(pid))[4] from pg_stat_activity where CARDINALITY(pg_blocking_pids(pid)) > 0"};
    $lock = qx{psql -F ' ' -A -t -c "select pid
                         from pg_stat_activity
                         where pid <> pg_backend_pid()
@@ -243,34 +231,33 @@ if($before) {
                         and pid in (select unnest(pg_blocking_pids(pid)) from pg_stat_activity where cardinality(pg_blocking_pids(pid)) > 0)
                         "};
 } else {
-   $lock = `db2 -x "select a.hld_application_handle, a.tabname from sysibmadm.mon_lockwaits a
-        where a.hld_application_handle not in (select req_application_handle from sysibmadm.mon_lockwaits) group by a.hld_application_handle, a.tabname with ur"`;
+   $lock = qx{psql -F ' ' -A -t -c "select 'Detailed implementation required...'"; };
 }
 @locks = split /\s+/, $lock;
+
 ## connection
 if($before) {
 #dblevel   $conn = qx{psql -F ' ' -A -t -c "select 
 #dblevel						(select numbackends from pg_stat_database where datid = $db) cur_cons,
 #dblevel						(select count(*) from pg_stat_activity where state = 'active' and pid <> pg_backend_pid() and datid = $db) act_cons,
 #dblevel						(select count(*) from pg_stat_activity where CARDINALITY(pg_blocking_pids(pid)) > 0 and datid = $db) lock_wait_cons"};
-   $conn = qx{psql -F ' ' -A -t -c "select 
-						(select sum(numbackends) from pg_stat_database) cur_cons,
-						(select count(*) from pg_stat_activity where state = 'active' and pid <> pg_backend_pid()) act_cons,
-						(select count(*) from pg_stat_activity where CARDINALITY(pg_blocking_pids(pid)) > 0) lock_wait_cons"};
+$conn = qx{psql -F ' ' -A -t -c "select 
+               (select sum(numbackends) from pg_stat_database) cur_cons,
+               (select count(*) from pg_stat_activity where state = 'active' and pid <> pg_backend_pid()) act_cons,
+               (select count(*) from pg_stat_activity where CARDINALITY(pg_blocking_pids(pid)) > 0) lock_wait_cons"};
 } else {
-   $conn = `db2 -x "select APPLS_CUR_CONS, APPLS_IN_DB2, NUM_LOCKS_WAITING,ACTIVE_SORTS,ACTIVE_HASH_JOINS from table(MON_GET_DATABASE(-2)) with ur"`;
+   $conn = qx{psql -F ' ' -A -t -c "select 'Detailed implementation required...'"; };
 }
 @conns = split /\s+/, $conn;
 
 ################ print
 ## timediff
 print "dbsecdiff: $snapdbtimediff tabsecdiff: $snaptabtimediff applsecdiff: $snapappltimediff\n";
+
 ## cpu
-#aix#$avmm = int($avm*4/1024);
-#aix#$frem = int($fre*4/1024);
-#aix#print "$adate CPU $cpu < R: $rq B: $bq P: $pq W: $wq AVM: $avmm FRE: $frem FI: $fi FO: $fo PI: $pi PO: $po IN: $in SC: $sc CS: $cs U: $us S: $sy W: $wa I: $id >\n";
 print "$adate CPU $cpu < R: $rq B: $bq PG: $swap FRE: $free BUFF: $buff CACHE: $cache FI: $fi FO: $fo PI: $pi PO: $po IN: $in CS: $cs U: $us S: $sy W: $wa I: $id >\n";
 print "$adate CPU> $gcpu\n";
+
 ## lock
 print "$adate Lock_holder : @locks\n";
 if($loglockapinfo){
@@ -281,18 +268,16 @@ while(defined($flockap = shift @locks)) {
         }
 }
 }
+
 ## snapdb
 print "$adate Lock $ddb_deadlocks : $conns[2]\n"; #deadlock, lockwaiting
-#print "$adate Sort $ddbcnt16 $ddbcnt17 : $conns[4]\n"; #total,overflow,active
-#print "$adate HSjoin $ddbcnt23 $ddbcnt24 : $conns[5]\n"; #total,overflow,active
-#print "$adate CPU_time $ddbcnt11 : $ddbcnt12\n"; #time,latchwait
 print "$adate Connection : $conns[0] $conns[1]\n"; #total,active
 print "$adate Trans $ddb_trans ( $ddb_commits $ddb_rollbacks ) > $gddbcnt3\n"; #tran,commit,rollback
-#print "$adate Throughput $ddbthrouput : $ddbcnt5 $ddbcnt6 $ddbcnt7 : $ddbcnt8 $ddbcnt9 $ddbcnt10\n"; #8+9+10,static,dynamic,failed,select,iud,ddl
 print "$adate Rows_read $ddb_tupreturned ( $ddb_tupfetched ) $ddb_blksall ( $ddb_blkshits $ddb_blksreads ) > $gddbcnt1\n"; # totread,idxread,totblk,hitblk,diskblk
 print "$adate Rows_write $ddb_tupmods > $gddbcnt2\n";
 print "$adate Temp $ddb_tempfiles $ddb_tempbytes\n";
 print "-" x 20 . "\n";
+
 ## snaptab : numscans,all_reads,numtabscans,seqtupreads,numidxscans,idxtupfetches,tupmods,livetups,deadtups
 if($tabtopcnt > 0) {
 if($sortwrite) {
@@ -322,6 +307,7 @@ else {
 $loopcnt = 0;
 print "-" x 20 . "\n";
 }
+
 ## snapappl : read,write
 if($apptopcnt > 0) {
 if($sortwrite) {
@@ -334,7 +320,7 @@ if($sortwrite) {
         if($loopcnt <= $topappapinfo) {
            @app = split /\./, $kk;
            $app = pop @app;
-           $t2apinfo = `db2pd -d $db -apinfo $app`;
+           $t2apinfo = qx{psql -F ' ' -A -t -c "select 'Detailed implementation required...'"; };
            print LOG_APINFO "$adate t${topappapinfo}apinfo $t2apinfo";
            }
         }
@@ -350,7 +336,7 @@ elsif($sortread) {
         if($loopcnt <= $topappapinfo) {
            @app = split /\./, $kk;
            $app = pop @app;
-           $t2apinfo = `db2pd -d $db -apinfo $app`;
+           $t2apinfo = qx{psql -F ' ' -A -t -c "select 'Detailed implementation required...'"; };
            print LOG_APINFO "$adate t${topappapinfo}apinfo $t2apinfo";
            }
         }
@@ -366,7 +352,7 @@ else {
         if($loopcnt <= $topappapinfo) {
            @app = split /\./, $kk;
            $app = pop @app;
-           $t2apinfo = `db2pd -d $db -apinfo $app`;
+           $t2apinfo = qx{psql -F ' ' -A -t -c "select 'Detailed implementation required...'"; };
            print LOG_APINFO "$adate t${topappapinfo}apinfo $t2apinfo";
            }
         }
@@ -377,16 +363,15 @@ else {
 $loopcnt = 0;
 
 print "+" x 100 . "\n";
-print "+" x 100 . "\n";
+
 close(LOG_APINFO);
 
 sub do_help { 
     $help = <<EOF; 
-usage: perl ./db2inframon_apinfo -d <dbname> -s <appsleepsec,0> -q <read> -w <mod,tran> -e <table,appl> -t <toptab,0> -a <topappl,0> -p <topappllog> -o <directory> [-z:log] [-x:locklog] [-c:applog] [-v:before ver.] [-W:write sort] [-R:read sort] [-O:once a day logging]
-help: perl ./db2inframon_apinfo -h 
+usage: perl ./pginframon_apinfo -d <dbname> -s <appsleepsec,0> -q <read> -w <mod,tran> -e <table,appl> -t <toptab,0> -a <topappl,0> -p <topappllog> -o <directory> [-z:log] [-x:locklog] [-c:applog] [-v:before ver.] [-W:write sort] [-R:read sort] [-O:once a day logging]
+help: perl ./pginframon_apinfo -h 
 EOF
     print "$help\n"; 
     exit; 
 }
-
 
