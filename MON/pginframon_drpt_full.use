@@ -1,17 +1,19 @@
-cat > pginframon.sh
+alias tailpgmon='tail -100f /var/lib/pgsql/16/IFR/MONITOR/LOG_PERL_D/`date +%Y%m`/pginframon_`date +%Y%m%d`.log'
+
+cat > pginframon.sh <<'EEOFF'
 #!/usr/bin/ksh
 
 #### init
 export TERM=ansi
 export LANG=C
-export PATH=/usr/pgsql-11/bin:$PATH
-export LD_LIBRARY_PATH=/usr/pgsql-11/lib:$LD_LIBRARY_PATH
-export PGDATA=/work2/pg/pgdata1
+export PATH=/usr/pgsql-16/bin:$PATH
+#export LD_LIBRARY_PATH=/usr/pgsql-16/lib:$LD_LIBRARY_PATH
+export PGDATA=/var/lib/pgsql/16/data
 export PGPORT=5432
-export PGUSER=pgdba
+export PGUSER=postgres
 export PGDATABASE=postgres
-export PGDB=13881
-cd /work2/pg/pgdata1/TMP/IFR/MONITOR
+export PGDB=41356
+cd /var/lib/pgsql/16/IFR/MONITOR
 
 #### db2 monitor
 cnt=0; rr=0; while true 
@@ -44,10 +46,12 @@ done
  
 #### reset
 
+EEOFF
+
 
 
 cat > package.sh
-psql -F ' ' -A -t -c "select queryid, sum(calls) calls, sum(shared_blks_hit+shared_blks_read) all_blks_read, sum(rows) c_f_rows, sum(total_time) t_exec_time, sum(shared_blks_written) all_blks_mod, sum(temp_blks_read) tmp_blks_read, sum(shared_blks_hit) blks_hit, sum(shared_blks_read) blks_read
+psql -F ' ' -A -t -c "select queryid, sum(calls) calls, sum(shared_blks_hit+shared_blks_read) all_blks_read, sum(rows) c_f_rows, sum(total_exec_time) t_exec_time, sum(shared_blks_written) all_blks_mod, sum(temp_blks_read) tmp_blks_read, sum(shared_blks_hit) blks_hit, sum(shared_blks_read) blks_read
 from pg_stat_statements
 --where dbid = $PGDB
 group by queryid"
@@ -172,22 +176,23 @@ END{
 
 
 ************************* check pginframon porcess
-1 * * * * sh ~/IFR/MONITOR/infrapgmon_check.sh > ~/IFR/MONITOR/infrapgmon_check.log 2>&1
+1 * * * * sh /var/lib/pgsql/16/IFR/MONITOR/infrapgmon_check.sh > /var/lib/pgsql/16/IFR/MONITOR/infrapgmon_check.log 2>&1
 
-$ cat > ~/IFR/MONITOR/infrapgmon_check.sh
+cat > /var/lib/pgsql/16/IFR/MONITOR/infrapgmon_check.sh <<'EEOFF'
 #!/usr/bin/sh
 export LANG=C
 export TERM=vt100
-perl ~/IFR/MONITOR/infrapgmon_check.pl
 
-$ cat > ~/IFR/MONITOR/infrapgmon_check.pl
-system("ps -ef | grep pginframon.sh | grep -v grep");
-$ret = $?;
-if($ret != 0) {
-system("nohup sh ~/IFR/MONITOR/pginframon.sh > ~/IFR/MONITOR/pginframon.sh.log 2>&1 &");
-$restartdate = localtime;
-print "$restartdate --> restart \n";
-}
+ps -ef | grep pginframon.sh | grep -v grep
+ret=$?
+
+if [ $ret -ne 0 ]; then
+nohup sh /var/lib/pgsql/16/IFR/MONITOR/pginframon.sh > /var/lib/pgsql/16/IFR/MONITOR/pginframon.sh.log 2>&1 &
+restartdate=$(date)
+echo "$restartdate --> restart"
+fi
+
+EEOFF
 
 
 
