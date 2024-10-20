@@ -1,0 +1,330 @@
+
+3,13,23,33,43,53 * * * * . ~/sqllib/db2profile; export DB2DBDFT=; perl /home/db2i115/IFR/MONC/DB2MON.pl /home/db2i115/IFR/MONC > /home/db2i115/IFR/MONC/DB2MON.pl.log 2>&1
+
+*************************************************************************
+
+cat > DB2MON.pl <<'EEOFF'
+#!/usr/bin/perl
+
+$locconf = $ARGV[0];
+@monlist = qx{ cat $locconf/DB2MON.conf |grep -v -E "^\#|^[[:blank:]]*\$" };
+foreach (@monlist) {
+@mon = split;
+$db = $mon[0];
+$user = $mon[1];
+$check = $mon[2];
+$loclog = $mon[3];
+$logfile = $mon[4];
+$locother = $mon[5];
+$checksql = $mon[6];
+$checkdsql = $mon[7];
+$smslist = $mon[8];
+$loclogd = $mon[9];
+$logdfile = $mon[10];
+$wmonm = $mon[11];
+$wmond = $mon[12];
+$wmonsms = $mon[13];
+$diskratio = $mon[14];
+$smsmesg = "over";
+
+printf "[$db][$user][$check] ++++++++++++++++++++++++++++++++++++++++\n";
+if($checksql=~/\w.sql/) {
+   system(qq{ db2 connect to $db user $user using \\"Nice!#13Ins\\" });
+   system("db2 -tf $locother/$checksql");
+   $ret = $?>>8;
+} elsif($checksql=~/\w.sh/) {
+   $smsmesg = qx{ sh $locother/$checksql $diskratio };
+   $ret = $?>>8;
+   }
+print "-----$ret-----\n";
+
+if($ret != 0) {
+qx {
+cat > $loclog/$logfile <<EOF
+0
+EOF
+};
+
+} else {
+if($wmonm) {
+qx {
+cat > $loclog/$logfile <<EOF
+1
+EOF
+};
+}
+
+if($wmond) {
+if($checkdsql=~/\w.sql/) {
+   $ret = qx{ db2 +w -tf $locother/$checkdsql };
+} elsif($checkdsql=~/\w.sh/) {
+   $ret = qx{ sh $locother/$checkdsql $diskratio };
+}
+qx {
+cat >> $loclogd/$logdfile <<EOF
+`date +%Y%m%d%H%M%S`
+$ret
+EOF
+};
+qx {
+tail -5000 $loclogd/$logdfile > $loclogd/${logdfile}_
+mv $loclogd/${logdfile}_ $loclogd/$logdfile
+};
+}
+
+if($wmonsms) {
+@smslist = qx{ cat $locother/$smslist |grep -v -E "^\#|^[[:blank:]]*\$" };
+foreach (@smslist) {
+@sms = split;
+smssend($sms[1]);
+}
+}
+}
+}
+
+sub smssend {
+$hp = shift @_;
+system(qq{ db2 connect to tdb user db2i115 using \\"Nice!#13Ins\\" });
+system(qq{ db2 -v "call op.sp_if_SendSMS('$hp','[$db][$check]$smsmesg')" });
+}
+
+EEOFF
+
+
+*************************************************************************
+
+
+cat > DB2MON.conf <<'EEOFF'
+#tdb db2i115 con /home/db2i115/IFR/MONM tdb_con.log /home/db2i115/IFR/MONC tdb_con.sql tdb_con_detail.sql tdb_sms.list /home/db2i115/IFR/MOND tdb_con.log.detail 1 1 1 90
+#tdb db2i115 actcon /home/db2i115/IFR/MONM tdb_actcon.log /home/db2i115/IFR/MONC tdb_actcon.sql tdb_actcon_detail.sql tdb_sms.list /home/db2i115/IFR/MOND tdb_actcon.log.detail 1 1 1 90
+#tdb db2i115 lock /home/db2i115/IFR/MONM tdb_lock.log /home/db2i115/IFR/MONC tdb_lock.sql tdb_lock_detail.sql tdb_sms.list /home/db2i115/IFR/MOND tdb_lock.log.detail 1 1 1 90
+#tdb db2i115 longsql /home/db2i115/IFR/MONM tdb_longsql.log /home/db2i115/IFR/MONC tdb_longsql.sql tdb_longsql_detail.sql tdb_sms.list /home/db2i115/IFR/MOND tdb_longsql.log.detail 1 1 1 90
+#tdb db2i115 longuow /home/db2i115/IFR/MONM tdb_longuow.log /home/db2i115/IFR/MONC tdb_longuow.sql tdb_longuow_detail.sql tdb_sms.list /home/db2i115/IFR/MOND tdb_longuow.log.detail 1 1 1 90
+#tdb db2i115 read /home/db2i115/IFR/MONM tdb_read.log /home/db2i115/IFR/MONC tdb_read.sql tdb_read_detail.sql tdb_sms.list /home/db2i115/IFR/MOND tdb_read.log.detail 1 1 1 90
+#tdb db2i115 write /home/db2i115/IFR/MONM tdb_write.log /home/db2i115/IFR/MONC tdb_write.sql tdb_write_detail.sql tdb_sms.list /home/db2i115/IFR/MOND tdb_write.log.detail 1 1 1 90
+#tdb db2i115 usedlog /home/db2i115/IFR/MONM tdb_usedlog.log /home/db2i115/IFR/MONC tdb_usedlog.sql tdb_usedlog_detail.sql tdb_sms.list /home/db2i115/IFR/MOND tdb_usedlog.log.detail 1 1 1 90
+#tdb db2i115 hadr /home/db2i115/IFR/MONM tdb_hadr.log /home/db2i115/IFR/MONC tdb_hadr.sql tdb_hadr_detail.sql tdb_sms.list /home/db2i115/IFR/MOND tdb_hadr.log.detail 1 1 1 90
+tdb db2i115 disk /home/db2i115/IFR/MONM tdb_disk.log /home/db2i115/IFR/MONC tdb_disk.sh tdb_disk_detail.sh tdb_sms.list /home/db2i115/IFR/MOND tdb_disk.log.detail 1 1 1 90
+EEOFF
+
+
+*************************************************************************
+
+cat > tdb_sms.list <<'EEOFF'
+아무개 01009876543
+홍길동 01012345678
+EEOFF
+
+*************************************************************************
+
+cat > tdb_con.sql <<'EEOFF'
+select *
+from (
+select count(*) cnt
+from table(mon_get_connection(null,-1))
+) a
+where a.cnt > 1900;
+EEOFF
+
+cat > tdb_actcon.sql <<'EEOFF'
+select *
+from (
+select count(*) cnt
+from table(mon_get_activity(null,-1))
+) a
+where a.cnt > 20;
+EEOFF
+
+cat > tdb_lock.sql <<'EEOFF'
+select *
+from (
+select count(*) cnt
+from table(mon_get_appl_lockwait(null, -2))
+where timestampdiff(2, current_timestamp-lock_wait_start_time) > 15
+) a
+where a.cnt > 0;
+EEOFF
+
+cat > tdb_longsql.sql <<'EEOFF'
+select *
+from (
+select count(*) cnt
+from table(mon_get_activity(null,-1))
+where timestampdiff(2, current_timestamp-local_start_time) > 3600
+and activity_state = 'EXECUTING';
+) a
+where a.cnt > 0;
+EEOFF
+
+cat > tdb_longuow.sql <<'EEOFF'
+select *
+from (
+select count(*) cnt
+from table(mon_get_unit_of_work(null,-2))
+where timestampdiff(2, current_timestamp-uow_start_time) > 10800
+and uow_stop_time is null
+) a
+where a.cnt > 0;
+EEOFF
+
+cat > tdb_read.sql <<'EEOFF'
+select *
+from (
+select count(*) cnt
+from table(mon_get_activity(null,-1))
+where rows_read > 100000000
+) a
+where a.cnt > 0;
+EEOFF
+
+cat > tdb_write.sql <<'EEOFF'
+select *
+from (
+select count(*) cnt
+from table(mon_get_activity(null,-1))
+where (rows_inserted+rows_updated+rows_deleted) > 5000000
+) a
+where a.cnt > 0;
+EEOFF
+
+cat > tdb_usedlog.sql <<'EEOFF'
+select *
+from (
+select count(*) cnt
+from table(mon_get_transaction_log(-1))
+where total_log_used > 5000000000
+) a
+where a.cnt > 0;
+EEOFF
+
+cat > tdb_hadr.sql <<'EEOFF'
+select *
+from (
+select count(*) cnt
+from table(mon_get_hadr(null))
+where hadr_state = 'PEER'
+) a
+where a.cnt < 1;
+EEOFF
+
+cat > tdb_disk.sh<<'EEOFF'
+df -P |perl -ane '
+BEGIN{ $arg1=$ARGV[0]; @ARGV=(); $diskret = 99 }
+$ur = ($F[4] =~ s/%//g); 
+if ($ur and ($F[4] > $arg1)) {
+print "$F[5]:$F[4]|";
+$diskret = 0;
+}
+END{ exit $diskret }
+' $1
+EEOFF
+
+*************************************************************************
+
+
+cat > tdb_con_detail.sql <<'EEOFF'
+select CLIENT_IPADDR,
+APPLICATION_NAME,
+count(*) cnt
+from table(mon_get_connection(null,-1))
+group by CLIENT_IPADDR, APPLICATION_NAME;
+EEOFF
+
+cat > tdb_actcon_detail.sql <<'EEOFF'
+select APPLICATION_HANDLE,
+APPLICATION_NAME,
+CLIENT_WRKSTNNAME,
+ACTIVITY_STATE,
+ROWS_READ,
+ROWS_RETURNED,
+STMT_TEXT::varchar(100) query
+from table(mon_get_activity(null,-1));
+EEOFF
+
+cat > tdb_lock_detail.sql <<'EEOFF'
+select LOCK_MODE,
+REQ_APPLICATION_HANDLE,
+HLD_APPLICATION_HANDLE
+from table(mon_get_appl_lockwait(null, -2))
+where timestampdiff(2, current_timestamp-lock_wait_start_time) > 15;
+EEOFF
+
+cat > tdb_longsql_detail.sql <<'EEOFF'
+select APPLICATION_HANDLE,
+APPLICATION_NAME,
+CLIENT_WRKSTNNAME,
+ACTIVITY_STATE,
+ROWS_READ,
+ROWS_RETURNED,
+STMT_TEXT::varchar(100) query
+from table(mon_get_activity(null,-1))
+where timestampdiff(2, current_timestamp-local_start_time) > 3600
+and activity_state = 'EXECUTING';
+EEOFF
+
+cat > tdb_longuow_detail.sql <<'EEOFF'
+select APPLICATION_HANDLE,
+APPLICATION_NAME,
+CLIENT_WRKSTNNAME,
+ROWS_READ,
+ROWS_RETURNED,
+ACT_COMPLETED_TOTAL
+from table(mon_get_unit_of_work(null,-2))
+where timestampdiff(2, current_timestamp-uow_start_time) > 10800
+and uow_stop_time is null;
+EEOFF
+
+cat > tdb_read_detail.sql <<'EEOFF'
+select APPLICATION_HANDLE,
+APPLICATION_NAME,
+CLIENT_WRKSTNNAME,
+ACTIVITY_STATE,
+ROWS_READ,
+ROWS_RETURNED,
+STMT_TEXT::varchar(100) query
+from table(mon_get_activity(null,-1))
+where rows_read > 100000000;
+EEOFF
+
+cat > tdb_write_detail.sql <<'EEOFF'
+select APPLICATION_HANDLE,
+APPLICATION_NAME,
+CLIENT_WRKSTNNAME,
+ACTIVITY_STATE,
+ROWS_READ,
+ROWS_RETURNED,
+rows_inserted+rows_updated+rows_deleted rows_write,
+STMT_TEXT::varchar(100) query
+from table(mon_get_activity(null,-1))
+where (rows_inserted+rows_updated+rows_deleted) > 5000000;
+EEOFF
+
+cat > tdb_usedlog_detail.sql <<'EEOFF'
+select uow_start_time,
+application_handle,
+uow_log_space_used
+from table(mon_get_unit_of_work(null,-2))
+where uow_log_space_used > 0
+order by uow_start_time asc;
+EEOFF
+
+cat > tdb_hadr_detail.sql <<'EEOFF'
+select hadr_state,
+PRIMARY_LOG_FILE,
+STANDBY_LOG_FILE
+from table(mon_get_hadr(null));
+EEOFF
+
+cat > tdb_disk_detail.sh<<'EEOFF'
+df -P |perl -ane '
+BEGIN{ $arg1=$ARGV[0]; @ARGV=(); $diskret = 99 }
+$ur = ($F[4] =~ s/%//g); 
+if ($ur and ($F[4] > $arg1)) {
+print "$F[5]:$F[4]|";
+$diskret = 0;
+}
+END{ exit $diskret }
+' $1
+EEOFF
+
+
