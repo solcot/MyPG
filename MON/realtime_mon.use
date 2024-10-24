@@ -208,7 +208,7 @@ where a.cnt < 1;
 EEOFF
 
 cat > tdb_disk.sh<<'EEOFF'
-df -P |perl -ane '
+df -P |grep DB2 |perl -ane '
 BEGIN{ $arg1=$ARGV[0]; @ARGV=(); $diskret = 99 }
 $ur = ($F[4] =~ s/%//g); 
 if ($ur and ($F[4] > $arg1)) {
@@ -316,7 +316,7 @@ from table(mon_get_hadr(null));
 EEOFF
 
 cat > tdb_disk_detail.sh<<'EEOFF'
-df -P |perl -ane '
+df -P |grep DB2 |perl -ane '
 BEGIN{ $arg1=$ARGV[0]; @ARGV=(); $diskret = 99 }
 $ur = ($F[4] =~ s/%//g); 
 if ($ur and ($F[4] > $arg1)) {
