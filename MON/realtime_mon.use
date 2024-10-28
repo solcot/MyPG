@@ -132,7 +132,7 @@ from (
 select count(*) cnt
 from table(mon_get_activity(null,-1))
 ) a
-where a.cnt > 20;
+where a.cnt > 30;
 EEOFF
 
 cat > tdb_lock.sql <<'EEOFF'
