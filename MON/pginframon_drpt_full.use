@@ -7,13 +7,13 @@ cat > pginframon.sh <<'EEOFF'
 export TERM=ansi
 export LANG=C
 export PATH=/usr/pgsql-16/bin:$PATH
-#export LD_LIBRARY_PATH=/usr/pgsql-16/lib:$LD_LIBRARY_PATH
-export PGDATA=/var/lib/pgsql/16/data
-export PGPORT=5432
-export PGUSER=postgres
-export PGDATABASE=postgres
-export PGDB=41356
-cd /var/lib/pgsql/16/IFR/MONITOR
+export PGPORT=5999
+#export PGDATABASE=infradb
+#export PGUSER=infrauser
+#export PGPASSWORD=qwer!@#$
+#export PGDATA=/var/lib/pgsql/16/data
+export PGDB=16390
+cd /var/lib/pgsql/15/IFR/MONITOR
 
 #### db2 monitor
 cnt=0; rr=0; while true 
