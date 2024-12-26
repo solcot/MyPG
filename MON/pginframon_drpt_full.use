@@ -1,4 +1,4 @@
-alias tailpgmon='tail -100f /var/lib/pgsql/16/IFR/MONITOR/LOG_PERL_D/`date +%Y%m`/pginframon_`date +%Y%m%d`.log'
+alias tailpgmon='tail -100f /var/lib/pgsql/15/IFR/MONITOR/LOG_PERL_D/`date +%Y%m`/pginframon_`date +%Y%m%d`.log'
 
 cat > pginframon.sh <<'EEOFF'
 #!/usr/bin/ksh
@@ -18,29 +18,32 @@ cd /var/lib/pgsql/15/IFR/MONITOR
 #### db2 monitor
 cnt=0; rr=0; while true 
 do
-perl ./pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o ./LOG_PERL_D -z -x -c -v -O
+perl ./pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o ./LOG_PERL_D -z -x -c -v #-O
 cnt=`expr $cnt + 1` 
 sleep 5
 
 if [ `expr $cnt % 120` -eq 0 ];
 then
-        perl ./pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 5 -a 0 -p 0 -o ./LOG_PERL -z -x -c -v #-O
-        #sleep 5
+        perl ./pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 5 -a 0 -p 0 -o ./LOG_PERL -z -x -c -v -O
+        sleep 5
         if [ `expr $cnt % 240` -eq 0 ];
         then
                 if [ $rr -eq 0 ];
                 then
-                        #perl ./inframon_drpt_full.pl -c 8 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 3 -e -o ./LOG_PERL
+                        perl ./inframon_drpt_full.pl -c 8 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 3 -e -o ./LOG_PERL
                         rr=1
                 else
-                        #perl ./inframon_drpt_full.pl -c 8 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 3 -o ./LOG_PERL
+                        perl ./inframon_drpt_full.pl -c 8 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 3 -o ./LOG_PERL
                         rr=0                            
                 fi
                 
-                #sleep 5
                 cnt=0
+                find ./LOG_PERL_D/* -prune -type d -mtime +95 |xargs rm -rf
+                find ./LOG_PERL/* -prune -type d -mtime +95 |xargs rm -rf
+                
+                sleep 5
         fi
-        sleep 5
+        #sleep 5
 fi
 done
  
@@ -50,27 +53,33 @@ EEOFF
 
 
 
-cat > package.sh
+cat > package.sh <<'EEOFF'
 psql -F ' ' -A -t -c "select queryid, sum(calls) calls, sum(shared_blks_hit+shared_blks_read) all_blks_read, sum(rows) c_f_rows, sum(total_exec_time) t_exec_time, sum(shared_blks_written) all_blks_mod, sum(temp_blks_read) tmp_blks_read, sum(shared_blks_hit) blks_hit, sum(shared_blks_read) blks_read
 from pg_stat_statements
 --where dbid = $PGDB
 group by queryid"
 
+EEOFF
 
 
-cat > package_header.sh
+
+cat > package_header.sh <<'EEOFF'
 perl -e '
 printf "%25s%25s%25s%25s%25s%25s%25s%25s%25s\n", "queryid","calls","all_blks_read","c_f_rows","t_exec_time","all_blks_mod","tmp_blks_read","blks_hit","blks_read";
 '
 
+EEOFF
 
 
-cat > package_log.sh
+
+cat > package_log.sh <<'EEOFF'
 echo -e "\n!! $1 [ $2 ] !!" >> $3 2>&1
 psql -F ' ' -A -t -c "select query
 from pg_stat_statements
 --where dbid = $PGDB
 where queryid = $1" >> $3 2>&1
+
+EEOFF
 
 
 
