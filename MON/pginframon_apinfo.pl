@@ -75,7 +75,7 @@ if($before) {
    open(IN, $logfile_dir . "/tmpdb"); $tmpdb = <IN>; close(IN);
 }
 $tmpdb =~ s/^\s+|\s+$//g;
-($bdb_trans, $bdb_commits, $bdb_rollbacks, $bdb_blksall, $bdb_blkshits, $bdb_blksreads, $bdb_tupreturned, $bdb_tupfetched, $bdb_tupmods, $bdb_tempfiles, $bdb_tempbytes, $bdb_deadlocks) = split /\s+/, $tmpdb;
+($bdb_trans, $bdb_commits, $bdb_rollbacks, $bdb_blksall, $bdb_blkshits, $bdb_blksreads, $bdb_tupreturned, $bdb_tupfetched, $bdb_tupmods, $bdb_tempfiles, $bdb_tempbytes, $bdb_deadlocks, $bdb_rqsttime, $bdb_calls) = split /\s+/, $tmpdb;
 
 ## snaptab
 if($tabtopcnt > 0) {
@@ -116,14 +116,21 @@ open(OUT, ">" . $logfile_dir . "/tmpdate"); print OUT "$adate"; close(OUT);
 $asnapdbts = qx{psql -F ' ' -A -t -c "select current_timestamp"};
 open(OUT, ">" . $logfile_dir . "/tmpdbts"); print OUT "$asnapdbts"; close(OUT);
 if($before) {
-   $tmpdb = qx{psql -F ' ' -A -t -c "select sum(xact_commit+xact_rollback) trnas, sum(xact_commit), sum(xact_rollback), sum(blks_hit+blks_read) blks_all, sum(blks_hit), sum(blks_read), sum(tup_returned), sum(tup_fetched), sum(tup_inserted+tup_updated+tup_deleted) tup_mod, sum(temp_files), sum(temp_bytes), sum(deadlocks) from pg_stat_database"};
+   if(qx{psql -F ' ' -A -t -c "select 'YES' from pg_class where relname = 'pg_stat_statements';"}) {
+   $tmpdb = qx{psql -F ' ' -A -t -c "select * from
+               (select sum(xact_commit+xact_rollback) trnas, sum(xact_commit), sum(xact_rollback), sum(blks_hit+blks_read) blks_all, sum(blks_hit), sum(blks_read), sum(tup_returned), sum(tup_fetched), sum(tup_inserted+tup_updated+tup_deleted) tup_mod, sum(temp_files), sum(temp_bytes), sum(deadlocks) from pg_stat_database) a
+               cross join
+               (select sum(total_exec_time), sum(calls) from pg_stat_statements) b;"};   
+   } else {
+   $tmpdb = qx{psql -F ' ' -A -t -c "select sum(xact_commit+xact_rollback) trnas, sum(xact_commit), sum(xact_rollback), sum(blks_hit+blks_read) blks_all, sum(blks_hit), sum(blks_read), sum(tup_returned), sum(tup_fetched), sum(tup_inserted+tup_updated+tup_deleted) tup_mod, sum(temp_files), sum(temp_bytes), sum(deadlocks), 0, 0 from pg_stat_database"};
+   }
    open(OUT, ">" . $logfile_dir . "/tmpdb"); print OUT "$tmpdb"; close(OUT);
 } else {
    $tmpdb = qx{psql -F ' ' -A -t -c "select 'Detailed implementation required...'"; };
    open(OUT, ">" . $logfile_dir . "/tmpdb"); print OUT "$tmpdb"; close(OUT);
 }
 $tmpdb =~ s/^\s+|\s+$//g;
-($adb_trans, $adb_commits, $adb_rollbacks, $adb_blksall, $adb_blkshits, $adb_blksreads, $adb_tupreturned, $adb_tupfetched, $adb_tupmods, $adb_tempfiles, $adb_tempbytes, $adb_deadlocks) = split /\s+/, $tmpdb;
+($adb_trans, $adb_commits, $adb_rollbacks, $adb_blksall, $adb_blkshits, $adb_blksreads, $adb_tupreturned, $adb_tupfetched, $adb_tupmods, $adb_tempfiles, $adb_tempbytes, $adb_deadlocks, $adb_rqsttime, $adb_calls) = split /\s+/, $tmpdb;
 
 ## snaptab
 if($tabtopcnt > 0) {
@@ -175,6 +182,10 @@ $gddbcnt2 = "#" x ($ddbcnt2/$sd2);
 $ddb_tempfiles = sprintf("%.2f", ($adb_tempfiles-$bdb_tempfiles)/$snapdbtimediff);
 $ddb_tempbytes = sprintf("%.2f", ($adb_tempbytes-$bdb_tempbytes)/$snapdbtimediff);
 $ddb_deadlocks = sprintf("%.2f", ($adb_deadlocks-$bdb_deadlocks)/$snapdbtimediff);
+
+$ddb_rqsttime = $adb_rqsttime-$bdb_rqsttime;
+$ddb_calls = $adb_calls-$bdb_calls;
+$avgrqsttime = sprintf("%.2f", $ddb_rqsttime/($ddb_calls+1));
 
 ## snaptab
 if($tabtopcnt > 0) {
@@ -270,6 +281,7 @@ while(defined($flockap = shift @locks)) {
 }
 
 ## snapdb
+print "$adate Rqsttime $avgrqsttime ( $ddb_rqsttime $ddb_calls ) : : \n"; #avgrequesttime, requesttime, requesttotal
 print "$adate Lock $ddb_deadlocks : $conns[2]\n"; #deadlock, lockwaiting
 print "$adate Connection : $conns[0] $conns[1]\n"; #total,active
 print "$adate Trans $ddb_trans ( $ddb_commits $ddb_rollbacks ) > $gddbcnt3\n"; #tran,commit,rollback
@@ -374,4 +386,5 @@ EOF
     print "$help\n"; 
     exit; 
 }
+
 
