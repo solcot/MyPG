@@ -185,23 +185,25 @@ END{
 
 
 ************************* check pginframon porcess
-1 * * * * sh /var/lib/pgsql/16/IFR/MONITOR/infrapgmon_check.sh > /var/lib/pgsql/16/IFR/MONITOR/infrapgmon_check.sh.log 2>&1
+1 * * * * sh /var/lib/pgsql/15/IFR/MONITOR/infrapgmon_check.sh > /var/lib/pgsql/15/IFR/MONITOR/infrapgmon_check.sh.log 2>&1
 
-cat > /var/lib/pgsql/16/IFR/MONITOR/infrapgmon_check.sh <<'EEOFF'
+cat > infrapgmon_check.sh <<'EEOFF'
 #!/usr/bin/sh
 export LANG=C
 export TERM=vt100
 
-ps -ef | grep pginframon.sh | grep -v grep
+ps -ef | grep /var/lib/pgsql/15/IFR/MONITOR/pginframon.sh | grep -v grep
 ret=$?
 
 if [ $ret -ne 0 ]; then
-nohup sh /var/lib/pgsql/16/IFR/MONITOR/pginframon.sh > /var/lib/pgsql/16/IFR/MONITOR/pginframon.sh.log 2>&1 &
+nohup sh /var/lib/pgsql/15/IFR/MONITOR/pginframon.sh > /var/lib/pgsql/15/IFR/MONITOR/pginframon.sh.log 2>&1 &
 restartdate=$(date)
 echo "$restartdate --> restart"
 fi
 
 EEOFF
+
+
 
 
 
