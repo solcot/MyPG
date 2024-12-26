@@ -183,7 +183,7 @@ $ddb_tempfiles = sprintf("%.2f", ($adb_tempfiles-$bdb_tempfiles)/$snapdbtimediff
 $ddb_tempbytes = sprintf("%.2f", ($adb_tempbytes-$bdb_tempbytes)/$snapdbtimediff);
 $ddb_deadlocks = sprintf("%.2f", ($adb_deadlocks-$bdb_deadlocks)/$snapdbtimediff);
 
-$ddb_rqsttime = $adb_rqsttime-$bdb_rqsttime;
+$ddb_rqsttime = sprintf("%.2f", ($adb_rqsttime-$bdb_rqsttime));
 $ddb_calls = $adb_calls-$bdb_calls;
 $avgrqsttime = sprintf("%.2f", $ddb_rqsttime/($ddb_calls+1));
 
