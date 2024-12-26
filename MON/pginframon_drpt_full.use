@@ -152,7 +152,7 @@ print "F: $ar1 -- E: $ar2 -- Diff: $diff \n";
 '
 
 ************************* CPU / Rqsttime / Trans / Rows_read / Rows_write anal
-find ~/IFR/MONITOR/LOG_PERL_D -name "db2inframon_*.log" -mtime -28 |xargs grep -Ee "CPU | Rqsttime |Trans |Rows_read |Rows_write " |perl -MData::Dumper -ane '
+find ~/IFR/MONITOR/LOG_PERL_D -name "db2inframon_*.log" -mtime -28 |xargs grep -Ee "CPU |Rqsttime |Trans |Rows_read |Rows_write " |perl -MData::Dumper -ane '
 if ( $F[0] + 0 eq $F[0] ) {
     $date = substr($F[0], 0, 8);
 	$time = substr($F[0], 8);
@@ -162,6 +162,11 @@ if ( $F[0] + 0 eq $F[0] ) {
 }
 
 #$mykey = $date . '_' . $F[1];
+$F[1] =~ s/CPU/01.CPU/;
+$F[1] =~ s/Rqsttime/02.Rqsttime/;
+$F[1] =~ s/Trans/03.Trans/;
+$F[1] =~ s/Rows_read/04.Rows_read/;
+$F[1] =~ s/Rows_write/05.Rows_write/;
 $mykey = $F[1];
 
 if ($time ge "090000" and $time le "180000") {
