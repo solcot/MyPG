@@ -167,12 +167,14 @@ $mykey = $F[1];
 
 if ($time ge "090000" and $time le "180000") {
 @roww = ($F[2]);
+if($roww[0] >= 0) {
 if($seen{$mykey}) {
  $cnt = $seen{$mykey}->[0] + 1;
  $seen{$mykey}->[0] = $cnt; #seen cnt
  $seen{$mykey}->[1] = ($seen{$mykey}->[1] + $roww[0]); #cpu or trans or read or write
  }
 else { $seen{$mykey} = [(1,@roww)] }
+}
 }
 END{
  foreach $key (keys %seen) {
