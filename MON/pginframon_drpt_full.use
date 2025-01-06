@@ -182,7 +182,7 @@ END{
  $seen{$key}->[1] = int($seen{$key}->[1] / ($seen{$key}->[0] + 0.01));
  }
  
- printf ("%15s %10s %10s\n", $key, $seen{$key}->[0], $seen{$key}->[1]);
+ printf ("%-15s %10s %10s\n", $key, $seen{$key}->[0], $seen{$key}->[1]);
  }
 }
 ' |perl -ane 's/CPU/01.CPU/;s/Rqsttime/02.Rqsttime/;s/Trans/03.Trans/;s/Rows_read/04.Rows_read/;s/Rows_write/05.Rows_write/;print' |sort -k1
