@@ -1,4 +1,7 @@
 alias tailpgmon='tail -100f /var/lib/pgsql/15/IFR/MONITOR/LOG_PERL_D/`date +%Y%m`/pginframon_`date +%Y%m%d`.log'
+alias tailpgmond='tail -100f /var/lib/pgsql/15/IFR/MONITOR/LOG_PERL/`date +%Y%m`/pginframon_`date +%Y%m%d`.log'
+alias tailpgmonp='tail -100f /var/lib/pgsql/15/IFR/MONITOR/LOG_PERL/`date +%Y%m`/drpt_`date +%Y%m%d`.log'
+
 
 cat > pginframon.sh <<'EEOFF'
 #!/usr/bin/ksh
