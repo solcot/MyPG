@@ -27,7 +27,7 @@ EEOFF
 
 --------------------------------------------------------------------------------------------
 
-cat > db2inframon.sh <'EEOFF'
+cat > db2inframon.sh <<'EEOFF'
 #!/usr/bin/ksh
 
 #### init
