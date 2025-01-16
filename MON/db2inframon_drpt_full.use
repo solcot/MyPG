@@ -1,74 +1,114 @@
 alias taildb2mon='tail -100f ~/IFR/MONITOR/LOG_PERL_D/`date +%Y%m`/db2inframon_`date +%Y%m%d`.log'
+alias taildb2mont='tail -100f ~/IFR/MONITOR/LOG_PERL/`date +%Y%m`/db2inframon_`date +%Y%m%d`.log'
+alias taildb2monq='tail -100f ~/IFR/MONITOR/LOG_PERL/`date +%Y%m`/drpt_`date +%Y%m%d`.log'
 
-cat > db2inframon.sh
+--------------------------------------------------------------------------------------------
+
+
+************************* check db2inframon porcess
+1 * * * * sh ~/IFR/MONITOR/infradb2mon_check.sh > ~/IFR/MONITOR/infradb2mon_check.sh.log 2>&1
+
+cat > ~/IFR/MONITOR/infradb2mon_check.sh <<'EEOFF'
+#!/usr/bin/sh
+export LANG=C
+export TERM=vt100
+
+ps -ef | grep /var/lib/dbs/db2i115/IFR/MONITOR/db2inframon.sh | grep -v grep
+ret=$?
+
+if [ $ret -ne 0 ]; then
+nohup sh ~/IFR/MONITOR/db2inframon.sh > ~/IFR/MONITOR/db2inframon.sh.log 2>&1 &
+restartdate=$(date)
+echo "$restartdate --> restart"
+fi
+
+EEOFF
+
+
+--------------------------------------------------------------------------------------------
+
+cat > db2inframon.sh <'EEOFF'
 #!/usr/bin/ksh
 
 #### init
 export TERM=ansi
 export LANG=C
 export DB2CODEPAGE=1208
-. ~db2i115/sqllib/db2profile
-cd /work3/db2/V11.5.dc_inshome/jhkim/MONITOR
+export DATABASE=oradb
+. ~/sqllib/db2profile
+export RDAY=95
+cd /var/lib/dbs/db2i115/IFR/MONITOR
 
 #### db2 monitor
 cnt=0; rr=0; while true
 do
-perl ./db2inframon_apinfo.pl -d mydb -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o ./LOG_PERL_D -z -x -c
+perl ./db2inframon_apinfo.pl -d $DATABASE -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o ./LOG_PERL_D -z -x -c
 cnt=`expr $cnt + 1`
 sleep 5
 
-if [ `expr $cnt % 60` -eq 0 ];
+if [ `expr $cnt % 120` -eq 0 ];
 then
-#        perl ./db2inframon_apinfo.pl -d mydb -s 0 -q 10000000 -w 1000000 -e 10000000 -t 5 -a 0 -p 0 -o ./LOG_PERL -z -x -c -O
-        perl ./db2inframon_apinfo.pl -d mydb -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o ./LOG_PERL -z -x -c -O
-        #sleep 5
-        if [ `expr $cnt % 120` -eq 0 ];
+        perl ./db2inframon_apinfo.pl -d $DATABASE -s 0 -q 10000000 -w 1000000 -e 10000000 -t 5 -a 0 -p 0 -o ./LOG_PERL -z -x -c -O
+        #perl ./db2inframon_apinfo.pl -d $DATABASE -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o ./LOG_PERL -z -x -c -O
+        sleep 5
+        
+        if [ `expr $cnt % 240` -eq 0 ];
         then
                 if [ $rr -eq 0 ];
                 then
-#                        perl ./inframon_drpt_full.pl -c 6 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -e -o ./LOG_PERL
+                        perl ./inframon_drpt_full.pl -c 6 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -e -o ./LOG_PERL
                         rr=1
                 else
-#                        perl ./inframon_drpt_full.pl -c 6 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -o ./LOG_PERL
+                        perl ./inframon_drpt_full.pl -c 6 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -o ./LOG_PERL
                         rr=0
                 fi
 
-                #sleep 5
                 cnt=0
+                find ./LOG_PERL_D/* -prune -type d -mtime +$RDAY |xargs rm -rf
+                find ./LOG_PERL/* -prune -type d -mtime +$RDAY |xargs rm -rf
+                
+                sleep 5
         fi
-        sleep 5
 fi
 done
 
 #### reset
 
+EEOFF
 
 
-
-cat > package.sh
-db2 connect to sample > /dev/null
+cat > package.sh <<'EEOFF'
+db2 connect to $DATABASE > /dev/null
 db2 -x "select executable_id, num_exec_with_metrics, rows_read, total_cpu_time, stmt_exec_time, rows_modified, lock_waits 
 from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>20</modified_within>',-2))"
 
+EEOFF
 
 
-cat > package_header.sh
+cat > package_header.sh <<'EEOFF'
 perl -e '
 printf "%66s%25s%25s%25s%25s%25s%25s\n", "exec_id","num_exec","rows_read","total_cpu","exec_time","rows_modified","lock_waits";
 '
 
+EEOFF
 
 
-cat > package_log.sh
-db2 connect to sample > /dev/null
+
+cat > package_log.sh <<'EEOFF'
+db2 connect to $DATABASE > /dev/null
 echo -e "\n!! $1 [ $2 ] !!" >> $3
 db2 "select varchar(object_type,10) type,varchar(object_schema,10) schema,varchar(object_module,10) module,varchar(object_name,30) name from table(mon_get_section_object($1,null,null,null,null,-2)) with ur" >> $3 2>&1
 db2 "call explain_from_section ($1, 'M', null, 0, null, ?, ?, ?, ?, ?)" > /dev/null 2>&1
 db2 -x "select max(explain_time) from systools.explain_statement with ur" >> $3 2>/dev/null
-#db2exfmt -d sample -1 >> $3 2>/dev/null
-##db2exfmt -d sample -e % -n % -s % -v % -w '2020-06-20-15.24.30.860389' '-#' 0 -o fmt
+#db2exfmt -d $DATABASE -1 >> $3 2>/dev/null
+##db2exfmt -d $DATABASE -e % -n % -s % -v % -w '2020-06-20-15.24.30.860389' '-#' 0 -o fmt
 ##db2 "select statement_text from systools.explain_statement where explain_time = '2020-06-20-15.24.30.860389'"
 
+EEOFF
+
+
+
+--------------------------------------------------------------------------------------------
 
 
 ************************* table anal
@@ -141,21 +181,41 @@ printf "F: %d -- E: %d -- Diff: %d \n", $ars[0], $ars[-1], $ars[-1]-$ars[0];
 }
 '
 
-************************* check db2inframon porcess
-1 * * * * sh ~/IFR/MONITOR/infradb2mon_check.sh > ~/IFR/MONITOR/infradb2mon_check.sh.log 2>&1
+************************* CPU / Rqsttime / Trans / Rows_read / Rows_write anal
+find ~/IFR/MONITOR/LOG_PERL -name "db2inframon_*.log" -mtime -28 |xargs grep -Ee "CPU |Rqsttime |Trans |Rows_read |Rows_write " |perl -MData::Dumper -ane '
+if ( $F[0] + 0 eq $F[0] ) {
+   $date = substr($F[0], 0, 8);
+$time = substr($F[0], 8);
+} else {
+$date = substr((split(/:/,$F[0]))[1], 0, 8);
+   $time = substr((split(/:/,$F[0]))[1], 8);
+}
 
-cat > ~/IFR/MONITOR/infradb2mon_check.sh <<'EEOFF'
-#!/usr/bin/sh
-export LANG=C
-export TERM=vt100
+#$mykey = $date . '_' . $F[1];
+$mykey = $F[1];
 
-ps -ef | grep db2inframon.sh | grep -v grep
-ret=$?
+if ($time ge "090000" and $time le "180000") {
+@roww = ($F[2]);
+if($roww[0] >= 0) {
+if($seen{$mykey}) {
+ $cnt = $seen{$mykey}->[0] + 1;
+ $seen{$mykey}->[0] = $cnt; #seen cnt
+ $seen{$mykey}->[1] = ($seen{$mykey}->[1] + $roww[0]); #cpu or trans or read or write
+ }
+else { $seen{$mykey} = [(1,@roww)] }
+}
+}
+END{
+ foreach $key (keys %seen) {
+ if($key eq "Rqsttime") {
+ $seen{$key}->[1] = sprintf("%.2f", $seen{$key}->[1] / ($seen{$key}->[0] + 0.01)); 
+ } else {
+ $seen{$key}->[1] = int($seen{$key}->[1] / ($seen{$key}->[0] + 0.01));
+ }
+ 
+ printf ("%-15s %10s %10s\n", $key, $seen{$key}->[0], $seen{$key}->[1]);
+ }
+}
+' |perl -ane 's/CPU/01.CPU/;s/Rqsttime/02.Rqsttime/;s/Trans/03.Trans/;s/Rows_read/04.Rows_read/;s/Rows_write/05.Rows_write/;print' |sort -k1 #|sort +0
 
-if [ $ret -ne 0 ]; then
-nohup sh ~/IFR/MONITOR/db2inframon.sh > ~/IFR/MONITOR/db2inframon.sh.log 2>&1 &
-restartdate=$(date)
-echo "$restartdate --> restart"
-fi
 
-EEOFF
