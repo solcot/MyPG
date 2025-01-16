@@ -70,7 +70,6 @@ then
                 
                 sleep 5
         fi
-        #sleep 5
 fi
 done
  
