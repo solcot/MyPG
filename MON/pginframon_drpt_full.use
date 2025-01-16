@@ -52,6 +52,7 @@ if [ `expr $cnt % 120` -eq 0 ];
 then
         perl ./pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 5 -a 0 -p 0 -o ./LOG_PERL -z -x -c -v -O
         sleep 5
+
         if [ `expr $cnt % 240` -eq 0 ];
         then
                 if [ $rr -eq 0 ];
