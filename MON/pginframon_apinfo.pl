@@ -262,6 +262,7 @@ $conn = qx{psql -F ' ' -A -t -c "select
 @conns = split /\s+/, $conn;
 
 ################ print
+system(qq/ psql -t -c "select query_id,count(*),max(extract(epoch from age(current_timestamp,query_start))),max(wait_event_type) from pg_stat_activity where backend_type = 'client backend' and pid <> pg_backend_pid() group by query_id" /);
 ## timediff
 print "dbsecdiff: $snapdbtimediff tabsecdiff: $snaptabtimediff applsecdiff: $snapappltimediff\n";
 
