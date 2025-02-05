@@ -262,7 +262,21 @@ $conn = qx{psql -F ' ' -A -t -c "select
 @conns = split /\s+/, $conn;
 
 ################ print
-system(qq/ psql -t -c "select query_id,count(*),max(extract(epoch from age(current_timestamp,query_start))),max(wait_event_type) from pg_stat_activity where backend_type = 'client backend' and pid <> pg_backend_pid() group by query_id" /);
+#system(qq/ psql -t -c "select max(pid),query_id,count(*),max(extract(epoch from age(current_timestamp,query_start))),max(wait_event_type) from pg_stat_activity where backend_type = 'client backend' and pid <> pg_backend_pid() group by query_id"|grep -v '^[[:space:]]*\$' /);
+
+@pg_activity = qx/ psql -t -c "select max(pid),query_id,count(*),max(extract(epoch from age(current_timestamp,query_start))),max(wait_event_type) from pg_stat_activity where backend_type = 'client backend' and pid <> pg_backend_pid() group by query_id"|grep -v '^[[:space:]]*\$' /;
+foreach $pg_act (@pg_activity) {
+chomp($pg_act);
+@pg_acts = split(/\s+/,$pg_act);
+@pg_pids = qx/ psql -t -c "select pid from pg_stat_activity where query_id = $pg_acts[3]"|grep -v '^[[:space:]]*\$' /;
+$pg_pcpu=0; foreach $pg_pid (@pg_pids) {
+chomp($pg_pid);
+chomp($pg_mpcpu = qx/ ps -p $pg_pid -o %cpu | tail -1 /);
+$pg_pcpu += $pg_mpcpu if $pg_mpcpu =~ /^\s*-?\d+(\.\d+)?\s*$/;
+}
+print "$pg_act | $pg_pcpu \n";
+}
+
 ## timediff
 print "dbsecdiff: $snapdbtimediff tabsecdiff: $snaptabtimediff applsecdiff: $snapappltimediff\n";
 
