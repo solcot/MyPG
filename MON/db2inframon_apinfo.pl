@@ -283,7 +283,7 @@ if($before) {
 @conns = split /\s+/, $conn;
 
 ################ print
-system(qq/ db2 -x "select stmtid,count(*),max(rows_read),max(total_act_time),max(lock_wait_time) from table(mon_get_activity(null,-1)) where application_handle <> mon_get_application_handle() group by stmtid" /);
+system(qq/ db2 -x "select max(application_handle),stmtid,count(*),max(rows_read),max(total_act_time),max(lock_wait_time),sum(total_cpu_time),sum(total_disp_run_queue_time) from table(mon_get_activity(null,-1)) where application_handle <> mon_get_application_handle() group by stmtid" /);
 ## timediff
 print "dbsecdiff: $snapdbtimediff tabsecdiff: $snaptabtimediff applsecdiff: $snapappltimediff\n";
 ## cpu
