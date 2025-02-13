@@ -48,6 +48,77 @@ sleep $ssec;
 
 
 
+-----> pkg cache anal
+diff_sec=30
+order_by=diff_total_exec_time_millisec
+
+psql -c "create table before_pcache as 
+select queryid, sum(calls) calls
+, sum(total_exec_time) total_exec_time
+, sum(shared_blks_hit+shared_blks_read) blks_read
+, sum(shared_blks_written) blks_modified
+, sum(temp_blks_read) temp_blks_read
+, sum(temp_blks_written) temp_blks_written
+from pg_stat_statements
+where false
+group by queryid"
+
+psql -c "create table after_pcache (like before_pcache)"
+
+psql -c "alter table before_pcache set unlogged"
+psql -c "alter table after_pcache set unlogged"
+
+
+psql -c "insert into before_pcache 
+select queryid, sum(calls) calls
+, sum(total_exec_time) total_exec_time
+, sum(shared_blks_hit+shared_blks_read) blks_read
+, sum(shared_blks_written) blks_modified
+, sum(temp_blks_read) temp_blks_read
+, sum(temp_blks_written) temp_blks_written
+from pg_stat_statements
+group by queryid"
+
+sleep $diff_sec
+
+psql -c "insert into after_pcache 
+select queryid, sum(calls) calls
+, sum(total_exec_time) total_exec_time
+, sum(shared_blks_hit+shared_blks_read) blks_read
+, sum(shared_blks_written) blks_modified
+, sum(temp_blks_read) temp_blks_read
+, sum(temp_blks_written) temp_blks_written
+from pg_stat_statements
+group by queryid"
+
+psql -c "select a.queryid
+, b.calls-a.calls diff_calls
+, b.total_exec_time-a.total_exec_time diff_total_exec_time_millisec
+, ((b.total_exec_time-a.total_exec_time) / (b.calls-a.calls))::int diff_avg_total_exec_time_millisec
+, b.blks_read-a.blks_read diff_blks_read
+, ((b.blks_read-a.blks_read) / (b.calls-a.calls))::int diff_avg_blks_read
+, b.blks_modified-a.blks_modified diff_blks_modified
+, ((b.blks_modified-a.blks_modified) / (b.calls-a.calls))::int diff_avg_blks_modified
+, b.temp_blks_read-a.temp_blks_read diff_temp_blks_read
+, ((b.temp_blks_read-a.temp_blks_read) / (b.calls-a.calls))::int diff_avg_temp_blks_read
+, b.temp_blks_written-a.temp_blks_written diff_temp_blks_written
+, ((b.temp_blks_written-a.temp_blks_written) / (b.calls-a.calls))::int diff_avg_temp_blks_written
+from before_pcache a, after_pcache b
+where a.queryid = b.queryid
+and (b.calls-a.calls) > 0
+order by $order_by desc"
+
+########## 자원 정리
+psql -c "drop table before_pcache"
+psql -c "drop table after_pcache"
+
+
+########## 추가 분석
+
+
+
+
+
 ****************************************************** Db2
 perl -e '
 BEGIN{
