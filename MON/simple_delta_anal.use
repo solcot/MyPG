@@ -1,0 +1,83 @@
+****************************************************** PostgreSQL
+perl -e '
+BEGIN{
+       $ssec = $ARGV[0];
+       #printf "%9s %9s %9s %9s %9s %9s\n","trans","blks_all","tup_mod","tup_returned","temp_files","temp_bytes";
+     }
+while(true) {
+$a = qx{psql -F " " -A -t -c "select sum(xact_commit+xact_rollback) trnas
+, sum(blks_hit+blks_read) blks_all
+, sum(tup_inserted+tup_updated+tup_deleted) tup_mod
+, sum(tup_returned)
+, sum(temp_files)
+, sum(temp_bytes)
+from pg_stat_database"};
+$a =~ s/^\s+|\s+$//g;
+@a = split(/\s+/,$a);
+$delta[0] = ($a[0] - $b[0]) / $ssec;
+$delta[1] = ($a[1] - $b[1]) / $ssec;
+$delta[2] = ($a[2] - $b[2]) / $ssec;
+$delta[3] = ($a[3] - $b[3]) / $ssec;
+$delta[4] = ($a[4] - $b[4]) / $ssec;
+$delta[5] = ($a[5] - $b[5]) / $ssec; 
+#print "@delta\n";
+#++++++++++++++++++++++++++
+#system(qq/ psql -t -c "select max(pid),query_id,count(*),max(now()-query_start),max(wait_event_type) from pg_stat_activity where backend_type=\047client backend\047 and backend_xmin is not null and pid<>pg_backend_pid() group by query_id"|grep -v \047^[[:space:]]*\$\047 /);
+
+@pg_activity = qx/ psql -t -c "select max(pid),query_id,count(*),max(now()-query_start),max(wait_event_type) from pg_stat_activity where backend_type=\047client backend\047 and backend_xmin is not null and pid<>pg_backend_pid() group by query_id"|grep -v \047^[[:space:]]*\$\047 /;
+foreach $pg_act (@pg_activity) {
+chomp($pg_act);
+@pg_acts = split(/\|/,$pg_act);
+$pg_qid = $pg_acts[1] + 0;
+@pg_pids = qx/ psql -t -c "select pid from pg_stat_activity where query_id = $pg_qid"|grep -v \047^[[:space:]]*\$\047 /;
+$pg_pcpu=0; foreach $pg_pid (@pg_pids) {
+chomp($pg_pid);
+chomp($pg_mpcpu = qx/ ps -p $pg_pid -o %cpu | tail -1 /);
+$pg_pcpu += $pg_mpcpu if $pg_mpcpu =~ /^\s*-?\d+(\.\d+)?\s*$/;
+}
+print "$pg_act | $pg_pcpu \n";
+}
+#++++++++++++++++++++++++++
+printf "%9s %9s %9s %9s %9s %9s\n","trans","blks_all","tup_mod","tup_returned","temp_files","temp_bytes";
+printf "%9d %9d %9d %9d %9d %9d\n",$delta[0], $delta[1], $delta[2], $delta[3], $delta[4], $delta[5];
+print "------------------------------------------------------------------------\n";
+@b = @a;
+sleep $ssec;
+}
+' 5
+
+
+
+****************************************************** Db2
+perl -e '
+BEGIN{
+       system("db2 connect to $ARGV[0]"); 
+       $ssec = $ARGV[1];
+       #printf "%9s %9s %9s %9s %9s %9s\n","trans","throuput","read","write","rqst","cpu";
+     }
+while(true) {
+$a = qx{db2 -x "select total_app_commits+total_app_rollbacks
+,select_sql_stmts+uid_sql_stmts+ddl_sql_stmts
+,rows_read, rows_inserted+rows_updated+rows_deleted
+,total_rqst_time, rqsts_completed_total
+,cpu_usage_total
+from table(mon_get_database(-2)) cross join table(env_get_system_resources())"};
+$a =~ s/^\s+|\s+$//g;
+@a = split(/\s+/,$a);
+$delta[0] = ($a[0] - $b[0]) / $ssec;
+$delta[1] = ($a[1] - $b[1]) / $ssec;
+$delta[2] = ($a[2] - $b[2]) / $ssec;
+$delta[3] = ($a[3] - $b[3]) / $ssec;
+$delta[4] = sprintf "%.2f", (($a[4] - $b[4]) / ($a[5] - $b[5]));
+$delta[5] = $a[6]; 
+#print "@delta\n";
+system(qq/ db2 -x "select max(application_handle),stmtid,count(*),max(rows_read),max(total_act_time),max(lock_wait_time),sum(total_cpu_time),sum(total_disp_run_queue_time) from table(mon_get_activity(null,-1)) where application_handle <> mon_get_application_handle() group by stmtid" /);
+printf "%9s %9s %9s %9s %9s %9s\n","trans","throuput","read","write","rqst","cpu";
+printf "%9d %9d %9d %9d %9.2f %9d\n",$delta[0], $delta[1], $delta[2], $delta[3], $delta[4], $delta[5];
+print "------------------------------------------------------------------------\n";
+@b = @a;
+sleep $ssec;
+}
+' oradb 5
+
+
