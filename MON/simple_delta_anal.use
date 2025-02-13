@@ -81,3 +81,83 @@ sleep $ssec;
 ' oradb 5
 
 
+
+-----> pkg cache anal
+diff_min=60
+diff_sec=30
+order_by=diff_exec_num # diff_avg_exec_time_millisec diff_avg_rows_read diff_avg_total_cpu_time_microsec
+
+db2 "declare global temporary table before_pcache as (
+select stmtid, executable_id, num_executions
+, stmt_exec_time
+, rows_read
+, rows_modified
+, total_cpu_time
+from table(mon_get_pkg_cache_stmt(null,null,null,-2)))
+definition only
+with replace 
+on commit preserve rows 
+not logged 
+on rollback delete rows"
+
+db2 "declare global temporary table after_pcache like session.before_pcache
+with replace 
+on commit preserve rows 
+not logged 
+on rollback delete rows"
+
+db2 "insert into session.before_pcache 
+select stmtid, max(executable_id) executable_id, sum(num_executions) num_executions
+, sum(stmt_exec_time) stmt_exec_time
+, sum(rows_read) rows_read
+, sum(rows_modified) rows_modified
+, sum(total_cpu_time) total_cpu_time
+from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>$diff_min</modified_within>',-2))
+group by stmtid
+with ur"
+
+sleep $diff_sec
+
+db2 "insert into session.after_pcache 
+select stmtid, max(executable_id) executable_id, sum(num_executions) num_executions
+, sum(stmt_exec_time) stmt_exec_time
+, sum(rows_read) rows_read
+, sum(rows_modified) rows_modified
+, sum(total_cpu_time) total_cpu_time
+from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>$diff_min</modified_within>',-2))
+group by stmtid
+with ur"
+
+db2 +w "select a.stmtid
+, a.executable_id exec_id
+, b.num_executions-a.num_executions diff_exec_num
+, b.stmt_exec_time-a.stmt_exec_time diff_exec_time_millisec
+, int((b.stmt_exec_time-a.stmt_exec_time) / (b.num_executions-a.num_executions)) diff_avg_exec_time_millisec
+, b.rows_read-a.rows_read diff_rows_read
+, int((b.rows_read-a.rows_read) / (b.num_executions-a.num_executions)) diff_avg_rows_read
+, b.rows_read-a.rows_read diff_rows_read
+, int((b.rows_modified-a.rows_modified) / (b.num_executions-a.num_executions)) diff_avg_rows_modified
+, b.total_cpu_time-a.total_cpu_time diff_total_cpu_time_microsec
+, int((b.total_cpu_time-a.total_cpu_time) / (b.num_executions-a.num_executions)) diff_avg_total_cpu_time_microsec
+from session.before_pcache a, session.after_pcache b
+where a.stmtid = b.stmtid
+and (b.num_executions-a.num_executions) > 0
+order by $order_by desc
+with ur"
+
+db2 commit
+
+########## 자원 정리
+db2 drop table session.before_pcache
+db2 drop table session.after_pcache
+db2 commit
+
+########## 추가 분석
+-- package cache의 executable_id로 explain 얻고 싶을때 ($e가 call등이 아니라 statement여야 함)
+db2 "call explain_from_section (x'0000', 'M', null, 0, null, ?, ?, ?, ?, ?)"
+-- package cache의 executable_id로 어떤 object(table or index)가 사용되었는지 (10.5.0.4 부터 가능)
+db2 "select object_type,object_schema,object_name from table(mon_get_section_object(x'0000',null,null,null,null,-2))"
+-- package cache의 executable_id로 전체 stmt_text 얻고 싶을때 : flush되기 전에만 가능
+db2 "select stmt_text from table(mon_get_pkg_cache_stmt(null, x'0000', null, -2))"
+
+
