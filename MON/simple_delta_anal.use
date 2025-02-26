@@ -22,9 +22,9 @@ $delta[4] = ($a[4] - $b[4]) / $ssec;
 $delta[5] = ($a[5] - $b[5]) / $ssec; 
 #print "@delta\n";
 #++++++++++++++++++++++++++
-#system(qq/ psql -t -c "select max(pid),query_id,count(*),max(now()-query_start),max(wait_event_type) from pg_stat_activity where backend_type=\047client backend\047 and (backend_xid is not null or backend_xmin is not null) and pid<>pg_backend_pid() group by query_id"|grep -v \047^[[:space:]]*\$\047 /);
+#system(qq/ psql -t -c "select max(pid),query_id,count(*),max(now()-query_start),max(wait_event_type),max(wait_event) from pg_stat_activity where backend_type=\047client backend\047 and (backend_xid is not null or backend_xmin is not null) and pid<>pg_backend_pid() group by query_id"|grep -v \047^[[:space:]]*\$\047 /);
 
-@pg_activity = qx/ psql -t -c "select max(pid),query_id,count(*),max(now()-query_start),max(wait_event_type) from pg_stat_activity where backend_type=\047client backend\047 and (backend_xid is not null or backend_xmin is not null) and pid<>pg_backend_pid() group by query_id"|grep -v \047^[[:space:]]*\$\047 /;
+@pg_activity = qx/ psql -t -c "select max(pid),query_id,count(*),max(now()-query_start),max(wait_event_type),max(wait_event) from pg_stat_activity where backend_type=\047client backend\047 and (backend_xid is not null or backend_xmin is not null) and pid<>pg_backend_pid() group by query_id"|grep -v \047^[[:space:]]*\$\047 /;
 foreach $pg_act (@pg_activity) {
 chomp($pg_act);
 @pg_acts = split(/\|/,$pg_act);
