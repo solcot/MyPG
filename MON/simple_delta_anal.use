@@ -142,7 +142,7 @@ $delta[3] = ($a[3] - $b[3]) / $ssec;
 $delta[4] = sprintf "%.2f", (($a[4] - $b[4]) / ($a[5] - $b[5]));
 $delta[5] = $a[6]; 
 #print "@delta\n";
-system(qq/ db2 -x "select max(application_handle),stmtid,count(*),max(rows_read),max(total_act_time),max(lock_wait_time),sum(total_cpu_time),sum(total_disp_run_queue_time) from table(mon_get_activity(null,-1)) where application_handle <> mon_get_application_handle() group by stmtid" /);
+system(qq/ db2 -x "select max(application_handle),stmtid,count(*),max(rows_read),max(total_act_time),max(lock_wait_time),sum(total_cpu_time),sum(total_disp_run_queue_time),max(activity_state) from table(mon_get_activity(null,-1)) where application_handle <> mon_get_application_handle() group by stmtid" /);
 printf "%9s %9s %9s %9s %9s %9s\n","trans","throuput","read","write","rqst","cpu";
 printf "%9d %9d %9d %9d %9.2f %9d\n",$delta[0], $delta[1], $delta[2], $delta[3], $delta[4], $delta[5];
 print "------------------------------------------------------------------------\n";
