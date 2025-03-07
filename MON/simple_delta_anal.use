@@ -3,6 +3,7 @@ perl -e '
 BEGIN{
        $ssec = $ARGV[0];
        #printf "%9s %9s %9s %9s %9s %9s\n","trans","blks_all","tup_mod","tup_returned","temp_files","temp_bytes";
+       $|=1;
      }
 while(true) {
 $a = qx{psql -F " " -A -t -c "select sum(xact_commit+xact_rollback) trnas
@@ -125,6 +126,7 @@ BEGIN{
        system("db2 connect to $ARGV[0]"); 
        $ssec = $ARGV[1];
        #printf "%9s %9s %9s %9s %9s %9s\n","trans","throuput","read","write","rqst","cpu";
+       $|=1;
      }
 while(true) {
 $a = qx{db2 -x "select total_app_commits+total_app_rollbacks
