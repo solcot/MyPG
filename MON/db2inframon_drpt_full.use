@@ -36,7 +36,7 @@ export LANG=C
 export DB2CODEPAGE=1208
 export DATABASE=oradb
 . ~/sqllib/db2profile
-export RDAY=95
+export RDAY=100
 cd /var/lib/dbs/db2i115/IFR/MONITOR
 
 #### db2 monitor
