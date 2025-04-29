@@ -396,7 +396,6 @@ else {
 $loopcnt = 0;
 
 print "+" x 100 . "\n";
-print "+" x 100 . "\n";
 close(LOG_APINFO);
 
 sub do_help { 
