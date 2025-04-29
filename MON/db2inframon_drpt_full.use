@@ -1,14 +1,16 @@
-alias taildb2mon='tail -100f ~/IFR/MONITOR/LOG_PERL_D/`date +%Y%m`/db2inframon_`date +%Y%m%d`.log'
-alias taildb2mont='tail -100f ~/IFR/MONITOR/LOG_PERL/`date +%Y%m`/db2inframon_`date +%Y%m%d`.log'
-alias taildb2monq='tail -100f ~/IFR/MONITOR/LOG_PERL/`date +%Y%m`/drpt_`date +%Y%m%d`.log'
+export IFRDIR=/var/lib/dbs/db2i115/IFR
+
+alias taildb2mon='tail -100f ${IFRDIR}/MONITOR/LOG_PERL_D/`date +%Y%m`/db2inframon_`date +%Y%m%d`.log'
+alias taildb2mont='tail -100f ${IFRDIR}/MONITOR/LOG_PERL/`date +%Y%m`/db2inframon_`date +%Y%m%d`.log'
+alias taildb2monq='tail -100f ${IFRDIR}/MONITOR/LOG_PERL/`date +%Y%m`/drpt_`date +%Y%m%d`.log'
 
 --------------------------------------------------------------------------------------------
 
 
 ************************* check db2inframon porcess
-1 * * * * sh ~/IFR/MONITOR/infradb2mon_check.sh > ~/IFR/MONITOR/infradb2mon_check.sh.log 2>&1
+1 * * * * sh ${IFRDIR}/MONITOR/infradb2mon_check.sh > ${IFRDIR}/MONITOR/infradb2mon_check.sh.log 2>&1
 
-cat > ~/IFR/MONITOR/infradb2mon_check.sh <<'EEOFF'
+cat > ${IFRDIR}/MONITOR/infradb2mon_check.sh <<'EEOFF'
 #!/usr/bin/sh
 export LANG=C
 export TERM=vt100
@@ -17,7 +19,7 @@ ps -ef | grep /var/lib/dbs/db2i115/IFR/MONITOR/db2inframon.sh | grep -v grep
 ret=$?
 
 if [ $ret -ne 0 ]; then
-nohup sh ~/IFR/MONITOR/db2inframon.sh > ~/IFR/MONITOR/db2inframon.sh.log 2>&1 &
+nohup sh ${IFRDIR}/MONITOR/db2inframon.sh > ${IFRDIR}/MONITOR/db2inframon.sh.log 2>&1 &
 restartdate=$(date)
 echo "$restartdate --> restart"
 fi
@@ -170,7 +172,7 @@ END{
 '
 
 ************************* archive log count anal
-find ~/IFR/MONITOR/LOG_PERL -name "db2inframon_????????.log_logs" -mtime -28 |xargs grep -Ee "Method 1 Next Log to Archive" |perl -ane '
+find ${IFRDIR}/MONITOR/LOG_PERL -name "db2inframon_????????.log_logs" -mtime -28 |xargs grep -Ee "Method 1 Next Log to Archive" |perl -ane '
 /(\d{8})/; $hs{$1} = $F[-1];
 END {
 foreach $key (sort keys %hs) {
@@ -183,7 +185,7 @@ printf "F: %d -- E: %d -- Diff: %d \n", $ars[0], $ars[-1], $ars[-1]-$ars[0];
 '
 
 ************************* CPU / Rqsttime / Trans / Rows_read / Rows_write anal
-find ~/IFR/MONITOR/LOG_PERL -name "db2inframon_*.log" -mtime -28 |xargs grep -Ee "CPU |Rqsttime |Trans |Rows_read |Rows_write " |perl -MData::Dumper -ane '
+find ${IFRDIR}/MONITOR/LOG_PERL -name "db2inframon_*.log" -mtime -28 |xargs grep -Ee "CPU |Rqsttime |Trans |Rows_read |Rows_write " |perl -MData::Dumper -ane '
 if ( $F[0] + 0 eq $F[0] ) {
    $date = substr($F[0], 0, 8);
 $time = substr($F[0], 8);
