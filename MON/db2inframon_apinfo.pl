@@ -287,9 +287,7 @@ system(qq/ db2 -x "select max(application_handle)::varchar(10),stmtid,count(*),m
 ## timediff
 print "dbsecdiff: $snapdbtimediff tabsecdiff: $snaptabtimediff applsecdiff: $snapappltimediff\n";
 ## cpu
-#$avmm = int($avm*4/1024); #aix
-#$frem = int($fre*4/1024); #aix
-#print "$adate CPU $cpu < R: $rq B: $bq P: $pq W: $wq AVM: $avmm FRE: $frem FI: $fi FO: $fo PI: $pi PO: $po IN: $in SC: $sc CS: $cs U: $us S: $sy W: $wa I: $id >\n";  #aix
+#print "$adate CPU $cpu < R: $rq B: $bq P: $pq W: $wq AVM: $avm FRE: $fre FI: $fi FO: $fo PI: $pi PO: $po IN: $in SC: $sc CS: $cs U: $us S: $sy W: $wa I: $id >\n";  #aix
 print "$adate CPU $cpu < R: $rq B: $bq PG: $swap FRE: $free BUFF: $buff CACHE: $cache FI: $fi FO: $fo PI: $pi PO: $po IN: $in CS: $cs U: $us S: $sy W: $wa I: $id >\n"; #linux
 print "$adate CPU: $gcpu\n";
 ## lock
