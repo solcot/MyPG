@@ -38,10 +38,10 @@ export TERM=ansi
 export LANG=C
 export DB2CODEPAGE=1208
 . ~/sqllib/db2profile
-export RDAY=100
 export DATABASE=oradb
 export IFRDIR=/var/lib/dbs/db2i115/IFR
 cd ${IFRDIR}/MONITOR
+export RDAY=100
 
 #### db2 monitor
 cnt=0; rr=0; while true
