@@ -14,8 +14,9 @@ cat > ${IFRDIR}/MONITOR/infradb2mon_check.sh <<'EEOFF'
 #!/usr/bin/sh
 export LANG=C
 export TERM=vt100
+export IFRDIR=/var/lib/dbs/db2i115/IFR
 
-ps -ef | grep /var/lib/dbs/db2i115/IFR/MONITOR/db2inframon.sh | grep -v grep
+ps -ef | grep ${IFRDIR}/MONITOR/db2inframon.sh | grep -v grep
 ret=$?
 
 if [ $ret -ne 0 ]; then
@@ -36,10 +37,11 @@ cat > db2inframon.sh <<'EEOFF'
 export TERM=ansi
 export LANG=C
 export DB2CODEPAGE=1208
-export DATABASE=oradb
 . ~/sqllib/db2profile
 export RDAY=100
-cd /var/lib/dbs/db2i115/IFR/MONITOR
+export DATABASE=oradb
+export IFRDIR=/var/lib/dbs/db2i115/IFR
+cd ${IFRDIR}/MONITOR
 
 #### db2 monitor
 cnt=0; rr=0; while true
@@ -50,18 +52,18 @@ sleep 5
 
 if [ `expr $cnt % 120` -eq 0 ];
 then
-        perl ./db2inframon_apinfo.pl -d $DATABASE -s 0 -q 10000000 -w 1000000 -e 10000000 -t 5 -a 0 -p 0 -o ./LOG_PERL -z -x -c -O
-        #perl ./db2inframon_apinfo.pl -d $DATABASE -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o ./LOG_PERL -z -x -c -O
+        #perl ./db2inframon_apinfo.pl -d $DATABASE -s 0 -q 10000000 -w 1000000 -e 10000000 -t 5 -a 0 -p 0 -o ./LOG_PERL -z -x -c -O
+        perl ./db2inframon_apinfo.pl -d $DATABASE -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o ./LOG_PERL -z -x -c -O
         sleep 5
         
         if [ `expr $cnt % 240` -eq 0 ];
         then
                 if [ $rr -eq 0 ];
                 then
-                        perl ./inframon_drpt_full.pl -c 6 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -e -o ./LOG_PERL
+                        #perl ./inframon_drpt_full.pl -c 6 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -e -o ./LOG_PERL
                         rr=1
                 else
-                        perl ./inframon_drpt_full.pl -c 6 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -o ./LOG_PERL
+                        #perl ./inframon_drpt_full.pl -c 6 -u 3 -t 5 -x ./package.sh -y ./package.sh -n ./package_header.sh -l ./package_log.sh -q 2 -o ./LOG_PERL
                         rr=0
                 fi
 
@@ -79,12 +81,14 @@ done
 EEOFF
 
 
+
 cat > package.sh <<'EEOFF'
 db2 connect to $DATABASE > /dev/null
 db2 -x "select executable_id, num_exec_with_metrics, rows_read, total_cpu_time, stmt_exec_time, rows_modified, lock_waits 
 from table(mon_get_pkg_cache_stmt(null,null,'<modified_within>20</modified_within>',-2))"
 
 EEOFF
+
 
 
 cat > package_header.sh <<'EEOFF'
