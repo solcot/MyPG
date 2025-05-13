@@ -41,7 +41,7 @@ export PGDB=16390
 export RDAY=95
 cd /var/lib/pgsql/15/IFR/MONITOR
 
-#### db2 monitor
+#### pg monitor
 cnt=0; rr=0; while true 
 do
 perl ./pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o ./LOG_PERL_D -z -x -c -v #-O
