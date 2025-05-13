@@ -169,8 +169,9 @@ END{
 '
 
 ************************* archive log count anal
-find $PGINFRAMON/LOG_PERL -name "pginframon_????????.log_archiver" -mtime -28 |xargs grep -Ee "last_archived_wal" |perl -ane '
-/(\d{8})/; $hs{$1} = hex("x". substr($F[-1],8,16));
+find $PGINFRAMON/LOG_PERL -name "pginframon_????????.log_archiver" -mtime -28 |xargs grep -Ee "archived_count" |perl -ane '
+#/(\d{8})/; $hs{$1} = hex("x". substr($F[-1],8,16));
+/(\d{8})/; $hs{$1} = $F[-1];
 END {
 foreach $key (sort keys %hs) {
 $a = $hs{$key}; push @ars, $a;
