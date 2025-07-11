@@ -405,8 +405,11 @@ try:
                     sell(sym, qty)
                 soldout = True
                 bought_list = []
-                time.sleep(1)
+                #time.sleep(1)
+                time.sleep(60)
         if t_exit < t_now:  # PM 03:20 ~ :프로그램 종료
+            send_message("종료시점 보유주식 조회내역은 아래와 같습니다.")
+            get_stock_balance()
             send_message("프로그램을 종료합니다.")
             break
 except Exception as e:
