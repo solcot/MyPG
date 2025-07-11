@@ -4,6 +4,7 @@ import datetime
 import time
 import yaml
 import random
+import math
 
 with open('C:\\StockPy\\config.yaml', encoding='UTF-8') as f:
     _cfg = yaml.load(f, Loader=yaml.FullLoader)
