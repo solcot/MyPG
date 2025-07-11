@@ -95,6 +95,11 @@ def get_target_price(code="005930"):
         return None # 데이터가 부족하면 목표가를 계산할 수 없으므로 None 반환
         
     try:
+        ### 아래 참고 #######################
+        ### stck_oprc: 시가 (Open Price)
+        ### stck_hgpr: 고가 (High Price)
+        ### stck_lwpr: 저가 (Low Price)
+        ### stck_clpr: 종가 (Close Price)
         stck_oprc = int(output[0]['stck_oprc']) # 오늘 시가
         
         #prev_day_open = int(output[1]['stck_oprc']) # 전일 시가
