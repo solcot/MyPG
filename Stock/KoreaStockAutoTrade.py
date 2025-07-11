@@ -282,12 +282,22 @@ try:
     #### 에프엔가이드,신라젠,DN오토모티브,이노션,제일기획
     random.shuffle(symbol_list)
     bought_list = [] # 매수 완료된 종목 리스트
-    total_cash = get_balance() # 보유 현금 조회
+    total_cash = get_balance() - 10000 # 보유 현금 조회 (10,000원 제외)
+    if total_cash < 0: # 잔액이 마이너스가 되는 경우 방지
+        total_cash = 0
     stock_dict = get_stock_balance() # 보유 주식 조회
     for sym in stock_dict.keys():
         bought_list.append(sym)
     target_buy_count = 15 # 매수할 종목 수
-    buy_percent = 0.066 # 종목당 매수 금액 비율
+
+    # 이미 매수한 종목 수를 고려하여 buy_percent 계산
+    remaining_buy_count = target_buy_count - len(bought_list)
+    if remaining_buy_count <= 0:
+        buy_percent = 0 # 더 이상 매수할 종목이 없으면 비율을 0으로 설정
+    else:
+        # 소수점 셋째 자리까지 유지하고 넷째 자리부터 버림
+        buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
+    
     buy_amount = total_cash * buy_percent  # 종목별 주문 금액 계산
     soldout = False
 
