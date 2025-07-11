@@ -321,7 +321,7 @@ try:
             soldout = True
             bought_list = []
             #----------------------매도 실패로 남아있는 주식이 있을수 있으므로-------------------------------
-            time.sleep(15)
+            time.sleep(60)
             total_cash = get_balance() - 10000 # 보유 현금 조회 (10,000원 제외)
             if total_cash < 0: # 잔액이 마이너스가 되는 경우 방지
                 total_cash = 0
