@@ -96,9 +96,19 @@ def get_target_price(code="005930"):
         
     try:
         stck_oprc = int(output[0]['stck_oprc']) # 오늘 시가
-        stck_hgpr = int(output[1]['stck_hgpr']) # 전일 고가
-        stck_lwpr = int(output[1]['stck_lwpr']) # 전일 저가
-        target_price = stck_oprc + (stck_hgpr - stck_lwpr) * 0.5
+        
+        #prev_day_open = int(output[1]['stck_oprc']) # 전일 시가
+        prev_day_open = int(output[1]['stck_lwpr']) # 전일 저가
+
+        #prev_day_close = int(output[1]['stck_clpr']) # 전일 종가
+        prev_day_close = int(output[1]['stck_hgpr']) # 전일 고가
+
+        # 전일 시가(or저가)와 종가(or고가) 중 높은 가격을 전일 고가로, 낮은 가격을 전일 저가로 설정
+        stck_hgpr_adjusted = max(prev_day_open, prev_day_close)
+        stck_lwpr_adjusted = min(prev_day_open, prev_day_close)
+
+        target_price = stck_oprc + (stck_hgpr_adjusted - stck_lwpr_adjusted) * 0.5   # 0.5 보다 다른 수치도 필요시 적용해 볼 것
+        
         return target_price
     except KeyError as e:
         send_message(f"[{code}] API 응답에서 필요한 키 누락: {e}. 응답 전문: {output}")
