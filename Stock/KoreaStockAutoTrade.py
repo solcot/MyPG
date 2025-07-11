@@ -320,7 +320,26 @@ try:
                 sell(sym, qty)
             soldout = True
             bought_list = []
-            stock_dict = get_stock_balance()
+            #----------------------매도 실패로 남아있는 주식이 있을수 있으므로-------------------------------
+            time.sleep(15)
+            total_cash = get_balance() - 10000 # 보유 현금 조회 (10,000원 제외)
+            if total_cash < 0: # 잔액이 마이너스가 되는 경우 방지
+                total_cash = 0
+            stock_dict = get_stock_balance() # 보유 주식 조회
+            for sym in stock_dict.keys():
+                bought_list.append(sym)
+
+            # 이미 매수한 종목 수를 고려하여 buy_percent 계산
+            remaining_buy_count = target_buy_count - len(bought_list)
+            if remaining_buy_count <= 0:
+                buy_percent = 0 # 더 이상 매수할 종목이 없으면 비율을 0으로 설정
+            else:
+                # 소수점 셋째 자리까지 유지하고 넷째 자리부터 버림
+                buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
+            
+            buy_amount = total_cash * buy_percent  # 종목별 주문 금액 계산
+            #--------------------------------------------------------------------------------------------
+            #stock_dict = get_stock_balance()
         if t_start < t_now < t_sell :  # AM 09:05 ~ PM 03:15 : 매수
             for sym in symbol_list:
                 if len(bought_list) < target_buy_count:
