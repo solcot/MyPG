@@ -439,8 +439,8 @@ try:
     send_message("===국내 주식 자동매매 프로그램을 시작합니다===")
     while True:
         t_now = datetime.now()
-        t_9 = t_now.replace(hour=9, minute=0, second=0, microsecond=0)
-        t_start = t_now.replace(hour=9, minute=5, second=0, microsecond=0)
+        t_9 = t_now.replace(hour=9, minute=0, second=15, microsecond=0)
+        t_start = t_now.replace(hour=9, minute=3, second=0, microsecond=0)
         #t_sell = t_now.replace(hour=15, minute=15, second=0, microsecond=0)
         #t_exit = t_now.replace(hour=15, minute=20, second=0,microsecond=0)
         t_sell = t_now.replace(hour=14, minute=58, second=0, microsecond=0)
@@ -449,13 +449,13 @@ try:
         if today == 5 or today == 6:  # 토요일이나 일요일이면 자동 종료
             send_message("주말이므로 프로그램을 종료합니다.")
             break
-        if t_9 < t_now < t_start and soldout == False: # # AM 09:00 ~ PM 09:05 : 잔여 수량 매도
+        if t_9 < t_now < t_start and soldout == False: # # AM 09:00 ~ AM 09:03 : 잔여 수량 매도
             for sym, qty in stock_dict.items():
                 sell(sym, qty)
             soldout = True
             bought_list = []
             stock_dict = get_stock_balance()
-        if t_start < t_now < t_sell:  # AM 09:05 ~ PM 02:58 : 매수
+        if t_start < t_now < t_sell:  # AM 09:03 ~ PM 02:58 : 매수
             for sym in symbol_list:
                 if len(bought_list) < target_buy_count:
                     if sym in bought_list:
@@ -489,7 +489,7 @@ try:
                 soldout = True
                 bought_list = []
                 time.sleep(1)
-        if t_exit < t_now:  # PM 03:05 ~ :프로그램 종료
+        if t_exit < t_now:  # PM 03:03 ~ :프로그램 종료
             send_message("종료시점 보유주식 조회내역은 아래와 같습니다.")
             get_stock_balance()
             send_message("프로그램을 종료합니다.")
