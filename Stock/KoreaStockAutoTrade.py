@@ -1,10 +1,13 @@
 import requests
 import json
-import datetime
 import time
 import yaml
 import random
 import math
+import pandas as pd
+from io import BytesIO
+from datetime import datetime, timedelta
+from holidayskr import is_holiday
 
 with open('C:\\StockPy\\config.yaml', encoding='UTF-8') as f:
     _cfg = yaml.load(f, Loader=yaml.FullLoader)
@@ -18,7 +21,7 @@ URL_BASE = _cfg['URL_BASE']
 
 def send_message(msg):
     """디스코드 메세지 전송"""
-    now = datetime.datetime.now()
+    now = datetime.now()
     message = {"content": f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] {str(msg)}"}
     requests.post(DISCORD_WEBHOOK_URL, data=message)
     print(message)
@@ -48,6 +51,150 @@ def hashkey(datas):
     hashkey = res.json()["HASH"]
     return hashkey
 
+def get_last_trading_day():
+    day = datetime.today() - timedelta(days=1)
+    while day.weekday() >= 5 or is_holiday(day.strftime("%Y-%m-%d")):
+        day -= timedelta(days=1)
+    return day.strftime('%Y%m%d')
+
+def fetch_krx_data(mktId, trade_date):
+    otp_url = 'http://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd'
+    otp_form_data = {
+        'locale': 'ko_KR',
+        'name': 'fileDown',
+        'url': 'dbms/MDC/STAT/standard/MDCSTAT01501',  # 이 부분이 핵심
+        'mktId': mktId,            # 'STK', 'KSQ'
+        'trdDd': trade_date,
+        'money': '1',              # 원 단위
+        'csvxls_isNo': 'false'
+    }
+    headers = {
+        'Referer': 'http://data.krx.co.kr/contents/MDC/MDI/mdiLoader',
+        'User-Agent': 'Mozilla/5.0'
+    }
+
+    send_message(f"OTP 코드 생성 요청 중... 시장: {mktId}, 날짜: {trade_date}")
+    otp_response = requests.post(otp_url, data=otp_form_data, headers=headers)
+    if otp_response.status_code != 200:
+        send_message(f"OTP 요청 실패: 상태 코드 {otp_response.status_code}")
+        send_message(otp_response.text)
+        return None
+    otp_code = otp_response.text
+
+    send_message(f"CSV 파일 다운로드 중... 시장: {mktId}")
+    csv_url = 'http://data.krx.co.kr/comm/fileDn/download_csv/download.cmd'
+    csv_response = requests.post(csv_url, data={'code': otp_code}, headers=headers)
+    if csv_response.status_code != 200:
+        send_message(f"CSV 다운로드 실패: 상태 코드 {csv_response.status_code}")
+        send_message(csv_response.text)
+        return None
+
+    try:
+        df = pd.read_csv(BytesIO(csv_response.content), encoding='euc-kr')
+        return df
+    except Exception as e:
+        send_message(f"CSV 파싱 오류: {e}")
+        return None
+
+def get_all_symbols():
+    trade_date = get_last_trading_day()
+    send_message(f"✅ 최종 거래일은 {trade_date} 입니다.")
+
+    df_kospi = fetch_krx_data('STK', trade_date)
+    df_kosdaq = fetch_krx_data('KSQ', trade_date)
+
+    if df_kospi is None and df_kosdaq is None:
+        send_message("❌ KOSPI와 KOSDAQ 데이터 모두 가져오기 실패")
+        return []
+    elif df_kospi is None:
+        df = df_kosdaq
+    elif df_kosdaq is None:
+        df = df_kospi
+    else:
+        df = pd.concat([df_kospi, df_kosdaq], ignore_index=True)
+
+    if df is None or df.empty:
+        send_message("❌ 데이터 로드 실패: 데이터프레임이 비어 있습니다.")
+        return []
+
+    send_message(f"\n✅ 전체 종목 수: {len(df)}")
+    #print("\n✅ 열 이름:")
+    #print(df.columns.tolist())
+    #print("\n✅ 원본 상위 10개 샘플:")
+    #print(df.head(10))
+
+    try:
+        df['등락률'] = df['등락률'].astype(str).str.replace('%', '', regex=False).astype(float)
+        df['종가'] = pd.to_numeric(df['종가'], errors='coerce')
+        df['시가'] = pd.to_numeric(df['시가'], errors='coerce')
+        df['고가'] = pd.to_numeric(df['고가'], errors='coerce')
+        df['저가'] = pd.to_numeric(df['저가'], errors='coerce')
+        df['시가총액'] = pd.to_numeric(df['시가총액'], errors='coerce')
+        df['거래량'] = pd.to_numeric(df['거래량'], errors='coerce')
+        df['거래대금'] = pd.to_numeric(df['거래대금'], errors='coerce')
+    except KeyError as e:
+        send_message(f"❌ 열 이름 오류: {e}")
+        send_message("사용 가능한 열:", df.columns.tolist())
+        return []
+
+    # 거래대금 단위가 억/천 단위일 수 있으므로 조정 확인 필요
+    #print("\n✅ 거래대금 단위 확인 (상위 5개):")
+    #print(df['거래대금'].head(5))
+
+    # 변동폭 비율 계산
+    df['전일변동폭비율'] = (df['고가'] - df['저가']) / df['저가']
+
+    # 필터링
+    filtered = df[
+        #(df['등락률'] >= -1) & (df['등락률'] <= 1) &           # 전일 등락률이 -1% ~ +1% 범위: 과하게 급등/급락하지 않은 종목
+        (df['등락률'] >= -1.5) & (df['등락률'] <= 1.5) &           # 전일 등락률이 -1% ~ +1% 범위: 과하게 급등/급락하지 않은 종목
+        #(df['종가'] >= 3000) & (df['종가'] <= 30000) &         # 전일 종가가 3,000원 이상 30,000원 이하: 저가/고가 extremes 제외
+        (df['종가'] >= 3000) & (df['종가'] <= 50000) &         # 전일 종가가 3,000원 이상 30,000원 이하: 저가/고가 extremes 제외
+        (df['시가총액'] >= 1e11) & (df['시가총액'] <= 1e12) &  # 시가총액이 1,000억 원 ~ 1조 원: 너무 작지도 크지도 않은 종목군
+        (df['거래량'] >= 50000) &                              # 전일 거래량 5만 주 이상: 유동성이 충분한 종목
+        (df['거래대금'] >= 2e9) &                              # 전일 거래대금 20억 원 이상: 자금이 어느 정도 몰린 종목
+        (df['전일변동폭비율'] >= 0.03)                         # 전일 고가/저가 차이가 3% 이상: 변동성이 있었던 종목
+    ].copy()  # .copy()는 SettingWithCopyWarning 방지를 위한 명시적 복사
+
+    ## 필터 조건
+    #filtered = df[
+    #    (df['등락률'] >= -1) & (df['등락률'] <= 0.5) &
+    #    (df['종가'] >= 3000) & (df['종가'] <= 30000) &
+    #    (df['시가총액'] >= 1e11) & (df['시가총액'] <= 1e12) &
+    #    (df['거래대금'] >= 1e9)  # 10억 원 이상
+    #]
+
+    #print(f"\n✅ 조건 만족 종목 수: {len(filtered)}")
+    #print("\n✅ 조건 만족 상위 10개 샘플:")
+    #print(filtered[['종목명', '종목코드', '종가', '등락률', '시가총액', '거래대금']].head(10))
+    #
+    ## 종목코드 리스트 생성
+    #symbols = filtered['종목코드'].astype(str).str.zfill(6).tolist()
+    #random.shuffle(symbols)
+
+    #print("\n✅ 예시 종목코드:", symbols[:5])
+    #return symbols
+
+
+    # 기존 필터 이후 추가
+    filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금']
+
+    # 점수 기준 정렬 → 상위 30개 추출
+    #top_filtered = filtered.sort_values(by='점수', ascending=False).head(30)
+    top_filtered = filtered.sort_values(by='점수', ascending=False)
+
+    send_message(f"\n✅ 최종 선정 종목 수: {len(top_filtered)}")
+    #print("\n✅ 상위 점수 종목 샘플:")
+    #print(top_filtered[['종목명', '종목코드', '종가', '전일변동폭비율', '거래대금', '점수']].head(10))
+    #print(top_filtered)
+
+    # 종목코드 리스트 생성 (정렬 순서 유지)
+    symbols = top_filtered['종목코드'].astype(str).str.zfill(6).tolist()
+    #print(f"\n✅ 최종 선정 종목코드 수: {len(symbols)}")
+    #print("\n✅ 예시 종목코드:", symbols)
+
+    return symbols
+    
 def get_current_price(code="005930"):
     """현재가 조회"""
     PATH = "uapi/domestic-stock/v1/quotations/inquire-price"
@@ -268,51 +415,7 @@ def sell(code="005930", qty="1"):
 try:
     ACCESS_TOKEN = get_access_token()
 
-    symbol_list = [
-        "048870", "032680", "071200", "014440", "115440",
-        "128540", "130580", "187270", "265560", "339950",
-        "356890", "234080", "284740", "450950", "001060",
-        "090850", "237880", "072870", "206650", "200710",
-        "234340", "181710", "002710", "158430", "469070",
-        "030190", "083500", "102970", "037030", "200880",
-        "403870", "001680", "452160", "002350", "376900",
-        "013990", "457550", "005880", "082740", "222800",
-        "058610", "445290", "028670", "487240", "102970",
-        "475150", "006800", "028050", "130660", "173130",
-        "290270", "319400", "038500", "001440", "031820",
-        "054920", "010280", "144960", "032820", "032350",
-        "064850", "215600", "007340", "214320", "030000",
-        "036640", "083450", "319660", "009470", "005810",
-        "000240", "003490", "023590", "194480", "020760",
-        "012340", "009290", "011200", "022100", "067280",
-        "004990", "001230", "017900", "042670", "174360",
-        "063570", "122900", "136480", "251270", "286940",
-        "034310", "109740", "068760", "105630", "475560",
-        "357880", "413640", "089590", "298690", "267980",
-        "014970", "088390", "048410", "307870", "115310"
-    ] # 매수 희망 종목 리스트
-    #### 시너지이노베이션,소프트센,인피니트헬스케어,영보화학,우리넷
-    #### 에코캡,나이스디앤비,신화콘텍,영화테크,아이비김영
-    #### 싸이버원,JW생명과학,쿠쿠홈시스,아스테라시스,JW중외제약
-    #### 현대이지웰,클리오,메가스터디,유바이오로직스,에이디테크놀로지
-    #### 헥토파이낸셜,NHN,TCC스틸,아톤,RISE AI&로봇
-    #### NICE평가정보,에프엔에스테크,KODEX 증권,파워넷,서연이화
-    #### HPSP,대상,제이엔비,넥센타이어,로킷헬스케어
-    #### 아가방컴퍼니,우진엔텍,대한해운,한화엔진,심텍
-    #### 에스피지,KODEX 로봇액티브,팬오션,KODEX AI전력핵심설비,KODEX 증권
-    #### SK이터닉스,미래에셋증권,삼성E&A,한전산업,오파스넷
-    #### 휴네시온,현대무벡스,삼표시멘트,대한전선,아이티센씨티에스
-    #### 한컴위드,아이티센엔텍,뉴파워프라즈마,우리기술,롯데관광개발
-    #### 에프엔가이드,신라젠,DN오토모티브,이노션,제일기획
-    #### HRS,GST,피에스케이,삼화전기,풍산홀딩스
-    #### 한국앤컴퍼니,대한항공,다우기술,데브시스터즈,일진디스플
-    #### 뉴인텍,광동제약,HMM,포스코DX,멀티캠퍼스
-    #### 롯데지주,동국홀딩스,광전자,HD현대인프라코어,RISE 중국본토대형주CSI100
-    #### NICE인프라,아이마켓코리아,하림,넷마블,롯데이노베이트
-    #### NICE,디에스케이,셀트리온제약,한세실업,더본코리아
-    #### SKAI,비아이매트릭스,제주항공,에어부산,매일유업
-    #### 삼륭물산,이녹스,현대바이오,비투엔,인포바인
-    random.shuffle(symbol_list)
+    symbol_list = get_all_symbols()
     bought_list = [] # 매수 완료된 종목 리스트
     total_cash = get_balance() - 10000 # 보유 현금 조회 (10,000원 제외)
     if total_cash < 0: # 잔액이 마이너스가 되는 경우 방지
@@ -335,14 +438,14 @@ try:
 
     send_message("===국내 주식 자동매매 프로그램을 시작합니다===")
     while True:
-        t_now = datetime.datetime.now()
+        t_now = datetime.now()
         t_9 = t_now.replace(hour=9, minute=0, second=0, microsecond=0)
         t_start = t_now.replace(hour=9, minute=5, second=0, microsecond=0)
         #t_sell = t_now.replace(hour=15, minute=15, second=0, microsecond=0)
         #t_exit = t_now.replace(hour=15, minute=20, second=0,microsecond=0)
         t_sell = t_now.replace(hour=14, minute=58, second=0, microsecond=0)
         t_exit = t_now.replace(hour=15, minute=3, second=0,microsecond=0)
-        today = datetime.datetime.today().weekday()
+        today = datetime.today().weekday()
         if today == 5 or today == 6:  # 토요일이나 일요일이면 자동 종료
             send_message("주말이므로 프로그램을 종료합니다.")
             break
