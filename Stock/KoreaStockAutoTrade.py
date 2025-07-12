@@ -177,7 +177,7 @@ def get_all_symbols():
 
 
     # 기존 필터 이후 추가
-    filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금']
+    filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금']   # 전일에 가격도 크게 움직이고, 돈도 많이 몰린 종목을 추리기 위해
 
     # 점수 기준 정렬 → 상위 30개 추출
     #top_filtered = filtered.sort_values(by='점수', ascending=False).head(30)
