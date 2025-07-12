@@ -416,6 +416,7 @@ try:
     ACCESS_TOKEN = get_access_token()
 
     symbol_list = get_all_symbols()
+    # send_message(f"\n✅ 구매 예정 종목코드: {symbol_list}")
     bought_list = [] # 매수 완료된 종목 리스트
     total_cash = get_balance() - 10000 # 보유 현금 조회 (10,000원 제외)
     if total_cash < 0: # 잔액이 마이너스가 되는 경우 방지
