@@ -250,7 +250,7 @@ def check_stop_loss(threshold=-3.0):
             time.sleep(0.5)
 
     return stopped_out
-    
+
 def get_current_price(code="005930"):
     """현재가 조회"""
     PATH = "uapi/domestic-stock/v1/quotations/inquire-price"
@@ -514,6 +514,8 @@ try:
     soldout = False
 
     send_message("===국내 주식 자동매매 프로그램을 시작합니다===")
+    last_stop_loss_check_time = datetime.now() - timedelta(minutes=1) # 초기값 설정
+
     while True:
         t_now = datetime.now()
         t_9 = t_now.replace(hour=9, minute=0, second=15, microsecond=0)
@@ -532,28 +534,31 @@ try:
             soldout = True
             bought_list = []
             stock_dict = get_stock_balance()
-        if t_start < t_now < t_sell:  # AM 09:03 ~ PM 02:58 : 매수               
-            # 손절 감시 (과도한 출력 없이) -------------------------------------------------------
-            stopped = check_stop_loss(threshold=-3.0)
-            if stopped:
-                for sym in stopped:
-                    if sym in bought_list:
-                        bought_list.remove(sym)
-                    #if sym in symbol_list:
-                    #    symbol_list.remove(sym)
-                        
-                time.sleep(30)  # 급격한 재매수 방지용 (API 요청 부하 완화)
 
-                # 🧮 손절 후 남은 종목 수 기준으로 buy_amount 재계산
-                remaining_buy_count = target_buy_count - len(bought_list)
-                if remaining_buy_count > 0:
-                    buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
-                    total_cash = get_balance() - 10000  # 현재 현금 기준 재계산
-                    if total_cash < 0:
-                        total_cash = 0
-                    buy_amount = total_cash * buy_percent
-                else:
-                    buy_amount = 0  # 남은 슬롯 없음 → 매수 불가
+        if t_start < t_now < t_sell:  # AM 09:03 ~ PM 02:58 : 매수     
+            # 손절 감시 (과도한 출력 없이) -------------------------------------------------------            
+            if (t_now - last_stop_loss_check_time).total_seconds() >= 30: # 30초마다 체크
+                stopped = check_stop_loss(threshold=-3.0)
+                if stopped:
+                    for sym in stopped:
+                        if sym in bought_list:
+                            bought_list.remove(sym)
+                        # **여기서 symbol_list에서도 해당 종목을 제거하는 로직 추가**
+                        if sym in symbol_list:
+                            symbol_list.remove(sym)
+
+                    time.sleep(30) # 급격한 재매수 방지용
+                    # 🧮 손절 후 남은 종목 수 기준으로 buy_amount 재계산
+                    remaining_buy_count = target_buy_count - len(bought_list)
+                    if remaining_buy_count > 0:
+                        buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
+                        total_cash = get_balance() - 10000
+                        if total_cash < 0:
+                            total_cash = 0
+                        buy_amount = total_cash * buy_percent
+                    else:
+                        buy_amount = 0
+                last_stop_loss_check_time = t_now # 마지막 체크 시간 업데이트
             # 손절 감시 끝 ------------------------------------------------------------------
 
             for sym in symbol_list:
