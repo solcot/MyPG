@@ -483,7 +483,13 @@ try:
                     if sym in bought_list:
                         continue
 
-                    target_price, open_price = get_price_info(sym) # k값조정시: target_price, open_price = get_price_info(sym, 0.7)
+                    # t_now가 13:00 이후이고 매수 종목 수가 target_buy_count 미만이면 k를 동적으로 낮춤
+                    if t_now >= t_now.replace(hour=13, minute=0, second=0) and len(bought_list) < target_buy_count:
+                        k = 0.3  # 예시: 0.5 → 0.3으로 완화
+                    else:
+                        k = 0.5
+                        
+                    target_price, open_price = get_price_info(sym, k)
                     current_price = get_current_price(sym)
                     if open_price is None or target_price is None or current_price is None: # 가격을 가져오지 못했으면 다음 종목으로 넘어감
                         send_message(f"[{sym}] 가격 수신 실패. 다음 종목으로 넘어갑니다.")
