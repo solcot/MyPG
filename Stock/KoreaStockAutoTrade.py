@@ -448,8 +448,8 @@ try:
         t_sell = t_now.replace(hour=14, minute=58, second=0, microsecond=0)
         t_exit = t_now.replace(hour=15, minute=3, second=0,microsecond=0)
         today = datetime.today().weekday()
-        if today == 5 or today == 6:  # 토요일이나 일요일이면 자동 종료
-            send_message("주말이므로 프로그램을 종료합니다.")
+        if today == 5 or today == 6 or is_holiday(today.strftime("%Y-%m-%d")):  # 토요일/일요일/휴일 이면 자동 종료
+            send_message("휴일이므로 프로그램을 종료합니다.")
             break
         if t_9 < t_now < t_start and soldout == False: # # AM 09:00 ~ AM 09:03 : 잔여 수량 매도
             for sym, qty in stock_dict.items():
