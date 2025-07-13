@@ -195,7 +195,7 @@ def get_all_symbols():
     #print("\n✅ 예시 종목코드:", symbols)
 
     return symbols
-    
+
 def get_current_price(code="005930"):
     """현재가 조회"""
     PATH = "uapi/domestic-stock/v1/quotations/inquire-price"
@@ -209,66 +209,86 @@ def get_current_price(code="005930"):
     "fid_cond_mrkt_div_code":"J",
     "fid_input_iscd":code,
     }
-    res = requests.get(URL, headers=headers, params=params)
-    return int(res.json()['output']['stck_prpr'])
 
-def get_target_price(code="005930"):
-    """변동성 돌파 전략으로 매수 목표가 조회"""
+    try:
+        res = requests.get(URL, headers=headers, params=params)
+        
+        if res.status_code != 200:
+            send_message(f"[{code}] 현재가 조회 실패 (HTTP {res.status_code})")
+            return None
+
+        result = res.json()
+        price_str = result.get('output', {}).get('stck_prpr')
+        
+        if price_str is None:
+            send_message(f"[{code}] 현재가 응답에 가격 정보 없음")
+            return None
+
+        current_price = int(price_str)
+        return current_price
+
+    except (KeyError, ValueError, TypeError) as e:
+        send_message(f"[{code}] 현재가 파싱 오류: {e}")
+        return None
+
+    except Exception as e:
+        send_message(f"[{code}] 현재가 조회 중 알 수 없는 오류: {e}")
+        return None
+
+def get_price_info(code="005930", k=0.5):
+    """
+    변동성 돌파 전략 목표가 + 당일 시가를 함께 반환
+    :param code: 종목 코드 (6자리 문자열)
+    :param k: 변동성 계수 (기본값 0.5)
+    :return: (target_price, open_price) or (None, None)
+    """
     PATH = "uapi/domestic-stock/v1/quotations/inquire-daily-price"
     URL = f"{URL_BASE}/{PATH}"
-    headers = {"Content-Type":"application/json", 
+    headers = {
+        "Content-Type":"application/json", 
         "authorization": f"Bearer {ACCESS_TOKEN}",
         "appKey":APP_KEY,
         "appSecret":APP_SECRET,
-        "tr_id":"FHKST01010400"}
-    params = {
-    "fid_cond_mrkt_div_code":"J",
-    "fid_input_iscd":code,
-    "fid_org_adj_prc":"1",
-    "fid_period_div_code":"D"
+        "tr_id":"FHKST01010400"
     }
-    res = requests.get(URL, headers=headers, params=params)
-    # 1. API 응답 상태 코드 확인
-    if res.status_code != 200:
-        send_message(f"[{code}] 일봉 조회 실패 (HTTP {res.status_code}): {res.json().get('msg1', '알 수 없는 오류')}")
-        return None # 오류 발생 시 목표가를 반환하지 않고 None을 반환
+    params = {
+        "fid_cond_mrkt_div_code":"J",
+        "fid_input_iscd":code,
+        "fid_org_adj_prc":"1",
+        "fid_period_div_code":"D"
+    }
 
-    response_data = res.json()
-    output = response_data.get('output') # 'output' 키가 없을 수도 있으므로 get() 사용
-
-    # 2. 'output' 데이터 유효성 검사 (list index out of range 방지)
-    # 최소한 어제 데이터 (인덱스 1)까지 있어야 하므로 길이가 2 이상이어야 함
-    if not output or len(output) < 2:
-        send_message(f"[{code}] 일봉 데이터 부족 또는 없음. API 응답 output: {output}")
-        return None # 데이터가 부족하면 목표가를 계산할 수 없으므로 None 반환
-        
     try:
         ### 아래 참고 #######################
         ### stck_oprc: 시가 (Open Price)
         ### stck_hgpr: 고가 (High Price)
         ### stck_lwpr: 저가 (Low Price)
         ### stck_clpr: 종가 (Close Price)
-        stck_oprc = int(output[0]['stck_oprc']) # 오늘 시가
-        
-        #prev_day_open = int(output[1]['stck_oprc']) # 전일 시가
-        prev_day_open = int(output[1]['stck_lwpr']) # 전일 저가
+        res = requests.get(URL, headers=headers, params=params)
+        if res.status_code != 200:
+            send_message(f"[{code}] 가격 정보 조회 실패 (HTTP {res.status_code})")
+            return None, None
 
-        #prev_day_close = int(output[1]['stck_clpr']) # 전일 종가
-        prev_day_close = int(output[1]['stck_hgpr']) # 전일 고가
+        output = res.json().get("output")
+        if not output or len(output) < 2:
+            send_message(f"[{code}] 일봉 데이터 부족 또는 없음.")
+            return None, None
 
-        # 전일 시가(or저가)와 종가(or고가) 중 높은 가격을 전일 고가로, 낮은 가격을 전일 저가로 설정
-        stck_hgpr_adjusted = max(prev_day_open, prev_day_close)
-        stck_lwpr_adjusted = min(prev_day_open, prev_day_close)
+        # 오늘 시가
+        open_price = int(output[0]['stck_oprc'])
 
-        target_price = stck_oprc + (stck_hgpr_adjusted - stck_lwpr_adjusted) * 0.5   # 0.5 보다 다른 수치도 필요시 적용해 볼 것
-        
-        return target_price
-    except KeyError as e:
-        send_message(f"[{code}] API 응답에서 필요한 키 누락: {e}. 응답 전문: {output}")
-        return None
-    except ValueError as e:
-        send_message(f"[{code}] 가격 데이터 형변환 오류: {e}. 응답 전문: {output}")
-        return None
+        # 전일 고가/저가로 변동폭 계산
+        prev_high = int(output[1]['stck_hgpr'])
+        prev_low  = int(output[1]['stck_lwpr'])
+
+        # 목표가 = 오늘 시가 + (전일 고가 - 전일 저가) * k
+        target_price = open_price + (prev_high - prev_low) * k
+
+        return target_price, open_price
+
+    except (KeyError, ValueError) as e:
+        send_message(f"[{code}] 가격 정보 파싱 오류: {e}")
+        return None, None
 
 def get_stock_balance():
     """주식 잔고조회"""
@@ -462,14 +482,17 @@ try:
                 if len(bought_list) < target_buy_count:
                     if sym in bought_list:
                         continue
-                    target_price = get_target_price(sym)
-                    if target_price is None: # 목표가를 가져오지 못했으면 다음 종목으로 넘어감
-                        send_message(f"[{sym}] 목표가 계산 실패. 다음 종목으로 넘어갑니다.")
+
+                    target_price, open_price = get_price_info(sym) # k값조정시: target_price, open_price = get_price_info(sym, 0.7)
+                    current_price = get_current_price(sym)
+                    if open_price is None or target_price is None or current_price is None: # 가격을 가져오지 못했으면 다음 종목으로 넘어감
+                        send_message(f"[{sym}] 가격 수신 실패. 다음 종목으로 넘어갑니다.")
                         time.sleep(1) # API 호출 빈도 조절
                         continue 
-                    current_price = get_current_price(sym)
-                    if target_price < current_price:
-                        buy_qty = 0  # 매수할 수량 초기화
+
+                    # 갭상승 제외하고, 진짜 장중 돌파만 매수
+                    if open_price < target_price < current_price:
+                        buy_qty = 0  # 매수할 수량 초기화                        
                         buy_qty = int(buy_amount // current_price)
                         if buy_qty > 0:
                             send_message(f"{sym} 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
