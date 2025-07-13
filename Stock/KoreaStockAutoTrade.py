@@ -196,6 +196,61 @@ def get_all_symbols():
 
     return symbols
 
+def check_stop_loss(threshold=-3.0):
+    """
+    보유 종목 중 손절 기준 이하인 종목을 매도
+    :param threshold: 손절 기준 수익률 (%)
+    :return: 손절 매도된 종목 리스트
+    """
+    stopped_out = []
+    PATH = "uapi/domestic-stock/v1/trading/inquire-balance"
+    URL = f"{URL_BASE}/{PATH}"
+    headers = {
+        "Content-Type":"application/json",
+        "authorization":f"Bearer {ACCESS_TOKEN}",
+        "appKey":APP_KEY,
+        "appSecret":APP_SECRET,
+        "tr_id":"TTTC8434R",
+        "custtype":"P",
+    }
+    params = {
+        "CANO": CANO,
+        "ACNT_PRDT_CD": ACNT_PRDT_CD,
+        "AFHR_FLPR_YN": "N",
+        "OFL_YN": "",
+        "INQR_DVSN": "02",
+        "UNPR_DVSN": "01",
+        "FUND_STTL_ICLD_YN": "N",
+        "FNCG_AMT_AUTO_RDPT_YN": "N",
+        "PRCS_DVSN": "01",
+        "CTX_AREA_FK100": "",
+        "CTX_AREA_NK100": ""
+    }
+
+    res = requests.get(URL, headers=headers, params=params)
+    if res.status_code != 200:
+        send_message(f"❌ 손절 체크 실패: {res.json().get('msg1', '알 수 없는 오류')}")
+        return stopped_out
+
+    stock_list = res.json().get('output1', [])
+
+    for stock in stock_list:
+        code = stock.get('pdno')
+        qty = int(stock.get('hldg_qty', 0))
+        buy_price = float(stock.get('pchs_avg_pric', 0))  # 매수 평균가
+        current_price = get_current_price(code)
+        if qty == 0 or buy_price == 0 or current_price is None:
+            continue
+
+        profit_pct = ((current_price - buy_price) / buy_price) * 100
+        if profit_pct <= threshold:
+            send_message(f"📉 손절매 발동! {stock.get('prdt_name')}({code}) 수익률 {profit_pct:.2f}% → 매도")
+            sell(code, qty)
+            stopped_out.append(code)
+            time.sleep(0.5)
+
+    return stopped_out
+    
 def get_current_price(code="005930"):
     """현재가 조회"""
     PATH = "uapi/domestic-stock/v1/quotations/inquire-price"
@@ -477,7 +532,30 @@ try:
             soldout = True
             bought_list = []
             stock_dict = get_stock_balance()
-        if t_start < t_now < t_sell:  # AM 09:03 ~ PM 02:58 : 매수
+        if t_start < t_now < t_sell:  # AM 09:03 ~ PM 02:58 : 매수               
+            # 손절 감시 (과도한 출력 없이) -------------------------------------------------------
+            stopped = check_stop_loss(threshold=-3.0)
+            if stopped:
+                for sym in stopped:
+                    if sym in bought_list:
+                        bought_list.remove(sym)
+                    #if sym in symbol_list:
+                    #    symbol_list.remove(sym)
+                        
+                time.sleep(30)  # 급격한 재매수 방지용 (API 요청 부하 완화)
+
+                # 🧮 손절 후 남은 종목 수 기준으로 buy_amount 재계산
+                remaining_buy_count = target_buy_count - len(bought_list)
+                if remaining_buy_count > 0:
+                    buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
+                    total_cash = get_balance() - 10000  # 현재 현금 기준 재계산
+                    if total_cash < 0:
+                        total_cash = 0
+                    buy_amount = total_cash * buy_percent
+                else:
+                    buy_amount = 0  # 남은 슬롯 없음 → 매수 불가
+            # 손절 감시 끝 ------------------------------------------------------------------
+
             for sym in symbol_list:
                 if len(bought_list) < target_buy_count:
                     if sym in bought_list:
@@ -488,7 +566,7 @@ try:
                         k = 0.3  # 예시: 0.5 → 0.3으로 완화
                     else:
                         k = 0.5
-                        
+
                     target_price, open_price = get_price_info(sym, k)
                     current_price = get_current_price(sym)
                     if open_price is None or target_price is None or current_price is None: # 가격을 가져오지 못했으면 다음 종목으로 넘어감
