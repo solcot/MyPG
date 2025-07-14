@@ -243,6 +243,7 @@ def check_stop_loss(threshold=-3.0):
         code = stock.get('pdno')
         qty = int(stock.get('hldg_qty', 0))
         buy_price = float(stock.get('pchs_avg_pric', 0))  # 매수 평균가
+        time.sleep(0.1)
         current_price = get_current_price(code)
         if qty == 0 or buy_price == 0 or current_price is None:
             continue
@@ -252,9 +253,65 @@ def check_stop_loss(threshold=-3.0):
             send_message(f"📉 손절매 발동! {stock.get('prdt_name')}({code}) 수익률 {profit_pct:.2f}% → 매도")
             sell(code, qty)
             stopped_out.append(code)
-            time.sleep(0.5)
+            #time.sleep(0.5)
 
     return stopped_out
+
+def check_profit_taking(threshold=10.0):
+    """
+    보유 종목 중 익절 기준 이상인 종목을 매도
+    :param threshold: 익절 기준 수익률 (%)
+    :return: 익절 매도된 종목 리스트
+    """
+    profited_out = []
+    PATH = "uapi/domestic-stock/v1/trading/inquire-balance"
+    URL = f"{URL_BASE}/{PATH}"
+    headers = {
+        "Content-Type":"application/json",
+        "authorization":f"Bearer {ACCESS_TOKEN}",
+        "appKey":APP_KEY,
+        "appSecret":APP_SECRET,
+        "tr_id":"TTTC8434R",
+        "custtype":"P",
+    }
+    params = {
+        "CANO": CANO,
+        "ACNT_PRDT_CD": ACNT_PRDT_CD,
+        "AFHR_FLPR_YN": "N",
+        "OFL_YN": "",
+        "INQR_DVSN": "02",
+        "UNPR_DVSN": "01",
+        "FUND_STTL_ICLD_YN": "N",
+        "FNCG_AMT_AUTO_RDPT_YN": "N",
+        "PRCS_DVSN": "01",
+        "CTX_AREA_FK100": "",
+        "CTX_AREA_NK100": ""
+    }
+
+    res = requests.get(URL, headers=headers, params=params)
+    if res.status_code != 200:
+        send_message(f"❌ 익절 체크 실패: {res.json().get('msg1', '알 수 없는 오류')}")
+        return profited_out
+
+    stock_list = res.json().get('output1', [])
+
+    for stock in stock_list:
+        code = stock.get('pdno')
+        qty = int(stock.get('hldg_qty', 0))
+        buy_price = float(stock.get('pchs_avg_pric', 0))  # 매수 평균가
+        time.sleep(0.1)
+        current_price = get_current_price(code)
+        if qty == 0 or buy_price == 0 or current_price is None:
+            continue
+
+        profit_pct = ((current_price - buy_price) / buy_price) * 100
+        if profit_pct >= threshold:
+            send_message(f"💰 익절 발동! {stock.get('prdt_name')}({code}) 수익률 {profit_pct:.2f}% → 매도")
+            sell(code, qty)
+            profited_out.append(code)
+            #time.sleep(0.5)
+
+    return profited_out
 
 def get_current_price(code="005930"):
     """
@@ -403,15 +460,15 @@ def get_stock_balance():
             stock_dict[stock.get('pdno')] = stock.get('hldg_qty')
             # f-string 포맷팅을 사용하여 순번을 두 자리 숫자로 표시합니다 (예: 01, 02)
             send_message(f"{item_count:02d}.{stock.get('prdt_name', '알 수 없음')}({stock.get('pdno', '알 수 없음')}): {stock.get('hldg_qty', 0)}주")
-            time.sleep(0.1)
+            #time.sleep(0.1)
     
     if evaluation:
         send_message(f"주식 평가 금액: {evaluation[0].get('scts_evlu_amt', 'N/A')}원")
-        time.sleep(0.1)
+        #time.sleep(0.1)
         send_message(f"평가 손익 합계: {evaluation[0].get('evlu_pfls_smtl_amt', 'N/A')}원")
-        time.sleep(0.1)
+        #time.sleep(0.1)
         send_message(f"총 평가 금액: {evaluation[0].get('tot_evlu_amt', 'N/A')}원")
-        time.sleep(0.1)
+        #time.sleep(0.1)
     else:
         send_message("평가 정보가 없습니다.")
     send_message(f"=================")
@@ -531,7 +588,8 @@ try:
     soldout = False
 
     send_message("===국내 주식 자동매매 프로그램을 시작합니다===")
-    last_stop_loss_check_time = datetime.now() - timedelta(minutes=1) # 초기값 설정
+    last_stop_loss_check_time = datetime.now() - timedelta(seconds=15) # 손절 초기값 설정 
+    last_profit_taking_check_time = datetime.now() - timedelta(seconds=45) # 익절 초기값 설정 
     last_balance_check_time = datetime.now() - timedelta(minutes=15)  # 초기화: 과거로 설정해서 15분후에 출력되도록 이후는 30분마다
     last_heartbeat = datetime.now() - timedelta(minutes=10)
     
@@ -562,18 +620,17 @@ try:
             stock_dict = get_stock_balance()
 
         if t_start < t_now < t_sell:  # AM 09:03 ~ PM 02:58 : 매수     
-            # 손절 감시 (과도한 출력 없이) -------------------------------------------------------            
+            # 손절 감시 로직 -------------------------------------------------------            
             if (t_now - last_stop_loss_check_time).total_seconds() >= 30: # 30초마다 체크
                 stopped = check_stop_loss(threshold=-3.0)
                 if stopped:
                     for sym in stopped:
                         if sym in bought_list:
                             bought_list.remove(sym)
-                        # **여기서 symbol_list에서도 해당 종목을 제거하는 로직 추가**
-                        if sym in symbol_list:
+                        if sym in symbol_list: # 손절한 종목 다시 매수하지 않도록 symbol_list에서 제거
                             symbol_list.remove(sym)
 
-                    time.sleep(10) # 급격한 재매수 방지용
+                    time.sleep(5) # 급격한 재매수 방지용
                     # 🧮 손절 후 남은 종목 수 기준으로 buy_amount 재계산
                     remaining_buy_count = target_buy_count - len(bought_list)
                     if remaining_buy_count > 0:
@@ -589,7 +646,34 @@ try:
                     else:
                         buy_amount = 0
                 last_stop_loss_check_time = t_now # 마지막 체크 시간 업데이트
-            # 손절 감시 끝 ------------------------------------------------------------------
+            # 손절 감시 로직 끝 ------------------------------------------------------------------
+            # 익절 감시 로직 -----------------------------------------------------------
+            if (t_now - last_profit_taking_check_time).total_seconds() >= 30: # 30초마다 체크
+                profited = check_profit_taking(threshold=10.0) # 익절 기준 10%
+                if profited:
+                    for sym in profited:
+                        if sym in bought_list:
+                            bought_list.remove(sym)
+                        if sym in symbol_list: # 익절한 종목 다시 매수하지 않도록 symbol_list에서 제거
+                            symbol_list.remove(sym)
+                            
+                    time.sleep(5) # 급격한 재매수 방지용
+                    # 🧮 익절 후 남은 종목 수 기준으로 buy_amount 재계산
+                    remaining_buy_count = target_buy_count - len(bought_list)
+                    if remaining_buy_count > 0:
+                        buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
+                        total_cash = get_balance() - 10000
+                        if total_cash < 0:
+                            total_cash = 0
+                        # 종목별 주문 금액 계산 (14:30 이후는 매수 비중을 절반으로 줄임)                    
+                        if t_now >= t_now.replace(hour=14, minute=30, second=0):
+                            buy_amount = total_cash * buy_percent * 0.5
+                        else:
+                            buy_amount = total_cash * buy_percent
+                    else:
+                        buy_amount = 0
+                last_profit_taking_check_time = t_now # 마지막 체크 시간 업데이트
+            # 익절 감시 로직 끝 -------------------------------------------------------------
 
             for sym in symbol_list:
                 if len(bought_list) < target_buy_count:
@@ -608,10 +692,11 @@ try:
                         k = 0.7
 
                     target_price, open_price = get_price_info(sym, k)
+                    time.sleep(0.1)
                     current_price = get_current_price(sym)
                     if open_price is None or target_price is None or current_price is None: # 가격을 가져오지 못했으면 다음 종목으로 넘어감
                         send_message(f"[{sym}] 가격 수신 실패. 다음 종목으로 넘어갑니다.")
-                        time.sleep(1) # API 호출 빈도 조절
+                        #time.sleep(1) # API 호출 빈도 조절
                         continue 
 
                     # 갭상승 제외하고, 진짜 장중 돌파만 매수
@@ -633,8 +718,8 @@ try:
                                 soldout = False
                                 bought_list.append(sym)
                                 get_stock_balance()
-                    time.sleep(1)
-            time.sleep(1)
+                    time.sleep(0.5)
+            time.sleep(0.5)
 
             # ✅ 30분마다 잔고 확인 (예: 09:15, 09:45, 10:15 ...)
             if (t_now - last_balance_check_time).total_seconds() >= 1800:  # 1800초 = 30분
