@@ -51,8 +51,8 @@ def fetch_krx_data(mktId, trade_date):
         return None
 
 def get_all_symbols():
-    trade_date = get_last_trading_day()
-    #trade_date = '20250709'
+    #trade_date = get_last_trading_day()
+    trade_date = '20250715'
     print(f"✅ 최종 거래일은 {trade_date} 입니다.")
 
     df_kospi = fetch_krx_data('STK', trade_date)
@@ -74,7 +74,7 @@ def get_all_symbols():
 
     print(f"\n✅ 전체 종목 수: {len(df)}")
     print("\n✅ 열 이름:")
-    print(df.columns.tolist())
+    print(df.columns.tolist()) # ['종목코드', '종목명', '종가', '대비', '등락률', '시가', '고가', '저가', '거래량', '거래대금', '시가총액', '상장주식수', '소속부']
     print("\n✅ 원본 상위 10개 샘플:")
     print(df.head(10))
 
@@ -146,13 +146,18 @@ def get_all_symbols():
     #    (df['전일변동폭비율'] >= 0.05)                         # 전일 고가/저가 차이가 3% 이상: 변동성이 있었던 종목
     #].copy()  # .copy()는 SettingWithCopyWarning 방지를 위한 명시적 복사
 
+    # 약 142개 선정됨
     filtered = df[
         (df['등락률'] >= -5.0) & 
-        (df['종가'] >= 2500) & (df['종가'] <= 99000) &
+        #(df['등락률'] >= -5.0) & (df['등락률'] <= 20.0) & 
+        #(df['종가'] >= 2500) & (df['종가'] <= 99000) &
+        (df['종가'] >= 2500) & (df['종가'] <= 199000) &
         (df['시가총액'] >= 5e10) & (df['시가총액'] <= 7e12) &
         (df['거래량'] >= 25000) &
+        #(df['거래량'] >= 22000) &
         (df['거래대금'] >= 3e9) &
-        (df['전일변동폭비율'] >= 0.055)
+        #(df['전일변동폭비율'] >= 0.055)
+        (df['전일변동폭비율'] >= 0.06)
     ].copy()
 
     #print(f"\n✅ 조건 만족 종목 수: {len(filtered)}")
@@ -171,8 +176,8 @@ def get_all_symbols():
     filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금']   # 전일에 가격도 크게 움직이고, 돈도 많이 몰린 종목을 추리기 위해
 
     # 점수 기준 정렬 → 상위 30개 추출
-    top_filtered = filtered.sort_values(by='점수', ascending=False).head(150)
-    #top_filtered = filtered.sort_values(by='점수', ascending=False)
+    #top_filtered = filtered.sort_values(by='점수', ascending=False).head(150)
+    top_filtered = filtered.sort_values(by='점수', ascending=False)
 
     print(f"\n✅ 최종 선정 종목 수: {len(top_filtered)}")
     print("\n✅ 상위 점수 종목 샘플:")
