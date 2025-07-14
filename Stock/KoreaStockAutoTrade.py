@@ -264,43 +264,49 @@ def check_stop_loss(threshold=-3.0):
     return stopped_out
 
 def get_current_price(code="005930"):
-    """현재가 조회"""
+    """
+    현재가 조회 함수 (재시도 포함)
+    - 최대 3번까지 재시도
+    - 각 재시도마다 대기시간 증가 (1초 → 2초 → 3초)
+    """
     PATH = "uapi/domestic-stock/v1/quotations/inquire-price"
     URL = f"{URL_BASE}/{PATH}"
-    headers = {"Content-Type":"application/json", 
-            "authorization": f"Bearer {ACCESS_TOKEN}",
-            "appKey":APP_KEY,
-            "appSecret":APP_SECRET,
-            "tr_id":"FHKST01010100"}
+    headers = {
+        "Content-Type": "application/json",
+        "authorization": f"Bearer {ACCESS_TOKEN}",
+        "appKey": APP_KEY,
+        "appSecret": APP_SECRET,
+        "tr_id": "FHKST01010100"
+    }
     params = {
-    "fid_cond_mrkt_div_code":"J",
-    "fid_input_iscd":code,
+        "fid_cond_mrkt_div_code": "J",
+        "fid_input_iscd": code,
     }
 
-    try:
-        res = requests.get(URL, headers=headers, params=params)
-        
-        if res.status_code != 200:
-            send_message(f"[{code}] 현재가 조회 실패 (HTTP {res.status_code})")
-            return None
+    for i in range(3):  # 최대 3회 재시도
+        try:
+            res = requests.get(URL, headers=headers, params=params, timeout=5)
 
-        result = res.json()
-        price_str = result.get('output', {}).get('stck_prpr')
-        
-        if price_str is None:
-            send_message(f"[{code}] 현재가 응답에 가격 정보 없음")
-            return None
+            if res.status_code == 200:
+                result = res.json()
+                price_str = result.get('output', {}).get('stck_prpr')
 
-        current_price = int(price_str)
-        return current_price
+                if price_str is None:
+                    send_message(f"[{code}] 현재가 응답에 가격 정보 없음")
+                    return None
 
-    except (KeyError, ValueError, TypeError) as e:
-        send_message(f"[{code}] 현재가 파싱 오류: {e}")
-        return None
+                current_price = int(price_str)
+                return current_price
+            else:
+                send_message(f"[{code}] 현재가 조회 실패 (HTTP {res.status_code}) - 재시도 {i+1}/3")
+                time.sleep(1 * (i + 1))  # 1초 → 2초 → 3초 대기
 
-    except Exception as e:
-        send_message(f"[{code}] 현재가 조회 중 알 수 없는 오류: {e}")
-        return None
+        except Exception as e:
+            send_message(f"[{code}] 현재가 조회 예외 발생: {e} - 재시도 {i+1}/3")
+            time.sleep(1 * (i + 1))
+
+    send_message(f"[{code}] ❌ 현재가 조회 최종 실패. 해당 종목은 건너뜁니다.")
+    return None
 
 def get_price_info(code="005930", k=0.5):
     """
