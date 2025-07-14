@@ -147,14 +147,18 @@ def get_all_symbols():
     # 변동폭 비율 계산
     df['전일변동폭비율'] = (df['고가'] - df['저가']) / df['저가']
 
-    # 약 147개 선정됨
+    # 약 142개 선정됨
     filtered = df[
         (df['등락률'] >= -5.0) & 
-        (df['종가'] >= 2500) & (df['종가'] <= 99000) &
+        #(df['등락률'] >= -5.0) & (df['등락률'] <= 20.0) & 
+        #(df['종가'] >= 2500) & (df['종가'] <= 99000) &
+        (df['종가'] >= 2500) & (df['종가'] <= 199000) &
         (df['시가총액'] >= 5e10) & (df['시가총액'] <= 7e12) &
         (df['거래량'] >= 25000) &
+        #(df['거래량'] >= 22000) &
         (df['거래대금'] >= 3e9) &
-        (df['전일변동폭비율'] >= 0.055)
+        #(df['전일변동폭비율'] >= 0.055)
+        (df['전일변동폭비율'] >= 0.06)
     ].copy()
 
     ## 필터 조건
@@ -181,8 +185,8 @@ def get_all_symbols():
     filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금']   # 전일에 가격도 크게 움직이고, 돈도 많이 몰린 종목을 추리기 위해
 
     # 점수 기준 정렬 → 상위 30개 추출
-    top_filtered = filtered.sort_values(by='점수', ascending=False).head(150)
-    #top_filtered = filtered.sort_values(by='점수', ascending=False)
+    #top_filtered = filtered.sort_values(by='점수', ascending=False).head(150)
+    top_filtered = filtered.sort_values(by='점수', ascending=False)
 
     send_message(f"✅ 최종 선정 종목 수: {len(top_filtered)}")
     #print("\n✅ 상위 점수 종목 샘플:")
