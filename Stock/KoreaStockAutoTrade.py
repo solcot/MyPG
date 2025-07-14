@@ -120,7 +120,7 @@ def get_all_symbols():
         send_message("❌ 데이터 로드 실패: 데이터프레임이 비어 있습니다.")
         return []
 
-    send_message(f"\n✅ 전체 종목 수: {len(df)}")
+    send_message(f"✅ 전체 종목 수: {len(df)}")
     #print("\n✅ 열 이름:")
     #print(df.columns.tolist())
     #print("\n✅ 원본 상위 10개 샘플:")
@@ -191,7 +191,7 @@ def get_all_symbols():
     #top_filtered = filtered.sort_values(by='점수', ascending=False).head(30)
     top_filtered = filtered.sort_values(by='점수', ascending=False)
 
-    send_message(f"\n✅ 최종 선정 종목 수: {len(top_filtered)}")
+    send_message(f"✅ 최종 선정 종목 수: {len(top_filtered)}")
     #print("\n✅ 상위 점수 종목 샘플:")
     #print(top_filtered[['종목명', '종목코드', '종가', '전일변동폭비율', '거래대금', '점수']].head(10))
     #print(top_filtered)
@@ -611,8 +611,8 @@ try:
                         buy_qty = 0  # 매수할 수량 초기화                        
                         buy_qty = int(buy_amount // current_price)
                         if buy_qty > 0:
-                            name = symbol_name_map.get(sym, "Unknown")
-                            send_message(f"{name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
+                            stock_name = symbol_name_map.get(sym, "Unknown")
+                            send_message(f"📈 {stock_name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
                             result = buy(sym, buy_qty)
                             if result:
                                 soldout = False
