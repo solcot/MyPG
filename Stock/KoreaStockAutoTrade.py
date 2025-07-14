@@ -522,6 +522,7 @@ try:
         buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
     
     # 종목별 주문 금액 계산 (14:30 이후는 매수 비중을 절반으로 줄임)
+    t_now = datetime.now()
     if t_now >= t_now.replace(hour=14, minute=30, second=0):
         buy_amount = total_cash * buy_percent * 0.5  # 매수 비중 절반
     else:
@@ -622,7 +623,7 @@ try:
                             buy_amount = total_cash * buy_percent * 0.5  # 매수 비중 절반
                         else:
                             buy_amount = total_cash * buy_percent
-                            
+
                         buy_qty = int(buy_amount // current_price)
                         if buy_qty > 0:
                             stock_name = symbol_name_map.get(sym, "Unknown")
