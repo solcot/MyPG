@@ -51,7 +51,8 @@ def fetch_krx_data(mktId, trade_date):
         return None
 
 def get_all_symbols():
-    trade_date = get_last_trading_day()
+    #trade_date = get_last_trading_day()
+    trade_date = '20250707'
     print(f"✅ 최종 거래일은 {trade_date} 입니다.")
 
     df_kospi = fetch_krx_data('STK', trade_date)
@@ -146,19 +147,12 @@ def get_all_symbols():
     #].copy()  # .copy()는 SettingWithCopyWarning 방지를 위한 명시적 복사
 
     filtered = df[
-        #(df['등락률'] >= -3.0) &  # 큰 하락 제외, 모멘텀 강조
-        (df['등락률'] >= -5.0) &  # 큰 하락 제외, 모멘텀 강조
-        #(df['등락률'] >= -5.0) & (df['등락률'] <= 10.0) &  # 또는 상한선을 추가해 과도한 상승도 조정 --> pool은 줄어들지만 전략에 더 맞음
-        #(df['종가'] >= 3000) & (df['종가'] <= 70000) &
-        (df['종가'] >= 3000) & (df['종가'] <= 90000) &
-        #(df['시가총액'] >= 1e11) & (df['시가총액'] <= 2e12) &
-        (df['시가총액'] >= 7e10) & (df['시가총액'] <= 3e12) &
-        #(df['거래량'] >= 50000) &
-        (df['거래량'] >= 30000) &
-        (df['거래대금'] >= 5e9) &
-        #(df['거래대금'] >= 1e10) &   # gemini 추천 (100억)
-        #(df['전일변동폭비율'] >= 0.05)
-        (df['전일변동폭비율'] >= 0.06)  # gemini 추천 (0.07-->40개 or 0.08-->36개)
+        (df['등락률'] >= -5.0) & 
+        (df['종가'] >= 2500) & (df['종가'] <= 99000) &
+        (df['시가총액'] >= 5e10) & (df['시가총액'] <= 7e12) &
+        (df['거래량'] >= 25000) &
+        (df['거래대금'] >= 3e9) &
+        (df['전일변동폭비율'] >= 0.055)
     ].copy()
 
     #print(f"\n✅ 조건 만족 종목 수: {len(filtered)}")
@@ -177,8 +171,8 @@ def get_all_symbols():
     filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금']   # 전일에 가격도 크게 움직이고, 돈도 많이 몰린 종목을 추리기 위해
 
     # 점수 기준 정렬 → 상위 30개 추출
-    #top_filtered = filtered.sort_values(by='점수', ascending=False).head(30)
-    top_filtered = filtered.sort_values(by='점수', ascending=False)
+    top_filtered = filtered.sort_values(by='점수', ascending=False).head(150)
+    #top_filtered = filtered.sort_values(by='점수', ascending=False)
 
     print(f"\n✅ 최종 선정 종목 수: {len(top_filtered)}")
     print("\n✅ 상위 점수 종목 샘플:")
