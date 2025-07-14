@@ -587,9 +587,9 @@ try:
 
                     # t_now가 13:00 이후이고 매수 종목 수가 target_buy_count 미만이면 k를 동적으로 낮춤
                     if t_now >= t_now.replace(hour=13, minute=0, second=0) and len(bought_list) < target_buy_count:
-                        k = 0.3  # 예시: 0.5 → 0.3으로 완화
+                        k = 0.5  # 예시: 0.5 → 0.3 로 완화 (or) 0.7 -> 0.5 로 완화
                     else:
-                        k = 0.5
+                        k = 0.7
 
                     target_price, open_price = get_price_info(sym, k)
                     current_price = get_current_price(sym)
