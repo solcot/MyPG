@@ -23,8 +23,11 @@ def send_message(msg):
     """디스코드 메세지 전송"""
     now = datetime.now()
     message = {"content": f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] {str(msg)}"}
-    requests.post(DISCORD_WEBHOOK_URL, data=message)
-    print(message)
+    try:
+        requests.post(DISCORD_WEBHOOK_URL, data=message, timeout=5)
+    except Exception as e:
+        print(f"❌ Discord 전송 실패: {e}", flush=True)
+    print(message, flush=True)
 
 def get_access_token():
     """토큰 발급"""
