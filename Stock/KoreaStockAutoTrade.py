@@ -534,7 +534,8 @@ try:
     send_message("===국내 주식 자동매매 프로그램을 시작합니다===")
     last_stop_loss_check_time = datetime.now() - timedelta(minutes=1) # 초기값 설정
     last_balance_check_time = datetime.now() - timedelta(minutes=15)  # 초기화: 과거로 설정해서 15분후에 출력되도록 이후는 30분마다
-
+    last_heartbeat = datetime.now() - timedelta(minutes=10)
+    
     while True:
         t_now = datetime.now()
         t_9 = t_now.replace(hour=9, minute=0, second=15, microsecond=0)
@@ -543,6 +544,12 @@ try:
         #t_exit = t_now.replace(hour=15, minute=20, second=0,microsecond=0)
         t_sell = t_now.replace(hour=14, minute=58, second=0, microsecond=0)
         t_exit = t_now.replace(hour=15, minute=3, second=0,microsecond=0)
+
+        # 10분마다 heartbeat 출력
+        if (t_now - last_heartbeat).total_seconds() >= 600:
+            send_message("✅ 시스템 정상 작동 중입니다.")
+            last_heartbeat = t_now
+
         #today = datetime.today().weekday()
         today = datetime.today()
         if today.weekday() >= 5 or is_holiday(today.strftime("%Y-%m-%d")):  # 토요일/일요일/휴일 이면 자동 종료
