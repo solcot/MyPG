@@ -147,21 +147,14 @@ def get_all_symbols():
     # 변동폭 비율 계산
     df['전일변동폭비율'] = (df['고가'] - df['저가']) / df['저가']
 
-    # 약 87개 선정됨
+    # 약 147개 선정됨
     filtered = df[
-        #(df['등락률'] >= -3.0) &  # 큰 하락 제외, 모멘텀 강조
-        (df['등락률'] >= -5.0) &  # 큰 하락 제외, 모멘텀 강조
-        #(df['등락률'] >= -5.0) & (df['등락률'] <= 10.0) &  # 또는 상한선을 추가해 과도한 상승도 조정 --> pool은 줄어들지만 전략에 더 맞음
-        #(df['종가'] >= 3000) & (df['종가'] <= 70000) &
-        (df['종가'] >= 3000) & (df['종가'] <= 90000) &
-        #(df['시가총액'] >= 1e11) & (df['시가총액'] <= 2e12) &
-        (df['시가총액'] >= 7e10) & (df['시가총액'] <= 3e12) &
-        #(df['거래량'] >= 50000) &
-        (df['거래량'] >= 30000) &
-        (df['거래대금'] >= 5e9) &
-        #(df['거래대금'] >= 1e10) &   # gemini 추천 (100억)
-        #(df['전일변동폭비율'] >= 0.05)
-        (df['전일변동폭비율'] >= 0.06)  # gemini 추천 (0.07-->40개 or 0.08-->36개)
+        (df['등락률'] >= -5.0) & 
+        (df['종가'] >= 2500) & (df['종가'] <= 99000) &
+        (df['시가총액'] >= 5e10) & (df['시가총액'] <= 7e12) &
+        (df['거래량'] >= 25000) &
+        (df['거래대금'] >= 3e9) &
+        (df['전일변동폭비율'] >= 0.055)
     ].copy()
 
     ## 필터 조건
@@ -188,8 +181,8 @@ def get_all_symbols():
     filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금']   # 전일에 가격도 크게 움직이고, 돈도 많이 몰린 종목을 추리기 위해
 
     # 점수 기준 정렬 → 상위 30개 추출
-    #top_filtered = filtered.sort_values(by='점수', ascending=False).head(30)
-    top_filtered = filtered.sort_values(by='점수', ascending=False)
+    top_filtered = filtered.sort_values(by='점수', ascending=False).head(150)
+    #top_filtered = filtered.sort_values(by='점수', ascending=False)
 
     send_message(f"✅ 최종 선정 종목 수: {len(top_filtered)}")
     #print("\n✅ 상위 점수 종목 샘플:")
@@ -528,7 +521,12 @@ try:
         # 소수점 셋째 자리까지 유지하고 넷째 자리부터 버림
         buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
     
-    buy_amount = total_cash * buy_percent  # 종목별 주문 금액 계산
+    # 종목별 주문 금액 계산 (14:30 이후는 매수 비중을 절반으로 줄임)
+    if t_now >= t_now.replace(hour=14, minute=30, second=0):
+        buy_amount = total_cash * buy_percent * 0.5  # 매수 비중 절반
+    else:
+        buy_amount = total_cash * buy_percent
+        
     soldout = False
 
     send_message("===국내 주식 자동매매 프로그램을 시작합니다===")
@@ -582,7 +580,11 @@ try:
                         total_cash = get_balance() - 10000
                         if total_cash < 0:
                             total_cash = 0
-                        buy_amount = total_cash * buy_percent
+                        # 종목별 주문 금액 계산 (14:30 이후는 매수 비중을 절반으로 줄임)
+                        if t_now >= t_now.replace(hour=14, minute=30, second=0):
+                            buy_amount = total_cash * buy_percent * 0.5  # 매수 비중 절반
+                        else:
+                            buy_amount = total_cash * buy_percent
                     else:
                         buy_amount = 0
                 last_stop_loss_check_time = t_now # 마지막 체크 시간 업데이트
@@ -593,9 +595,14 @@ try:
                     if sym in bought_list:
                         continue
 
-                    # t_now가 13:00 이후이고 매수 종목 수가 target_buy_count 미만이면 k를 동적으로 낮춤
-                    if t_now >= t_now.replace(hour=13, minute=0, second=0) and len(bought_list) < target_buy_count:
-                        k = 0.5  # 예시: 0.5 → 0.3 로 완화 (or) 0.7 -> 0.5 로 완화
+                    # 🔁 k값 점진적 완화 로직 추가
+                    if len(bought_list) < target_buy_count:
+                        if t_now >= t_now.replace(hour=14, minute=30, second=0):
+                            k = 0.3
+                        elif t_now >= t_now.replace(hour=13, minute=0, second=0):
+                            k = 0.5
+                        else:
+                            k = 0.7
                     else:
                         k = 0.7
 
@@ -608,7 +615,14 @@ try:
 
                     # 갭상승 제외하고, 진짜 장중 돌파만 매수
                     if open_price < target_price < current_price:
-                        buy_qty = 0  # 매수할 수량 초기화                        
+                        buy_qty = 0  # 매수할 수량 초기화  
+
+                        # 종목별 주문 금액 계산 (14:30 이후는 매수 비중을 절반으로 줄임)
+                        if t_now >= t_now.replace(hour=14, minute=30, second=0):
+                            buy_amount = total_cash * buy_percent * 0.5  # 매수 비중 절반
+                        else:
+                            buy_amount = total_cash * buy_percent
+                            
                         buy_qty = int(buy_amount // current_price)
                         if buy_qty > 0:
                             stock_name = symbol_name_map.get(sym, "Unknown")
