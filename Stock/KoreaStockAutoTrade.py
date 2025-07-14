@@ -622,7 +622,7 @@ try:
         if t_start < t_now < t_sell:  # AM 09:03 ~ PM 02:58 : 매수     
             # 손절 감시 로직 -------------------------------------------------------            
             if (t_now - last_stop_loss_check_time).total_seconds() >= 30: # 30초마다 체크
-                stopped = check_stop_loss(threshold=-3.0)
+                stopped = check_stop_loss(threshold=-5.0)  # -3.0
                 if stopped:
                     for sym in stopped:
                         if sym in bought_list:
