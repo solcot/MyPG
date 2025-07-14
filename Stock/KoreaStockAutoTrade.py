@@ -198,6 +198,11 @@ def get_all_symbols():
 
     # 종목코드 리스트 생성 (정렬 순서 유지)
     symbols = top_filtered['종목코드'].astype(str).str.zfill(6).tolist()
+    global symbol_name_map
+    symbol_name_map = dict(zip(
+        top_filtered['종목코드'].astype(str).str.zfill(6),
+        top_filtered['종목명']
+    ))
     #print(f"\n✅ 최종 선정 종목코드 수: {len(symbols)}")
     #print("\n✅ 예시 종목코드:", symbols)
 
@@ -555,7 +560,7 @@ try:
                         if sym in symbol_list:
                             symbol_list.remove(sym)
 
-                    time.sleep(30) # 급격한 재매수 방지용
+                    time.sleep(10) # 급격한 재매수 방지용
                     # 🧮 손절 후 남은 종목 수 기준으로 buy_amount 재계산
                     remaining_buy_count = target_buy_count - len(bought_list)
                     if remaining_buy_count > 0:
@@ -592,7 +597,8 @@ try:
                         buy_qty = 0  # 매수할 수량 초기화                        
                         buy_qty = int(buy_amount // current_price)
                         if buy_qty > 0:
-                            send_message(f"{sym} 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
+                            name = symbol_name_map.get(sym, "Unknown")
+                            send_message(f"{name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
                             result = buy(sym, buy_qty)
                             if result:
                                 soldout = False
