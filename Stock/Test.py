@@ -51,8 +51,8 @@ def fetch_krx_data(mktId, trade_date):
         return None
 
 def get_all_symbols():
-    #trade_date = get_last_trading_day()
-    trade_date = '20250707'
+    trade_date = get_last_trading_day()
+    #trade_date = '20250709'
     print(f"✅ 최종 거래일은 {trade_date} 입니다.")
 
     df_kospi = fetch_krx_data('STK', trade_date)
