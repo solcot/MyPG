@@ -533,6 +533,7 @@ try:
 
     send_message("===국내 주식 자동매매 프로그램을 시작합니다===")
     last_stop_loss_check_time = datetime.now() - timedelta(minutes=1) # 초기값 설정
+    last_balance_check_time = datetime.now() - timedelta(minutes=15)  # 초기화: 과거로 설정해서 15분후에 출력되도록 이후는 30분마다
 
     while True:
         t_now = datetime.now()
@@ -612,9 +613,12 @@ try:
                                 get_stock_balance()
                     time.sleep(1)
             time.sleep(1)
-            if t_now.minute == 30 and t_now.second <= 5: 
+
+            # ✅ 30분마다 잔고 확인 (예: 09:15, 09:45, 10:15 ...)
+            if (t_now - last_balance_check_time).total_seconds() >= 1800:  # 1800초 = 30분
                 get_stock_balance()
-                time.sleep(5)
+                last_balance_check_time = t_now
+
         if t_sell < t_now < t_exit:  # PM 02:58 ~ PM 03:03 : 일괄 매도
             if soldout == False:
                 stock_dict = get_stock_balance()
