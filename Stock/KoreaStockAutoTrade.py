@@ -700,7 +700,7 @@ try:
 
                     # 🔁 k값 점진적 완화 로직 추가
                     if len(bought_list) < target_buy_count:
-                        if t_now >= t_now.replace(hour=14, minute=30, second=0):
+                        if t_now >= t_now.replace(hour=14, minute=0, second=0):
                             k = 0.3
                         elif t_now >= t_now.replace(hour=13, minute=0, second=0):
                             k = 0.5
