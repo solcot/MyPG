@@ -631,7 +631,7 @@ try:
 
         if t_start < t_now < t_sell:  # AM 09:03 ~ PM 02:58 : 매수     
         
-            send_message("루프 시작..................")
+            #send_message("루프 시작..................") #루프 시간 측정용
 
             # 손절 감시 로직 -------------------------------------------------------            
             if (t_now - last_stop_loss_check_time).total_seconds() >= 30: # 30초마다 체크
@@ -739,7 +739,7 @@ try:
                 get_stock_balance()
                 last_balance_check_time = t_now
 
-            send_message("루프 끝..................")
+            #send_message("루프 끝..................") #루프 시간 측정용
 
         if t_sell < t_now < t_exit:  # PM 02:58 ~ PM 03:03 : 일괄 매도
             if soldout == False:
