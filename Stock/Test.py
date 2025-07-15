@@ -52,7 +52,7 @@ def fetch_krx_data(mktId, trade_date):
 
 def get_all_symbols():
     #trade_date = get_last_trading_day()
-    trade_date = '20250715'
+    trade_date = '20250714'
     print(f"✅ 최종 거래일은 {trade_date} 입니다.")
 
     df_kospi = fetch_krx_data('STK', trade_date)
@@ -146,18 +146,20 @@ def get_all_symbols():
     #    (df['전일변동폭비율'] >= 0.05)                         # 전일 고가/저가 차이가 3% 이상: 변동성이 있었던 종목
     #].copy()  # .copy()는 SettingWithCopyWarning 방지를 위한 명시적 복사
 
-    # 약 142개 선정됨
+    # 약 150개 선정됨
     filtered = df[
         (df['등락률'] >= -5.0) & 
         #(df['등락률'] >= -5.0) & (df['등락률'] <= 20.0) & 
         #(df['종가'] >= 2500) & (df['종가'] <= 99000) &
-        (df['종가'] >= 2500) & (df['종가'] <= 199000) &
-        (df['시가총액'] >= 5e10) & (df['시가총액'] <= 7e12) &
+        #(df['종가'] >= 2500) & (df['종가'] <= 199000) &
+        (df['종가'] >= 2500) & (df['종가'] <= 239000) &
+        #(df['시가총액'] >= 5e10) & (df['시가총액'] <= 7e12) &
+        (df['시가총액'] >= 5e10) &
         (df['거래량'] >= 25000) &
         #(df['거래량'] >= 22000) &
         (df['거래대금'] >= 3e9) &
-        #(df['전일변동폭비율'] >= 0.055)
-        (df['전일변동폭비율'] >= 0.06)
+        (df['전일변동폭비율'] >= 0.055)
+        #(df['전일변동폭비율'] >= 0.06)
     ].copy()
 
     #print(f"\n✅ 조건 만족 종목 수: {len(filtered)}")
