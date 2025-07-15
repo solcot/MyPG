@@ -583,7 +583,7 @@ try:
     
     #********************************************************
     target_buy_count = 25 # 매수할 종목 수, 계좌금액과 매수단가등 고려 조정
-    SLIPPAGE_LIMIT = 1.02  # 1.015~1.03 에서 적절히 적용
+    SLIPPAGE_LIMIT = 1.015  # 1.01,1.015,1.02,1.025,1.03 에서 적절히 적용
     AMOUNT_LIMIT = 0.7  # 0.5,0.7,1 에서 적절히 적용
     #********************************************************
 
@@ -720,7 +720,9 @@ try:
                         continue 
 
                     # 갭상승 제외하고, 진짜 장중 돌파만 매수
-                    if open_price < target_price < current_price:
+                    #if open_price < target_price < current_price:
+                    # 갭상승(or NXT) 포함해서 target_price 돌파 매수
+                    if target_price < current_price:
                         stock_name = symbol_name_map.get(sym, "Unknown")
                         # 돌파 조건은 만족했지만 슬리피지 체크
                         if current_price > target_price * SLIPPAGE_LIMIT:
