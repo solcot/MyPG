@@ -736,8 +736,8 @@ try:
                                 soldout = False
                                 bought_list.append(sym)
                                 get_stock_balance()
-                    #time.sleep(0.5)
-            #time.sleep(0.5)
+                    time.sleep(0.025)
+            time.sleep(0.25)
 
             # ✅ 30분마다 잔고 확인 (예: 09:15, 09:45, 10:15 ...)
             if (t_now - last_balance_check_time).total_seconds() >= 1800:  # 1800초 = 30분
