@@ -247,7 +247,7 @@ def check_stop_loss(threshold=-3.0):
         code = stock.get('pdno')
         qty = int(stock.get('hldg_qty', 0))
         buy_price = float(stock.get('pchs_avg_pric', 0))  # 매수 평균가
-        time.sleep(0.1)
+        #time.sleep(0.1)
         current_price = get_current_price(code)
         if qty == 0 or buy_price == 0 or current_price is None:
             continue
@@ -303,7 +303,7 @@ def check_profit_taking(threshold=10.0):
         code = stock.get('pdno')
         qty = int(stock.get('hldg_qty', 0))
         buy_price = float(stock.get('pchs_avg_pric', 0))  # 매수 평균가
-        time.sleep(0.1)
+        #time.sleep(0.1)
         current_price = get_current_price(code)
         if qty == 0 or buy_price == 0 or current_price is None:
             continue
@@ -337,6 +337,7 @@ def get_current_price(code="005930"):
         "fid_input_iscd": code,
     }
 
+    time.sleep(0.05)
     for i in range(3):  # 최대 3회 재시도
         try:
             res = requests.get(URL, headers=headers, params=params, timeout=5)
@@ -385,6 +386,7 @@ def get_price_info(code="005930", k=0.5):
         "fid_period_div_code":"D"
     }
 
+    time.sleep(0.05)
     try:
         ### 아래 참고 #######################
         ### stck_oprc: 시가 (Open Price)
@@ -523,6 +525,8 @@ def buy(code="005930", qty="1"):
         "custtype":"P",
         "hashkey" : hashkey(data)
     }
+    
+    time.sleep(0.05)
     res = requests.post(URL, headers=headers, data=json.dumps(data))
     if res.json()['rt_cd'] == '0':
         send_message(f"[매수 성공]{str(res.json())}")
@@ -551,6 +555,8 @@ def sell(code="005930", qty="1"):
         "custtype":"P",
         "hashkey" : hashkey(data)
     }
+
+    time.sleep(0.05)
     res = requests.post(URL, headers=headers, data=json.dumps(data))
     if res.json()['rt_cd'] == '0':
         send_message(f"[매도 성공]{str(res.json())}")
@@ -624,6 +630,9 @@ try:
             stock_dict = get_stock_balance()
 
         if t_start < t_now < t_sell:  # AM 09:03 ~ PM 02:58 : 매수     
+        
+            send_message("루프 시작..................")
+
             # 손절 감시 로직 -------------------------------------------------------            
             if (t_now - last_stop_loss_check_time).total_seconds() >= 30: # 30초마다 체크
                 stopped = check_stop_loss(threshold=-5.0)  # -3.0
@@ -696,7 +705,7 @@ try:
                         k = 0.7
 
                     target_price, open_price = get_price_info(sym, k)
-                    time.sleep(0.1)
+                    #time.sleep(0.1)
                     current_price = get_current_price(sym)
                     if open_price is None or target_price is None or current_price is None: # 가격을 가져오지 못했으면 다음 종목으로 넘어감
                         send_message(f"[{sym}] 가격 수신 실패. 다음 종목으로 넘어갑니다.")
@@ -722,13 +731,15 @@ try:
                                 soldout = False
                                 bought_list.append(sym)
                                 get_stock_balance()
-                    time.sleep(0.5)
-            time.sleep(0.5)
+                    #time.sleep(0.5)
+            #time.sleep(0.5)
 
             # ✅ 30분마다 잔고 확인 (예: 09:15, 09:45, 10:15 ...)
             if (t_now - last_balance_check_time).total_seconds() >= 1800:  # 1800초 = 30분
                 get_stock_balance()
                 last_balance_check_time = t_now
+
+            send_message("루프 끝..................")
 
         if t_sell < t_now < t_exit:  # PM 02:58 ~ PM 03:03 : 일괄 매도
             if soldout == False:
