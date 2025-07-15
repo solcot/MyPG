@@ -147,7 +147,7 @@ def get_all_symbols():
     # 변동폭 비율 계산
     df['전일변동폭비율'] = (df['고가'] - df['저가']) / df['저가']
 
-    # 약 150개 선정됨
+    # 약 150~190 개 선정됨
     filtered = df[
         (df['등락률'] >= -5.0) & 
         #(df['등락률'] >= -5.0) & (df['등락률'] <= 20.0) & 
@@ -582,13 +582,18 @@ try:
         bought_list.append(sym)
     
     #********************************************************
-    target_buy_count = 25 # 매수할 종목 수, 계좌금액과 매수단가등 고려 조정
+    # ACCOUNT_AMT = 6000000 # 이 금액 변동시 TARGET_BUY_COUNT, filter: (df['종가'] <= 239000) 조정 필요
+    TARGET_BUY_COUNT = 25 # 매수할 종목 수, 계좌금액과 매수단가등 고려 조정
     SLIPPAGE_LIMIT = 1.015  # 1.01,1.015,1.02,1.025,1.03 에서 적절히 적용
-    AMOUNT_LIMIT = 0.7  # 0.5,0.7,1 에서 적절히 적용
+    AMOUNT_LIMIT1 = 0.7  # 0.5,0.7,1 에서 적절히 적용
+    AMOUNT_LIMIT2 = 0.5  # 0.5,0.7,1 에서 적절히 적용
+    TARGET_K1 = 0.7
+    TARGET_K2 = 0.5
+    TARGET_K3 = 0.3
     #********************************************************
 
     # 이미 매수한 종목 수를 고려하여 buy_percent 계산
-    remaining_buy_count = target_buy_count - len(bought_list)
+    remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
     if remaining_buy_count <= 0:
         buy_percent = 0 # 더 이상 매수할 종목이 없으면 비율을 0으로 설정
     else:
@@ -596,9 +601,11 @@ try:
         buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
     
     t_now = datetime.now()
-    # 종목별 주문 금액 계산 (14:00 이후는 매수 비중을 줄임)
-    if t_now >= t_now.replace(hour=14, minute=0, second=0):
-        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT)  # 매수 비중 줄임
+    # 종목별 주문 금액 완화 로직 추가
+    if t_now >= t_now.replace(hour=14, minute=30, second=0):
+        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
+    elif t_now >= t_now.replace(hour=14, minute=0, second=0):
+        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
     else:
         buy_amount = int(total_cash * buy_percent)
         
@@ -652,15 +659,17 @@ try:
 
                     time.sleep(5) # 급격한 재매수 방지용
                     # 🧮 손절 후 남은 종목 수 기준으로 buy_amount 재계산
-                    remaining_buy_count = target_buy_count - len(bought_list)
+                    remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
                     if remaining_buy_count > 0:
                         buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
                         total_cash = get_balance() - 10000
                         if total_cash < 0:
                             total_cash = 0
-                        # 종목별 주문 금액 계산 (14:00 이후는 매수 비중을 줄임)
-                        if t_now >= t_now.replace(hour=14, minute=0, second=0):
-                            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT)  # 매수 비중 줄임
+                        # 종목별 주문 금액 완화 로직 추가
+                        if t_now >= t_now.replace(hour=14, minute=30, second=0):
+                            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
+                        elif t_now >= t_now.replace(hour=14, minute=0, second=0):
+                            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
                         else:
                             buy_amount = int(total_cash * buy_percent)
                     else:
@@ -679,15 +688,17 @@ try:
                             
                     time.sleep(5) # 급격한 재매수 방지용
                     # 🧮 익절 후 남은 종목 수 기준으로 buy_amount 재계산
-                    remaining_buy_count = target_buy_count - len(bought_list)
+                    remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
                     if remaining_buy_count > 0:
                         buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
                         total_cash = get_balance() - 10000
                         if total_cash < 0:
                             total_cash = 0
-                        # 종목별 주문 금액 계산 (14:00 이후는 매수 비중을 줄임)
-                        if t_now >= t_now.replace(hour=14, minute=0, second=0):
-                            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT)  # 매수 비중 줄임
+                        # 종목별 주문 금액 완화 로직 추가
+                        if t_now >= t_now.replace(hour=14, minute=30, second=0):
+                            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
+                        elif t_now >= t_now.replace(hour=14, minute=0, second=0):
+                            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
                         else:
                             buy_amount = int(total_cash * buy_percent)
                     else:
@@ -696,20 +707,20 @@ try:
             # 익절 감시 로직 끝 -------------------------------------------------------------
 
             for sym in symbol_list:
-                if len(bought_list) < target_buy_count:
+                if len(bought_list) < TARGET_BUY_COUNT:
                     if sym in bought_list:
                         continue
 
                     # 🔁 k값 점진적 완화 로직 추가
-                    if len(bought_list) < target_buy_count:
+                    if len(bought_list) < TARGET_BUY_COUNT:
                         if t_now >= t_now.replace(hour=14, minute=0, second=0):
-                            k = 0.3
+                            k = TARGET_K3
                         elif t_now >= t_now.replace(hour=13, minute=0, second=0):
-                            k = 0.5
+                            k = TARGET_K2
                         else:
-                            k = 0.7
+                            k = TARGET_K1
                     else:
-                        k = 0.7
+                        k = TARGET_K1
 
                     target_price, open_price = get_price_info(sym, k)
                     #time.sleep(0.1)
@@ -731,9 +742,11 @@ try:
                         else:
                             buy_qty = 0  # 매수할 수량 초기화  
 
-                            # 종목별 주문 금액 계산 (14:00 이후는 매수 비중을 줄임)
-                            if t_now >= t_now.replace(hour=14, minute=0, second=0):
-                                buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT)  # 매수 비중 줄임
+                            # 종목별 주문 금액 완화 로직 추가
+                            if t_now >= t_now.replace(hour=14, minute=30, second=0):
+                                buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
+                            elif t_now >= t_now.replace(hour=14, minute=0, second=0):
+                                buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
                             else:
                                 buy_amount = int(total_cash * buy_percent)
 
