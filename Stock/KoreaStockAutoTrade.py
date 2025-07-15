@@ -582,7 +582,9 @@ try:
         bought_list.append(sym)
     
     #********************************************************
-    target_buy_count = 25 # 매수할 종목 수
+    target_buy_count = 25 # 매수할 종목 수, 계좌금액과 매수단가등 고려 조정
+    SLIPPAGE_LIMIT = 1.02  # 1.015~1.03 에서 적절히 적용
+    AMOUNT_LIMIT = 0.7  # 0.5,0.7,1 에서 적절히 적용
     #********************************************************
 
     # 이미 매수한 종목 수를 고려하여 buy_percent 계산
@@ -593,12 +595,12 @@ try:
         # 소수점 셋째 자리까지 유지하고 넷째 자리부터 버림
         buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
     
-    # 종목별 주문 금액 계산 (14:30 이후는 매수 비중을 절반으로 줄임)
     t_now = datetime.now()
+    # 종목별 주문 금액 계산 (14:00 이후는 매수 비중을 줄임)
     if t_now >= t_now.replace(hour=14, minute=0, second=0):
-        buy_amount = total_cash * buy_percent * 0.5  # 매수 비중 절반
+        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT)  # 매수 비중 줄임
     else:
-        buy_amount = total_cash * buy_percent
+        buy_amount = int(total_cash * buy_percent)
         
     soldout = False
 
@@ -656,11 +658,11 @@ try:
                         total_cash = get_balance() - 10000
                         if total_cash < 0:
                             total_cash = 0
-                        # 종목별 주문 금액 계산 (14:30 이후는 매수 비중을 절반으로 줄임)
+                        # 종목별 주문 금액 계산 (14:00 이후는 매수 비중을 줄임)
                         if t_now >= t_now.replace(hour=14, minute=0, second=0):
-                            buy_amount = total_cash * buy_percent * 0.5  # 매수 비중 절반
+                            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT)  # 매수 비중 줄임
                         else:
-                            buy_amount = total_cash * buy_percent
+                            buy_amount = int(total_cash * buy_percent)
                     else:
                         buy_amount = 0
                 last_stop_loss_check_time = t_now # 마지막 체크 시간 업데이트
@@ -683,11 +685,11 @@ try:
                         total_cash = get_balance() - 10000
                         if total_cash < 0:
                             total_cash = 0
-                        # 종목별 주문 금액 계산 (14:30 이후는 매수 비중을 절반으로 줄임)                    
+                        # 종목별 주문 금액 계산 (14:00 이후는 매수 비중을 줄임)
                         if t_now >= t_now.replace(hour=14, minute=0, second=0):
-                            buy_amount = total_cash * buy_percent * 0.5
+                            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT)  # 매수 비중 줄임
                         else:
-                            buy_amount = total_cash * buy_percent
+                            buy_amount = int(total_cash * buy_percent)
                     else:
                         buy_amount = 0
                 last_profit_taking_check_time = t_now # 마지막 체크 시간 업데이트
@@ -719,25 +721,30 @@ try:
 
                     # 갭상승 제외하고, 진짜 장중 돌파만 매수
                     if open_price < target_price < current_price:
-                        buy_qty = 0  # 매수할 수량 초기화  
-
-                        # 종목별 주문 금액 계산 (14:30 이후는 매수 비중을 절반으로 줄임)
-                        if t_now >= t_now.replace(hour=14, minute=0, second=0):
-                            buy_amount = total_cash * buy_percent * 0.5  # 매수 비중 절반
+                        stock_name = symbol_name_map.get(sym, "Unknown")
+                        # 돌파 조건은 만족했지만 슬리피지 체크
+                        if current_price > target_price * SLIPPAGE_LIMIT:
+                            send_message(f"🔄 {stock_name}({sym}) 슬리피지 초과(현재가 {current_price:.2f} > 허용가 {target_price * SLIPPAGE_LIMIT:.2f})")
+                            continue
                         else:
-                            buy_amount = total_cash * buy_percent
+                            buy_qty = 0  # 매수할 수량 초기화  
 
-                        buy_qty = int(buy_amount // current_price)
-                        if buy_qty > 0:
-                            stock_name = symbol_name_map.get(sym, "Unknown")
-                            send_message(f"📈 {stock_name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
-                            result = buy(sym, buy_qty)
-                            if result:
-                                soldout = False
-                                bought_list.append(sym)
-                                get_stock_balance()
+                            # 종목별 주문 금액 계산 (14:00 이후는 매수 비중을 줄임)
+                            if t_now >= t_now.replace(hour=14, minute=0, second=0):
+                                buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT)  # 매수 비중 줄임
+                            else:
+                                buy_amount = int(total_cash * buy_percent)
+
+                            buy_qty = int(buy_amount // current_price)
+                            if buy_qty > 0:
+                                send_message(f"📈 {stock_name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
+                                result = buy(sym, buy_qty)
+                                if result:
+                                    soldout = False
+                                    bought_list.append(sym)
+                                    get_stock_balance()
                     time.sleep(0.025)
-            time.sleep(0.25)
+            time.sleep(0.025)
 
             # ✅ 30분마다 잔고 확인 (예: 09:15, 09:45, 10:15 ...)
             if (t_now - last_balance_check_time).total_seconds() >= 1800:  # 1800초 = 30분
