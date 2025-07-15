@@ -595,7 +595,7 @@ try:
     
     # 종목별 주문 금액 계산 (14:30 이후는 매수 비중을 절반으로 줄임)
     t_now = datetime.now()
-    if t_now >= t_now.replace(hour=14, minute=30, second=0):
+    if t_now >= t_now.replace(hour=14, minute=0, second=0):
         buy_amount = total_cash * buy_percent * 0.5  # 매수 비중 절반
     else:
         buy_amount = total_cash * buy_percent
@@ -657,7 +657,7 @@ try:
                         if total_cash < 0:
                             total_cash = 0
                         # 종목별 주문 금액 계산 (14:30 이후는 매수 비중을 절반으로 줄임)
-                        if t_now >= t_now.replace(hour=14, minute=30, second=0):
+                        if t_now >= t_now.replace(hour=14, minute=0, second=0):
                             buy_amount = total_cash * buy_percent * 0.5  # 매수 비중 절반
                         else:
                             buy_amount = total_cash * buy_percent
@@ -684,7 +684,7 @@ try:
                         if total_cash < 0:
                             total_cash = 0
                         # 종목별 주문 금액 계산 (14:30 이후는 매수 비중을 절반으로 줄임)                    
-                        if t_now >= t_now.replace(hour=14, minute=30, second=0):
+                        if t_now >= t_now.replace(hour=14, minute=0, second=0):
                             buy_amount = total_cash * buy_percent * 0.5
                         else:
                             buy_amount = total_cash * buy_percent
@@ -722,7 +722,7 @@ try:
                         buy_qty = 0  # 매수할 수량 초기화  
 
                         # 종목별 주문 금액 계산 (14:30 이후는 매수 비중을 절반으로 줄임)
-                        if t_now >= t_now.replace(hour=14, minute=30, second=0):
+                        if t_now >= t_now.replace(hour=14, minute=0, second=0):
                             buy_amount = total_cash * buy_percent * 0.5  # 매수 비중 절반
                         else:
                             buy_amount = total_cash * buy_percent
