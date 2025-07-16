@@ -584,14 +584,22 @@ try:
     #********************************************************
     # ACCOUNT_AMT = 6000000 # 계좌 금액 변동시 TARGET_BUY_COUNT, filter: (df['종가'] <= 239000) 2가지 조정 필요
     TARGET_BUY_COUNT = 25 # 매수할 종목 수, 계좌금액과 매수단가등 고려 조정
+    
     SLIPPAGE_LIMIT = 1.01  # 1.01,1.015,1.02,1.025,1.03 에서 적절히 적용
+    
     STOP_LOSE_PCT = -3.0 # 손절기준 % -> 상황에 따라 적절히 조절 (-3, -5, -7)
     TAKE_PROFIT_PCT = 5.0 # 익절기준 % -> 상황에 따라 적절히 조절 (5, 7, 10, 15)
-    AMOUNT_LIMIT1 = 0.7  # 0.5,0.7,1 에서 적절히 적용, 14시부터 적용
-    AMOUNT_LIMIT2 = 0.5  # 0.5,0.7,1 에서 적절히 적용, 14시30분부터 적용
+    
+    AMOUNT_LIMIT1_TIME = {'hour': 13, 'minute': 0, 'second': 0}
+    AMOUNT_LIMIT1 = 0.7  # 0.5,0.7,1 에서 적절히 적용
+    AMOUNT_LIMIT2_TIME = {'hour': 13, 'minute': 30, 'second': 0}
+    AMOUNT_LIMIT2 = 0.5  # 0.5,0.7,1 에서 적절히 적용
+    
     TARGET_K1 = 0.7 # default
-    TARGET_K2 = 0.5 # 변동성돌파 k값, 13시부터 적용
-    TARGET_K3 = 0.3 # 변동성돌파 k값, 14시부터 적용
+    TARGET_K2_TIME = {'hour': 13, 'minute': 0, 'second': 0}
+    TARGET_K2 = 0.5 # 변동성돌파 k값
+    TARGET_K3_TIME = {'hour': 13, 'minute': 30, 'second': 0}
+    TARGET_K3 = 0.3 # 변동성돌파 k값
     #********************************************************
 
     # 이미 매수한 종목 수를 고려하여 buy_percent 계산
@@ -604,9 +612,9 @@ try:
     
     t_now = datetime.now()
     # 종목별 주문 금액 완화 로직 추가
-    if t_now >= t_now.replace(hour=14, minute=30, second=0):
+    if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
         buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
-    elif t_now >= t_now.replace(hour=14, minute=0, second=0):
+    elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
         buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
     else:
         buy_amount = int(total_cash * buy_percent)
@@ -625,8 +633,8 @@ try:
         t_start = t_now.replace(hour=9, minute=3, second=0, microsecond=0)
         #t_sell = t_now.replace(hour=15, minute=15, second=0, microsecond=0)
         #t_exit = t_now.replace(hour=15, minute=20, second=0,microsecond=0)
-        t_sell = t_now.replace(hour=14, minute=58, second=0, microsecond=0)
-        t_exit = t_now.replace(hour=15, minute=3, second=0,microsecond=0)
+        t_sell = t_now.replace(hour=14, minute=3, second=0, microsecond=0)
+        t_exit = t_now.replace(hour=14, minute=8, second=0,microsecond=0)
 
         # 10분마다 heartbeat 출력
         if (t_now - last_heartbeat).total_seconds() >= 600:
@@ -668,9 +676,9 @@ try:
                         if total_cash < 0:
                             total_cash = 0
                         # 종목별 주문 금액 완화 로직 추가
-                        if t_now >= t_now.replace(hour=14, minute=30, second=0):
+                        if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
                             buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
-                        elif t_now >= t_now.replace(hour=14, minute=0, second=0):
+                        elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
                             buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
                         else:
                             buy_amount = int(total_cash * buy_percent)
@@ -697,9 +705,9 @@ try:
                         if total_cash < 0:
                             total_cash = 0
                         # 종목별 주문 금액 완화 로직 추가
-                        if t_now >= t_now.replace(hour=14, minute=30, second=0):
+                        if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
                             buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
-                        elif t_now >= t_now.replace(hour=14, minute=0, second=0):
+                        elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
                             buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
                         else:
                             buy_amount = int(total_cash * buy_percent)
@@ -715,9 +723,9 @@ try:
 
                     # 🔁 k값 점진적 완화 로직 추가
                     if len(bought_list) < TARGET_BUY_COUNT:
-                        if t_now >= t_now.replace(hour=14, minute=0, second=0):
+                        if t_now >= t_now.replace(**TARGET_K3_TIME):
                             k = TARGET_K3
-                        elif t_now >= t_now.replace(hour=13, minute=0, second=0):
+                        elif t_now >= t_now.replace(**TARGET_K2_TIME):
                             k = TARGET_K2
                         else:
                             k = TARGET_K1
@@ -739,15 +747,15 @@ try:
                         stock_name = symbol_name_map.get(sym, "Unknown")
                         # 돌파 조건은 만족했지만 슬리피지 체크
                         if current_price > target_price * SLIPPAGE_LIMIT:
-                            send_message(f"🔄 {stock_name}({sym}) 슬리피지 초과(현재가 {current_price:.2f} > 허용가 {target_price * SLIPPAGE_LIMIT:.2f})")
+                            send_message(f"🔄 {stock_name}({sym}) 슬리피지 초과(현재가 {current_price:.2f} > 허용가 {target_price * SLIPPAGE_LIMIT:.2f}) - 패스")
                             continue
                         else:
                             buy_qty = 0  # 매수할 수량 초기화  
 
                             # 종목별 주문 금액 완화 로직 추가
-                            if t_now >= t_now.replace(hour=14, minute=30, second=0):
+                            if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
                                 buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
-                            elif t_now >= t_now.replace(hour=14, minute=0, second=0):
+                            elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
                                 buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
                             else:
                                 buy_amount = int(total_cash * buy_percent)
