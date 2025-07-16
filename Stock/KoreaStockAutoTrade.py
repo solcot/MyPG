@@ -8,6 +8,8 @@ import pandas as pd
 from io import BytesIO
 from datetime import datetime, timedelta
 from holidayskr import is_holiday
+import configparser # 추가
+import os # 파일 존재 여부 확인 및 삭제를 위해 os 모듈 추가
 
 with open('C:\\StockPy\\config.yaml', encoding='UTF-8') as f:
     _cfg = yaml.load(f, Loader=yaml.FullLoader)
@@ -18,6 +20,10 @@ CANO = _cfg['CANO']
 ACNT_PRDT_CD = _cfg['ACNT_PRDT_CD']
 DISCORD_WEBHOOK_URL = _cfg['DISCORD_WEBHOOK_URL']
 URL_BASE = _cfg['URL_BASE']
+
+# SettingReload.ini 파일을 위한 ConfigParser 객체 전역 선언 (또는 함수 바깥)
+RELOAD_CONFIG_PATH = 'C:\\StockPy\\SettingReload.ini'
+RELOAD_CONFIG = configparser.ConfigParser()
 
 def send_message(msg):
     """디스코드 메세지 전송"""
@@ -154,7 +160,8 @@ def get_all_symbols():
         #(df['등락률'] >= -5.0) & (df['등락률'] <= 20.0) & 
         #(df['종가'] >= 2500) & (df['종가'] <= 99000) &
         #(df['종가'] >= 2500) & (df['종가'] <= 199000) &
-        (df['종가'] >= 2500) & (df['종가'] <= 239000) &
+        #(df['종가'] >= 2500) & (df['종가'] <= 239000) &
+        (df['종가'] >= 2500) & (df['종가'] <= 279000) &
         #(df['시가총액'] >= 5e10) & (df['시가총액'] <= 7e12) &
         (df['시가총액'] >= 5e10) &
         (df['거래량'] >= 25000) &
@@ -569,220 +576,303 @@ def sell(code="005930", qty="1"):
         send_message(f"[매도 실패]{str(res.json())}")
         return False
 
+def load_settings():
+    """Setting.ini 파일에서 설정을 읽어옵니다."""
+    config = configparser.ConfigParser()
+    config_path = 'C:\\StockPy\\Setting.ini'
+
+    try:
+        config.read(config_path, encoding='utf-8')
+        send_message(f"✅ 설정 파일 '{config_path}'을(를) 성공적으로 읽었습니다.")
+    except Exception as e:
+        send_message(f"❌ 설정 파일 '{config_path}' 읽기 실패: {e}")
+        send_message("기본 설정값을 사용합니다.")
+        return {
+            'ACCOUNT_AMT': 6000000,
+            'EXCLUDE_LIST': [],
+            'TARGET_BUY_COUNT': 25,
+            'T_9_TIME': {'hour': 9, 'minute': 0, 'second': 15},
+            'T_START_TIME': {'hour': 9, 'minute': 3, 'second': 0},
+            'T_SELL_TIME': {'hour': 14, 'minute': 3, 'second': 0},
+            'T_EXIT_TIME': {'hour': 14, 'minute': 8, 'second': 0},
+            'SLIPPAGE_LIMIT': 1.01,
+            'STOP_LOSE_PCT': -3.0,
+            'TAKE_PROFIT_PCT': 5.0,
+            'AMOUNT_LIMIT1_TIME': {'hour': 13, 'minute': 0, 'second': 0},
+            'AMOUNT_LIMIT1': 0.7,
+            'AMOUNT_LIMIT2_TIME': {'hour': 13, 'minute': 30, 'second': 0},
+            'AMOUNT_LIMIT2': 0.5,
+            'TARGET_K1': 0.7,
+            'TARGET_K2_TIME': {'hour': 13, 'minute': 0, 'second': 0},
+            'TARGET_K2': 0.5,
+            'TARGET_K3_TIME': {'hour': 13, 'minute': 30, 'second': 0},
+            'TARGET_K3': 0.3
+        }
+
+    settings = {}
+    try:
+        settings['ACCOUNT_AMT'] = config.getint('General', 'ACCOUNT_AMT')
+        exclude_list_str = config.get('General', 'EXCLUDE_LIST', fallback='')
+        settings['EXCLUDE_LIST'] = [item.strip() for item in exclude_list_str.split(',') if item.strip()] if exclude_list_str else []
+        settings['TARGET_BUY_COUNT'] = config.getint('General', 'TARGET_BUY_COUNT')
+
+        def parse_time_setting(config_obj, prefix):
+            hour = config_obj.getint('TimeSettings', f'{prefix}_HOUR')
+            minute = config_obj.getint('TimeSettings', f'{prefix}_MINUTE')
+            second = config_obj.getint('TimeSettings', f'{prefix}_SECOND')
+            return {'hour': hour, 'minute': minute, 'second': second}
+
+        settings['T_9_TIME'] = parse_time_setting(config, 'T_9')
+        settings['T_START_TIME'] = parse_time_setting(config, 'T_START')
+        settings['T_SELL_TIME'] = parse_time_setting(config, 'T_SELL')
+        settings['T_EXIT_TIME'] = parse_time_setting(config, 'T_EXIT')
+        settings['AMOUNT_LIMIT1_TIME'] = parse_time_setting(config, 'AMOUNT_LIMIT1')
+        settings['AMOUNT_LIMIT2_TIME'] = parse_time_setting(config, 'AMOUNT_LIMIT2')
+        settings['TARGET_K2_TIME'] = parse_time_setting(config, 'TARGET_K2')
+        settings['TARGET_K3_TIME'] = parse_time_setting(config, 'TARGET_K3')
+
+        settings['SLIPPAGE_LIMIT'] = config.getfloat('StrategyParameters', 'SLIPPAGE_LIMIT')
+        settings['STOP_LOSE_PCT'] = config.getfloat('StrategyParameters', 'STOP_LOSE_PCT')
+        settings['TAKE_PROFIT_PCT'] = config.getfloat('StrategyParameters', 'TAKE_PROFIT_PCT')
+        settings['AMOUNT_LIMIT1'] = config.getfloat('StrategyParameters', 'AMOUNT_LIMIT1')
+        settings['AMOUNT_LIMIT2'] = config.getfloat('StrategyParameters', 'AMOUNT_LIMIT2')
+        settings['TARGET_K1'] = config.getfloat('StrategyParameters', 'TARGET_K1')
+        settings['TARGET_K2'] = config.getfloat('StrategyParameters', 'TARGET_K2')
+        settings['TARGET_K3'] = config.getfloat('StrategyParameters', 'TARGET_K3')
+
+    except (configparser.NoSectionError, configparser.NoOptionError, ValueError) as e:
+        send_message(f"❌ 설정 파일 파싱 오류: {e}. 설정 값 확인이 필요합니다.")
+        return {
+            'ACCOUNT_AMT': 6000000,
+            'EXCLUDE_LIST': [],
+            'TARGET_BUY_COUNT': 25,
+            'T_9_TIME': {'hour': 9, 'minute': 0, 'second': 15},
+            'T_START_TIME': {'hour': 9, 'minute': 3, 'second': 0},
+            'T_SELL_TIME': {'hour': 14, 'minute': 3, 'second': 0},
+            'T_EXIT_TIME': {'hour': 14, 'minute': 8, 'second': 0},
+            'SLIPPAGE_LIMIT': 1.01,
+            'STOP_LOSE_PCT': -3.0,
+            'TAKE_PROFIT_PCT': 5.0,
+            'AMOUNT_LIMIT1_TIME': {'hour': 13, 'minute': 0, 'second': 0},
+            'AMOUNT_LIMIT1': 0.7,
+            'AMOUNT_LIMIT2_TIME': {'hour': 13, 'minute': 30, 'second': 0},
+            'AMOUNT_LIMIT2': 0.5,
+            'TARGET_K1': 0.7,
+            'TARGET_K2_TIME': {'hour': 13, 'minute': 0, 'second': 0},
+            'TARGET_K2': 0.5,
+            'TARGET_K3_TIME': {'hour': 13, 'minute': 30, 'second': 0},
+            'TARGET_K3': 0.3
+        }
+
+    return settings
+
+def load_reload_setting():
+    """SettingReload.ini 파일에서 RELOAD 값을 읽어옵니다."""
+    RELOAD_CONFIG.read(RELOAD_CONFIG_PATH, encoding='utf-8')
+    try:
+        return RELOAD_CONFIG.getboolean('General', 'RELOAD', fallback=False)
+    except (configparser.NoSectionError, configparser.NoOptionError, ValueError) as e:
+        send_message(f"❌ SettingReload.ini 읽기 오류: {e}. 기본값 FALSE를 사용합니다.")
+        return False
+
+def write_reload_setting(value):
+    """SettingReload.ini 파일의 RELOAD 값을 씁니다."""
+    if not RELOAD_CONFIG.has_section('General'):
+        RELOAD_CONFIG.add_section('General')
+    RELOAD_CONFIG.set('General', 'RELOAD', str(value).upper()) # TRUE/FALSE로 저장
+    try:
+        with open(RELOAD_CONFIG_PATH, 'w', encoding='utf-8') as f:
+            RELOAD_CONFIG.write(f)
+        send_message(f"✅ SettingReload.ini RELOAD 값을 {value}로 업데이트했습니다.")
+    except Exception as e:
+        send_message(f"❌ SettingReload.ini 쓰기 오류: {e}")
+
+#***********************************************************************************************************
+#***********************************************************************************************************
+#***********************************************************************************************************
+#***********************************************************************************************************
+#***********************************************************************************************************
 # 자동매매 시작
 try:
     ACCESS_TOKEN = get_access_token()
 
     symbol_list = get_all_symbols()  # 거래량, 시총, 조건 필터링된 종목들
 
-    #*************************************************************************************************************
-    # ACCOUNT_AMT = 6000000 # 계좌 금액 변동시 TARGET_BUY_COUNT, filter: (df['종가'] <= 239000) 2가지 조정 필요
-
-    EXCLUDE_LIST = []  # ['005930', '000660', '035420'] 또는 [], 수동 제외 리스트(프로그램 재기동시 반영되도록 9시 이후 손절종목 or 필요시 입력)
-
-    TARGET_BUY_COUNT = 25 # 매수할 종목 수, 계좌금액과 매수단가등 고려 조정
-    
-    T_9_TIME = {'hour': 9, 'minute': 0, 'second': 15}
-    T_START_TIME = {'hour': 9, 'minute': 3, 'second': 0}
-    T_SELL_TIME = {'hour': 14, 'minute': 3, 'second': 0}
-    T_EXIT_TIME = {'hour': 14, 'minute': 8, 'second': 0}
-
-    SLIPPAGE_LIMIT = 1.01  # 1.01,1.015,1.02,1.025,1.03 에서 적절히 적용
-    
-    STOP_LOSE_PCT = -3.0 # 손절기준 % -> 상황에 따라 적절히 조절 (-3, -5, -7)
-    TAKE_PROFIT_PCT = 5.0 # 익절기준 % -> 상황에 따라 적절히 조절 (5, 7, 10, 15)
-    
-    AMOUNT_LIMIT1_TIME = {'hour': 13, 'minute': 0, 'second': 0}
-    AMOUNT_LIMIT1 = 0.7  # 0.5,0.7,1 에서 적절히 적용
-    AMOUNT_LIMIT2_TIME = {'hour': 13, 'minute': 30, 'second': 0}
-    AMOUNT_LIMIT2 = 0.5  # 0.5,0.7,1 에서 적절히 적용
-    
-    TARGET_K1 = 0.7 # default
-    TARGET_K2_TIME = {'hour': 13, 'minute': 0, 'second': 0}
-    TARGET_K2 = 0.5 # 변동성돌파 k값
-    TARGET_K3_TIME = {'hour': 13, 'minute': 30, 'second': 0}
-    TARGET_K3 = 0.3 # 변동성돌파 k값
-    #*************************************************************************************************************
-
-    if EXCLUDE_LIST:
-        symbol_list = [sym for sym in symbol_list if sym not in EXCLUDE_LIST]
-
-    bought_list = [] # 매수 완료된 종목 리스트
-    total_cash = get_balance() - 10000 # 보유 현금 조회 (10,000원 제외)
-    if total_cash < 0: # 잔액이 마이너스가 되는 경우 방지
-        total_cash = 0
-    stock_dict = get_stock_balance() # 보유 주식 조회
-    for sym in stock_dict.keys():
-        bought_list.append(sym)
-
-    t_now = datetime.now()
-
-    # 주식 매수/매도 시간
-    t_9 = t_now.replace(**T_9_TIME)
-    t_start = t_now.replace(**T_START_TIME)
-    t_sell = t_now.replace(**T_SELL_TIME)
-    t_exit = t_now.replace(**T_EXIT_TIME)
-
-    # 이미 매수한 종목 수를 고려하여 buy_percent 계산
-    remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
-    if remaining_buy_count <= 0:
-        buy_percent = 0 # 더 이상 매수할 종목이 없으면 비율을 0으로 설정
-    else:
-        # 소수점 셋째 자리까지 유지하고 넷째 자리부터 버림
-        buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
-    
-    # 종목별 주문 금액 완화 로직 추가
-    if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
-    elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
-    else:
-        buy_amount = int(total_cash * buy_percent)
-        
-    soldout = False
-
-    send_message("===국내 주식 자동매매 프로그램을 시작합니다===")
-    last_stop_loss_check_time = datetime.now() - timedelta(seconds=15) # 손절 초기값 설정 
-    last_profit_taking_check_time = datetime.now() - timedelta(seconds=45) # 익절 초기값 설정 
-    last_balance_check_time = datetime.now() - timedelta(minutes=15)  # 초기화: 과거로 설정해서 15분후에 출력되도록 이후는 30분마다
-    last_heartbeat = datetime.now() - timedelta(minutes=10)
-    # 슬리피지 초과 감시용 변수들 (초기화 부분)
-    slippage_count = {}
-    slippage_last_logged = {}
-    
+    # --- ✨ 메인 자동매매 루프 시작 ✨ ---
+    # 외부 루프: 설정 재로드를 위해 전체 로직을 감쌈
     while True:
+        program_exit_due_to_holiday = False # ✨ 추가: 휴일 종료 플래그 ✨
+        # --- 설정 파일에서 값 로드 ---------------------------------------------------------------------------------------------
+        settings = load_settings()
+
+        ## --- ✨ 테스트 출력 시작 ✨ ---
+        #send_message("--- [setting.ini] 로드된 설정 값 ---")
+        #for key, value in settings.items():
+        #    if isinstance(value, dict): # 시간 설정 (딕셔너리)은 보기 좋게 출력
+        #        time_str = f"{{'hour': {value['hour']}, 'minute': {value['minute']}, 'second': {value['second']}}}"
+        #        send_message(f"- {key}: {time_str}")
+        #    elif isinstance(value, list): # 리스트는 join으로 출력
+        #        send_message(f"- {key}: {', '.join(value)}")
+        #    else:
+        #        send_message(f"- {key}: {value}")
+        #send_message("--- [setting.ini] 로드된 설정 값 끝 ---")
+        ## --- ✨ 테스트 출력 끝 ✨ ---
+
+        ACCOUNT_AMT = settings['ACCOUNT_AMT']
+        EXCLUDE_LIST = settings['EXCLUDE_LIST']
+        TARGET_BUY_COUNT = settings['TARGET_BUY_COUNT']
+
+        T_9_TIME = settings['T_9_TIME']
+        T_START_TIME = settings['T_START_TIME']
+        T_SELL_TIME = settings['T_SELL_TIME']
+        T_EXIT_TIME = settings['T_EXIT_TIME']
+
+        SLIPPAGE_LIMIT = settings['SLIPPAGE_LIMIT']
+
+        STOP_LOSE_PCT = settings['STOP_LOSE_PCT']
+        TAKE_PROFIT_PCT = settings['TAKE_PROFIT_PCT']
+
+        AMOUNT_LIMIT1_TIME = settings['AMOUNT_LIMIT1_TIME']
+        AMOUNT_LIMIT1 = settings['AMOUNT_LIMIT1']
+        AMOUNT_LIMIT2_TIME = settings['AMOUNT_LIMIT2_TIME']
+        AMOUNT_LIMIT2 = settings['AMOUNT_LIMIT2']
+
+        TARGET_K1 = settings['TARGET_K1']
+        TARGET_K2_TIME = settings['TARGET_K2_TIME']
+        TARGET_K2 = settings['TARGET_K2']
+        TARGET_K3_TIME = settings['TARGET_K3_TIME']
+        TARGET_K3 = settings['TARGET_K3']
+        # --- 설정 파일 로드 끝 ---------------------------------------------------------------------------------------------
+        ######*************************************************************************************************************
+        ###### ACCOUNT_AMT = 6000000 # 계좌 금액 변동시 TARGET_BUY_COUNT, filter: (df['종가'] <= 239000) 2가지 조정 필요
+        #####
+        #####EXCLUDE_LIST = []  # ['005930', '000660', '035420'] 또는 [], 수동 제외 리스트(프로그램 재기동시 반영되도록 9시 이후 손절종목 or 필요시 입력)
+        #####
+        #####TARGET_BUY_COUNT = 25 # 매수할 종목 수, 계좌금액과 매수단가등 고려 조정
+        #####
+        #####T_9_TIME = {'hour': 9, 'minute': 0, 'second': 15}
+        #####T_START_TIME = {'hour': 9, 'minute': 3, 'second': 0}
+        #####T_SELL_TIME = {'hour': 14, 'minute': 3, 'second': 0}
+        #####T_EXIT_TIME = {'hour': 14, 'minute': 8, 'second': 0}
+        #####
+        #####SLIPPAGE_LIMIT = 1.01  # 1.01,1.015,1.02,1.025,1.03 에서 적절히 적용
+        #####
+        #####STOP_LOSE_PCT = -3.0 # 손절기준 % -> 상황에 따라 적절히 조절 (-3, -5, -7)
+        #####TAKE_PROFIT_PCT = 5.0 # 익절기준 % -> 상황에 따라 적절히 조절 (5, 7, 10, 15)
+        #####
+        #####AMOUNT_LIMIT1_TIME = {'hour': 13, 'minute': 0, 'second': 0}
+        #####AMOUNT_LIMIT1 = 0.7  # 0.5,0.7,1 에서 적절히 적용
+        #####AMOUNT_LIMIT2_TIME = {'hour': 13, 'minute': 30, 'second': 0}
+        #####AMOUNT_LIMIT2 = 0.5  # 0.5,0.7,1 에서 적절히 적용
+        #####
+        #####TARGET_K1 = 0.7 # default
+        #####TARGET_K2_TIME = {'hour': 13, 'minute': 0, 'second': 0}
+        #####TARGET_K2 = 0.5 # 변동성돌파 k값
+        #####TARGET_K3_TIME = {'hour': 13, 'minute': 30, 'second': 0}
+        #####TARGET_K3 = 0.3 # 변동성돌파 k값
+        ######*************************************************************************************************************
+
+        if EXCLUDE_LIST:
+            symbol_list = [sym for sym in symbol_list if sym not in EXCLUDE_LIST]
+
+        bought_list = [] # 매수 완료된 종목 리스트
+        total_cash = get_balance() - 10000 # 보유 현금 조회 (10,000원 제외)
+        if total_cash < 0: # 잔액이 마이너스가 되는 경우 방지
+            total_cash = 0
+        stock_dict = get_stock_balance() # 보유 주식 조회
+        for sym in stock_dict.keys():
+            bought_list.append(sym)
+
         t_now = datetime.now()
 
-        # 10분마다 heartbeat 출력
-        if (t_now - last_heartbeat).total_seconds() >= 600:
-            send_message("✅ 시스템 정상 작동 중입니다.")
-            last_heartbeat = t_now
+        # 주식 매수/매도 시간
+        t_9 = t_now.replace(**T_9_TIME)
+        t_start = t_now.replace(**T_START_TIME)
+        t_sell = t_now.replace(**T_SELL_TIME)
+        t_exit = t_now.replace(**T_EXIT_TIME)
 
-        #today = datetime.today().weekday()
-        today = datetime.today()
-        if today.weekday() >= 5 or is_holiday(today.strftime("%Y-%m-%d")):  # 토요일/일요일/휴일 이면 자동 종료
-            send_message("휴일이므로 프로그램을 종료합니다.")
-            break
-        if t_9 < t_now < t_start and soldout == False: # # AM 09:00 ~ AM 09:03 : 잔여 수량 매도
-            for sym, qty in stock_dict.items():
-                sell(sym, qty)
-            soldout = True
-            bought_list = []
-            stock_dict = get_stock_balance()
-
-        if t_start < t_now < t_sell:  # AM 09:03 ~ PM 02:58 : 매수     
+        # 이미 매수한 종목 수를 고려하여 buy_percent 계산
+        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
+        if remaining_buy_count <= 0:
+            buy_percent = 0 # 더 이상 매수할 종목이 없으면 비율을 0으로 설정
+        else:
+            # 소수점 셋째 자리까지 유지하고 넷째 자리부터 버림
+            buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
         
-            #send_message("루프 시작..................") #루프 시간 측정용
+        # 종목별 주문 금액 완화 로직 추가
+        if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
+            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
+        elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
+            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
+        else:
+            buy_amount = int(total_cash * buy_percent)
+            
+        soldout = False
 
-            # 손절 감시 로직 -------------------------------------------------------            
-            if (t_now - last_stop_loss_check_time).total_seconds() >= 30: # 30초마다 체크
-                stopped = check_stop_loss(threshold=STOP_LOSE_PCT)
-                if stopped:
-                    for sym in stopped:
-                        if sym in bought_list:
-                            bought_list.remove(sym)
-                        if sym in symbol_list: # 손절한 종목 다시 매수하지 않도록 symbol_list에서 제거
-                            symbol_list.remove(sym)
+        send_message("===국내 주식 자동매매 프로그램을 시작합니다===")
+        last_stop_loss_check_time = datetime.now() - timedelta(seconds=15) # 손절 초기값 설정 
+        last_profit_taking_check_time = datetime.now() - timedelta(seconds=45) # 익절 초기값 설정 
+        last_balance_check_time = datetime.now() - timedelta(minutes=15)  # 초기화: 과거로 설정해서 15분후에 출력되도록 이후는 30분마다
+        last_heartbeat = datetime.now() - timedelta(minutes=10)
+        last_reload_check_time = datetime.now() - timedelta(seconds=10)
+        # 슬리피지 초과 감시용 변수들 (초기화 부분)
+        slippage_count = {}
+        slippage_last_logged = {}
+        
+        while True:
+            t_now = datetime.now()
 
-                    time.sleep(5) # 급격한 재매수 방지용
-                    # 🧮 손절 후 남은 종목 수 기준으로 buy_amount 재계산
-                    remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
-                    if remaining_buy_count > 0:
-                        buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
-                        total_cash = get_balance() - 10000
-                        if total_cash < 0:
-                            total_cash = 0
-                        # 종목별 주문 금액 완화 로직 추가
-                        if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-                            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
-                        elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-                            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
-                        else:
-                            buy_amount = int(total_cash * buy_percent)
-                    else:
-                        buy_amount = 0
-                last_stop_loss_check_time = t_now # 마지막 체크 시간 업데이트
-            # 손절 감시 로직 끝 ------------------------------------------------------------------
-            # 익절 감시 로직 -----------------------------------------------------------
-            if (t_now - last_profit_taking_check_time).total_seconds() >= 30: # 30초마다 체크
-                profited = check_profit_taking(threshold=TAKE_PROFIT_PCT)
-                if profited:
-                    for sym in profited:
-                        if sym in bought_list:
-                            bought_list.remove(sym)
-                        if sym in symbol_list: # 익절한 종목 다시 매수하지 않도록 symbol_list에서 제거
-                            symbol_list.remove(sym)
-                            
-                    time.sleep(5) # 급격한 재매수 방지용
-                    # 🧮 익절 후 남은 종목 수 기준으로 buy_amount 재계산
-                    remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
-                    if remaining_buy_count > 0:
-                        buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
-                        total_cash = get_balance() - 10000
-                        if total_cash < 0:
-                            total_cash = 0
-                        # 종목별 주문 금액 완화 로직 추가
-                        if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-                            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
-                        elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-                            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
-                        else:
-                            buy_amount = int(total_cash * buy_percent)
-                    else:
-                        buy_amount = 0
-                last_profit_taking_check_time = t_now # 마지막 체크 시간 업데이트
-            # 익절 감시 로직 끝 -------------------------------------------------------------
+            # 10분마다 heartbeat 출력
+            if (t_now - last_heartbeat).total_seconds() >= 600:
+                send_message("✅ 시스템 정상 작동 중입니다.")
+                last_heartbeat = t_now
 
-            for sym in symbol_list:
-                if len(bought_list) < TARGET_BUY_COUNT:
-                    if sym in bought_list:
-                        continue
+            #today = datetime.today().weekday()
+            today = datetime.today()
+            if today.weekday() >= 5 or is_holiday(today.strftime("%Y-%m-%d")):  # 토요일/일요일/휴일 이면 자동 종료
+                send_message("휴일이므로 프로그램을 종료합니다.")
+                program_exit_due_to_holiday = True # ✨ 플래그 설정 ✨
+                break
 
-                    # 🔁 k값 점진적 완화 로직 추가
-                    if len(bought_list) < TARGET_BUY_COUNT:
-                        if t_now >= t_now.replace(**TARGET_K3_TIME):
-                            k = TARGET_K3
-                        elif t_now >= t_now.replace(**TARGET_K2_TIME):
-                            k = TARGET_K2
-                        else:
-                            k = TARGET_K1
-                    else:
-                        k = TARGET_K1
+            # --- ✨ SettingReload.ini 확인 및 재로드 로직 ✨ ---
+            # 특정 시간(예: 매분 00초) 또는 주기적으로 재로드 플래그 확인
+            if (t_now - last_reload_check_time).total_seconds() >= 60: # 60초가 지났으면 수행
+                if load_reload_setting(): # RELOAD = TRUE 인 경우
+                    send_message("🔄 SettingReload.ini RELOAD = TRUE 감지! 설정을 재로드합니다.")
+                    write_reload_setting(False) # RELOAD를 FALSE로 되돌림
+                    break # 내부 while 루프를 종료하고 외부 while 루프로 이동하여 설정 재로드
+                last_reload_check_time = t_now # 재로드 체크 후 시간 업데이트
+            # --- ✨ 재로드 로직 끝 ✨ ---
 
-                    target_price, open_price = get_price_info(sym, k)
-                    #time.sleep(0.1)
-                    current_price = get_current_price(sym)
-                    if open_price is None or target_price is None or current_price is None: # 가격을 가져오지 못했으면 다음 종목으로 넘어감
-                        send_message(f"[{sym}] 가격 수신 실패. 다음 종목으로 넘어갑니다.")
-                        #time.sleep(1) # API 호출 빈도 조절
-                        continue 
+            if t_9 < t_now < t_start and soldout == False: # # AM 09:00 ~ AM 09:03 : 잔여 수량 매도
+                for sym, qty in stock_dict.items():
+                    sell(sym, qty)
+                soldout = True
+                bought_list = []
+                stock_dict = get_stock_balance()
 
-                    # 갭상승 제외하고, 진짜 장중 돌파만 매수
-                    #if open_price < target_price < current_price:
-                    # 갭상승(or NXT) 포함해서 target_price 돌파 매수
-                    if target_price < current_price:
-                        stock_name = symbol_name_map.get(sym, "Unknown")
+            if t_start < t_now < t_sell:  # AM 09:03 ~ PM 02:58 : 매수     
+            
+                #send_message("루프 시작..................") #루프 시간 측정용
 
-                        # 돌파 조건은 만족했지만 슬리피지 체크
-                        if current_price > target_price * SLIPPAGE_LIMIT:
-                            # 슬리피지 횟수 기록
-                            if sym not in slippage_count:
-                                slippage_count[sym] = 1
-                            else:
-                                slippage_count[sym] += 1
-                            # 3회 이하까지는 무조건 출력
-                            if slippage_count[sym] <= 3:
-                                send_message(f"🔄 {stock_name}({sym}) 슬리피지 초과 {slippage_count[sym]}회 (현재가 {current_price:.2f} > 허용가 {target_price * SLIPPAGE_LIMIT:.2f})")
-                            else:
-                                # 마지막으로 출력한 시간이 10분 지났으면 다시 출력
-                                last_log_time = slippage_last_logged.get(sym)
-                                if last_log_time is None or (t_now - last_log_time).total_seconds() >= 600:
-                                    send_message(f"🔄 {stock_name}({sym}) 슬리피지 반복 초과 중... 매수 조건이 너무 엄격할 수 있음")
-                                    slippage_last_logged[sym] = t_now
-                            continue  # 슬리피지 초과 종목은 매수하지 않음
-                        else:
-                            buy_qty = 0  # 매수할 수량 초기화  
+                # 손절 감시 로직 -------------------------------------------------------            
+                if (t_now - last_stop_loss_check_time).total_seconds() >= 30: # 30초마다 체크
+                    stopped = check_stop_loss(threshold=STOP_LOSE_PCT)
+                    if stopped:
+                        for sym in stopped:
+                            if sym in bought_list:
+                                bought_list.remove(sym)
+                            if sym in symbol_list: # 손절한 종목 다시 매수하지 않도록 symbol_list에서 제거
+                                symbol_list.remove(sym)
 
+                        time.sleep(5) # 급격한 재매수 방지용
+                        # 🧮 손절 후 남은 종목 수 기준으로 buy_amount 재계산
+                        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
+                        if remaining_buy_count > 0:
+                            buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
+                            total_cash = get_balance() - 10000
+                            if total_cash < 0:
+                                total_cash = 0
                             # 종목별 주문 금액 완화 로직 추가
                             if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
                                 buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
@@ -790,38 +880,139 @@ try:
                                 buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
                             else:
                                 buy_amount = int(total_cash * buy_percent)
+                        else:
+                            buy_amount = 0
+                    last_stop_loss_check_time = t_now # 마지막 체크 시간 업데이트
+                # 손절 감시 로직 끝 ------------------------------------------------------------------
+                # 익절 감시 로직 -----------------------------------------------------------
+                if (t_now - last_profit_taking_check_time).total_seconds() >= 30: # 30초마다 체크
+                    profited = check_profit_taking(threshold=TAKE_PROFIT_PCT)
+                    if profited:
+                        for sym in profited:
+                            if sym in bought_list:
+                                bought_list.remove(sym)
+                            if sym in symbol_list: # 익절한 종목 다시 매수하지 않도록 symbol_list에서 제거
+                                symbol_list.remove(sym)
+                                
+                        time.sleep(5) # 급격한 재매수 방지용
+                        # 🧮 익절 후 남은 종목 수 기준으로 buy_amount 재계산
+                        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
+                        if remaining_buy_count > 0:
+                            buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
+                            total_cash = get_balance() - 10000
+                            if total_cash < 0:
+                                total_cash = 0
+                            # 종목별 주문 금액 완화 로직 추가
+                            if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
+                                buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
+                            elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
+                                buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
+                            else:
+                                buy_amount = int(total_cash * buy_percent)
+                        else:
+                            buy_amount = 0
+                    last_profit_taking_check_time = t_now # 마지막 체크 시간 업데이트
+                # 익절 감시 로직 끝 -------------------------------------------------------------
 
-                            buy_qty = int(buy_amount // current_price)
-                            if buy_qty > 0:
-                                send_message(f"📈 {stock_name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
-                                result = buy(sym, buy_qty)
-                                if result:
-                                    soldout = False
-                                    bought_list.append(sym)
-                                    get_stock_balance()
-                    time.sleep(0.025)
-            time.sleep(0.025)
+                for sym in symbol_list:
+                    if len(bought_list) < TARGET_BUY_COUNT:
+                        if sym in bought_list:
+                            continue
 
-            # ✅ 30분마다 잔고 확인 (예: 09:15, 09:45, 10:15 ...)
-            if (t_now - last_balance_check_time).total_seconds() >= 1800:  # 1800초 = 30분
+                        # 🔁 k값 점진적 완화 로직 추가
+                        if len(bought_list) < TARGET_BUY_COUNT:
+                            if t_now >= t_now.replace(**TARGET_K3_TIME):
+                                k = TARGET_K3
+                            elif t_now >= t_now.replace(**TARGET_K2_TIME):
+                                k = TARGET_K2
+                            else:
+                                k = TARGET_K1
+                        else:
+                            k = TARGET_K1
+
+                        target_price, open_price = get_price_info(sym, k)
+                        #time.sleep(0.1)
+                        current_price = get_current_price(sym)
+                        if open_price is None or target_price is None or current_price is None: # 가격을 가져오지 못했으면 다음 종목으로 넘어감
+                            send_message(f"[{sym}] 가격 수신 실패. 다음 종목으로 넘어갑니다.")
+                            #time.sleep(1) # API 호출 빈도 조절
+                            continue 
+
+                        # 갭상승 제외하고, 진짜 장중 돌파만 매수
+                        #if open_price < target_price < current_price:
+                        # 갭상승(or NXT) 포함해서 target_price 돌파 매수
+                        if target_price < current_price:
+                            stock_name = symbol_name_map.get(sym, "Unknown")
+
+                            # 돌파 조건은 만족했지만 슬리피지 체크
+                            if current_price > target_price * SLIPPAGE_LIMIT:
+                                # 슬리피지 횟수 기록
+                                if sym not in slippage_count:
+                                    slippage_count[sym] = 1
+                                else:
+                                    slippage_count[sym] += 1
+                                # 3회 이하까지는 무조건 출력
+                                if slippage_count[sym] <= 3:
+                                    send_message(f"🔄 {stock_name}({sym}) 슬리피지 초과 {slippage_count[sym]}회 (현재가 {current_price:.2f} > 허용가 {target_price * SLIPPAGE_LIMIT:.2f})")
+                                else:
+                                    # 마지막으로 출력한 시간이 10분 지났으면 다시 출력
+                                    last_log_time = slippage_last_logged.get(sym)
+                                    if last_log_time is None or (t_now - last_log_time).total_seconds() >= 600:
+                                        send_message(f"🔄 {stock_name}({sym}) 슬리피지 반복 초과 중... 매수 조건이 너무 엄격할 수 있음")
+                                        slippage_last_logged[sym] = t_now
+                                continue  # 슬리피지 초과 종목은 매수하지 않음
+                            else:
+                                buy_qty = 0  # 매수할 수량 초기화  
+
+                                # 종목별 주문 금액 완화 로직 추가
+                                if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
+                                    buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
+                                elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
+                                    buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
+                                else:
+                                    buy_amount = int(total_cash * buy_percent)
+
+                                buy_qty = int(buy_amount // current_price)
+                                if buy_qty > 0:
+                                    send_message(f"📈 {stock_name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
+                                    result = buy(sym, buy_qty)
+                                    if result:
+                                        soldout = False
+                                        bought_list.append(sym)
+                                        get_stock_balance()
+                        time.sleep(0.025)
+                time.sleep(0.025)
+
+                # ✅ 30분마다 잔고 확인 (예: 09:15, 09:45, 10:15 ...)
+                if (t_now - last_balance_check_time).total_seconds() >= 1800:  # 1800초 = 30분
+                    get_stock_balance()
+                    last_balance_check_time = t_now
+
+                #send_message("루프 끝..................") #루프 시간 측정용
+
+            if t_sell < t_now < t_exit:  # PM 02:58 ~ PM 03:03 : 일괄 매도
+                if soldout == False:
+                    stock_dict = get_stock_balance()
+                    for sym, qty in stock_dict.items():
+                        sell(sym, qty)
+                    soldout = True
+                    bought_list = []
+                    time.sleep(1)
+            if t_exit < t_now:  # PM 03:03 ~ :프로그램 종료
+                send_message("종료시점 보유주식 조회내역은 아래와 같습니다.")
                 get_stock_balance()
-                last_balance_check_time = t_now
+                send_message("프로그램을 종료합니다.")
+                break
 
-            #send_message("루프 끝..................") #루프 시간 측정용
-
-        if t_sell < t_now < t_exit:  # PM 02:58 ~ PM 03:03 : 일괄 매도
-            if soldout == False:
-                stock_dict = get_stock_balance()
-                for sym, qty in stock_dict.items():
-                    sell(sym, qty)
-                soldout = True
-                bought_list = []
-                time.sleep(1)
-        if t_exit < t_now:  # PM 03:03 ~ :프로그램 종료
-            send_message("종료시점 보유주식 조회내역은 아래와 같습니다.")
-            get_stock_balance()
-            send_message("프로그램을 종료합니다.")
+        # 내부 루프가 break로 종료되었을 때 처리
+        if program_exit_due_to_holiday: # ✨ 플래그 확인 ✨
+            break # 외부 루프도 종료하여 프로그램 완전히 끝냄
+        elif t_exit > t_now: # 프로그램 종료 시간이 아닌데 break 되었다면 (즉, 재로드 때문)
+            send_message("🔄 설정 재로드를 위해 메인 루프를 다시 시작합니다.")
+            continue # 외부 while True 루프의 다음 반복으로 이동
+        else: # 프로그램 종료 시간이라면 외부 루프도 종료
             break
+
 except Exception as e:
     send_message(f"[오류 발생]{e}")
     time.sleep(1)
