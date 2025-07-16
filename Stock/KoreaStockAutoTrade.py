@@ -148,6 +148,7 @@ def get_all_symbols():
     df['전일변동폭비율'] = (df['고가'] - df['저가']) / df['저가']
 
     # 약 150~200개 정도로 조정
+    #*************************************************************************************************************
     filtered = df[
         (df['등락률'] >= -5.0) & 
         #(df['등락률'] >= -5.0) & (df['등락률'] <= 20.0) & 
@@ -162,6 +163,7 @@ def get_all_symbols():
         #(df['전일변동폭비율'] >= 0.055)
         (df['전일변동폭비율'] >= 0.06)
     ].copy()
+    #*************************************************************************************************************
 
     ## 필터 조건
     #filtered = df[
@@ -571,8 +573,13 @@ def sell(code="005930", qty="1"):
 try:
     ACCESS_TOKEN = get_access_token()
 
-    symbol_list = get_all_symbols()
-    # send_message(f"\n✅ 구매 예정 종목코드: {symbol_list}")
+    symbol_list = get_all_symbols()  # 거래량, 시총, 조건 필터링된 종목들    
+    #*************************************************************************************************************
+    EXCLUDE_LIST = []  # ['005930', '000660', '035420'] 또는 [] ,수동 제외 리스트 (없으면 빈 리스트)
+    #*************************************************************************************************************
+    if EXCLUDE_LIST:
+        symbol_list = [sym for sym in symbol_list if sym not in EXCLUDE_LIST]
+
     bought_list = [] # 매수 완료된 종목 리스트
     total_cash = get_balance() - 10000 # 보유 현금 조회 (10,000원 제외)
     if total_cash < 0: # 잔액이 마이너스가 되는 경우 방지
@@ -581,7 +588,7 @@ try:
     for sym in stock_dict.keys():
         bought_list.append(sym)
     
-    #********************************************************
+    #*************************************************************************************************************
     # ACCOUNT_AMT = 6000000 # 계좌 금액 변동시 TARGET_BUY_COUNT, filter: (df['종가'] <= 239000) 2가지 조정 필요
     TARGET_BUY_COUNT = 25 # 매수할 종목 수, 계좌금액과 매수단가등 고려 조정
     
@@ -600,7 +607,7 @@ try:
     TARGET_K2 = 0.5 # 변동성돌파 k값
     TARGET_K3_TIME = {'hour': 13, 'minute': 30, 'second': 0}
     TARGET_K3 = 0.3 # 변동성돌파 k값
-    #********************************************************
+    #*************************************************************************************************************
 
     # 이미 매수한 종목 수를 고려하여 buy_percent 계산
     remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
@@ -626,15 +633,20 @@ try:
     last_profit_taking_check_time = datetime.now() - timedelta(seconds=45) # 익절 초기값 설정 
     last_balance_check_time = datetime.now() - timedelta(minutes=15)  # 초기화: 과거로 설정해서 15분후에 출력되도록 이후는 30분마다
     last_heartbeat = datetime.now() - timedelta(minutes=10)
+    # 슬리피지 초과 감시용 변수들 (초기화 부분)
+    slippage_count = {}
+    slippage_last_logged = {}
     
     while True:
         t_now = datetime.now()
+        #*************************************************************************************************************
         t_9 = t_now.replace(hour=9, minute=0, second=15, microsecond=0)
         t_start = t_now.replace(hour=9, minute=3, second=0, microsecond=0)
         #t_sell = t_now.replace(hour=15, minute=15, second=0, microsecond=0)
         #t_exit = t_now.replace(hour=15, minute=20, second=0,microsecond=0)
         t_sell = t_now.replace(hour=14, minute=3, second=0, microsecond=0)
         t_exit = t_now.replace(hour=14, minute=8, second=0,microsecond=0)
+        #*************************************************************************************************************
 
         # 10분마다 heartbeat 출력
         if (t_now - last_heartbeat).total_seconds() >= 600:
@@ -745,10 +757,24 @@ try:
                     # 갭상승(or NXT) 포함해서 target_price 돌파 매수
                     if target_price < current_price:
                         stock_name = symbol_name_map.get(sym, "Unknown")
+
                         # 돌파 조건은 만족했지만 슬리피지 체크
                         if current_price > target_price * SLIPPAGE_LIMIT:
-                            send_message(f"🔄 {stock_name}({sym}) 슬리피지 초과(현재가 {current_price:.2f} > 허용가 {target_price * SLIPPAGE_LIMIT:.2f}) - 패스")
-                            continue
+                            # 슬리피지 횟수 기록
+                            if sym not in slippage_count:
+                                slippage_count[sym] = 1
+                            else:
+                                slippage_count[sym] += 1
+                            # 3회 이하까지는 무조건 출력
+                            if slippage_count[sym] <= 3:
+                                send_message(f"🔄 {stock_name}({sym}) 슬리피지 초과 {slippage_count[sym]}회 (현재가 {current_price:.2f} > 허용가 {target_price * SLIPPAGE_LIMIT:.2f})")
+                            else:
+                                # 마지막으로 출력한 시간이 10분 지났으면 다시 출력
+                                last_log_time = slippage_last_logged.get(sym)
+                                if last_log_time is None or (t_now - last_log_time).total_seconds() >= 600:
+                                    send_message(f"🔄 {stock_name}({sym}) 슬리피지 반복 초과 중... 매수 조건이 너무 엄격할 수 있음")
+                                    slippage_last_logged[sym] = t_now
+                            continue  # 슬리피지 초과 종목은 매수하지 않음
                         else:
                             buy_qty = 0  # 매수할 수량 초기화  
 
