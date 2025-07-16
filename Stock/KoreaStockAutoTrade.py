@@ -582,14 +582,16 @@ try:
         bought_list.append(sym)
     
     #********************************************************
-    # ACCOUNT_AMT = 6000000 # 이 금액 변동시 TARGET_BUY_COUNT, filter: (df['종가'] <= 239000) 조정 필요
+    # ACCOUNT_AMT = 6000000 # 계좌 금액 변동시 TARGET_BUY_COUNT, filter: (df['종가'] <= 239000) 2가지 조정 필요
     TARGET_BUY_COUNT = 25 # 매수할 종목 수, 계좌금액과 매수단가등 고려 조정
     SLIPPAGE_LIMIT = 1.015  # 1.01,1.015,1.02,1.025,1.03 에서 적절히 적용
-    AMOUNT_LIMIT1 = 0.7  # 0.5,0.7,1 에서 적절히 적용
-    AMOUNT_LIMIT2 = 0.5  # 0.5,0.7,1 에서 적절히 적용
-    TARGET_K1 = 0.7
-    TARGET_K2 = 0.5
-    TARGET_K3 = 0.3
+    STOP_LOSE_PCT = -5.0 # 손절기준 % -> 상황에 따라 적절히 조절
+    TAKE_PROFIT_PCT = 10.0 # 익정기준 % -> 상황에 따라 적절히 조절
+    AMOUNT_LIMIT1 = 0.7  # 0.5,0.7,1 에서 적절히 적용, 14시부터 적용
+    AMOUNT_LIMIT2 = 0.5  # 0.5,0.7,1 에서 적절히 적용, 14시30분부터 적용
+    TARGET_K1 = 0.7 # default
+    TARGET_K2 = 0.5 # 변동성돌파 k값, 13시부터 적용
+    TARGET_K3 = 0.3 # 변동성돌파 k값, 14시부터 적용
     #********************************************************
 
     # 이미 매수한 종목 수를 고려하여 buy_percent 계산
@@ -649,7 +651,7 @@ try:
 
             # 손절 감시 로직 -------------------------------------------------------            
             if (t_now - last_stop_loss_check_time).total_seconds() >= 30: # 30초마다 체크
-                stopped = check_stop_loss(threshold=-5.0)  # -3.0
+                stopped = check_stop_loss(threshold=STOP_LOSE_PCT)
                 if stopped:
                     for sym in stopped:
                         if sym in bought_list:
@@ -678,7 +680,7 @@ try:
             # 손절 감시 로직 끝 ------------------------------------------------------------------
             # 익절 감시 로직 -----------------------------------------------------------
             if (t_now - last_profit_taking_check_time).total_seconds() >= 30: # 30초마다 체크
-                profited = check_profit_taking(threshold=10.0) # 익절 기준 10%
+                profited = check_profit_taking(threshold=TAKE_PROFIT_PCT)
                 if profited:
                     for sym in profited:
                         if sym in bought_list:
