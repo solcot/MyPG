@@ -573,25 +573,20 @@ def sell(code="005930", qty="1"):
 try:
     ACCESS_TOKEN = get_access_token()
 
-    symbol_list = get_all_symbols()  # 거래량, 시총, 조건 필터링된 종목들    
-    #*************************************************************************************************************
-    EXCLUDE_LIST = []  # ['005930', '000660', '035420'] 또는 [] ,수동 제외 리스트 (없으면 빈 리스트)
-    #*************************************************************************************************************
-    if EXCLUDE_LIST:
-        symbol_list = [sym for sym in symbol_list if sym not in EXCLUDE_LIST]
+    symbol_list = get_all_symbols()  # 거래량, 시총, 조건 필터링된 종목들
 
-    bought_list = [] # 매수 완료된 종목 리스트
-    total_cash = get_balance() - 10000 # 보유 현금 조회 (10,000원 제외)
-    if total_cash < 0: # 잔액이 마이너스가 되는 경우 방지
-        total_cash = 0
-    stock_dict = get_stock_balance() # 보유 주식 조회
-    for sym in stock_dict.keys():
-        bought_list.append(sym)
-    
     #*************************************************************************************************************
     # ACCOUNT_AMT = 6000000 # 계좌 금액 변동시 TARGET_BUY_COUNT, filter: (df['종가'] <= 239000) 2가지 조정 필요
+
+    EXCLUDE_LIST = []  # ['005930', '000660', '035420'] 또는 [], 수동 제외 리스트(프로그램 재기동시 반영되도록 9시 이후 손절종목 or 필요시 입력)
+
     TARGET_BUY_COUNT = 25 # 매수할 종목 수, 계좌금액과 매수단가등 고려 조정
     
+    T_9_TIME = {'hour': 9, 'minute': 0, 'second': 15}
+    T_START_TIME = {'hour': 9, 'minute': 3, 'second': 0}
+    T_SELL_TIME = {'hour': 14, 'minute': 3, 'second': 0}
+    T_EXIT_TIME = {'hour': 14, 'minute': 8, 'second': 0}
+
     SLIPPAGE_LIMIT = 1.01  # 1.01,1.015,1.02,1.025,1.03 에서 적절히 적용
     
     STOP_LOSE_PCT = -3.0 # 손절기준 % -> 상황에 따라 적절히 조절 (-3, -5, -7)
@@ -609,6 +604,25 @@ try:
     TARGET_K3 = 0.3 # 변동성돌파 k값
     #*************************************************************************************************************
 
+    if EXCLUDE_LIST:
+        symbol_list = [sym for sym in symbol_list if sym not in EXCLUDE_LIST]
+
+    bought_list = [] # 매수 완료된 종목 리스트
+    total_cash = get_balance() - 10000 # 보유 현금 조회 (10,000원 제외)
+    if total_cash < 0: # 잔액이 마이너스가 되는 경우 방지
+        total_cash = 0
+    stock_dict = get_stock_balance() # 보유 주식 조회
+    for sym in stock_dict.keys():
+        bought_list.append(sym)
+
+    t_now = datetime.now()
+
+    # 주식 매수/매도 시간
+    t_9 = t_now.replace(**T_9_TIME)
+    t_start = t_now.replace(**T_START_TIME)
+    t_sell = t_now.replace(**T_SELL_TIME)
+    t_exit = t_now.replace(**T_EXIT_TIME)
+
     # 이미 매수한 종목 수를 고려하여 buy_percent 계산
     remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
     if remaining_buy_count <= 0:
@@ -617,7 +631,6 @@ try:
         # 소수점 셋째 자리까지 유지하고 넷째 자리부터 버림
         buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
     
-    t_now = datetime.now()
     # 종목별 주문 금액 완화 로직 추가
     if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
         buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
@@ -639,14 +652,6 @@ try:
     
     while True:
         t_now = datetime.now()
-        #*************************************************************************************************************
-        t_9 = t_now.replace(hour=9, minute=0, second=15, microsecond=0)
-        t_start = t_now.replace(hour=9, minute=3, second=0, microsecond=0)
-        #t_sell = t_now.replace(hour=15, minute=15, second=0, microsecond=0)
-        #t_exit = t_now.replace(hour=15, minute=20, second=0,microsecond=0)
-        t_sell = t_now.replace(hour=14, minute=3, second=0, microsecond=0)
-        t_exit = t_now.replace(hour=14, minute=8, second=0,microsecond=0)
-        #*************************************************************************************************************
 
         # 10분마다 heartbeat 출력
         if (t_now - last_heartbeat).total_seconds() >= 600:
