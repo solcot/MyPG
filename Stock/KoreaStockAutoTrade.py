@@ -154,23 +154,25 @@ def get_all_symbols():
     df['전일변동폭비율'] = (df['고가'] - df['저가']) / df['저가']
 
     #*************************************************************************************************************
-    # 약 180~200개 정도 필터됨
+    # 약 120~140개 정도 필터됨
     filtered = df[
         #(df['등락률'] >= -5.0) & 
-        (df['등락률'] >= -5.0) & (df['등락률'] <= 15.0) & 
+        #(df['등락률'] >= -5.0) & (df['등락률'] <= 15.0) & 
+        (df['등락률'] >= -5.0) & (df['등락률'] <= 10.0) & 
         #(df['종가'] >= 2500) & (df['종가'] <= 99000) &
         #(df['종가'] >= 2500) & (df['종가'] <= 199000) &
         #(df['종가'] >= 2500) & (df['종가'] <= 239000) &
         #(df['종가'] >= 2500) & (df['종가'] <= 466000) &
-        (df['종가'] >= 2500) & (df['종가'] <= 300000) &
-        #(df['시가총액'] >= 5e10) & (df['시가총액'] <= 7e12) &
-        (df['시가총액'] >= 5e10) &
+        #(df['종가'] >= 2500) & (df['종가'] <= 300000) &
+        (df['종가'] >= 2500) & (df['종가'] <= 150000) &
+        #(df['시가총액'] >= 5e10) &
+        (df['시가총액'] >= 5e10) & (df['시가총액'] <= 7e12) &
         (df['거래량'] >= 30000) &
         #(df['거래량'] >= 50000) &
         (df['거래대금'] >= 3e9) &
         #(df['거래대금'] >= 5e9) &
-        (df['전일변동폭비율'] >= 0.05)
-        #(df['전일변동폭비율'] >= 0.06)
+        #(df['전일변동폭비율'] >= 0.05)
+        (df['전일변동폭비율'] >= 0.06)
     ].copy()
     #*************************************************************************************************************
 
@@ -195,11 +197,12 @@ def get_all_symbols():
 
 
     # 기존 필터 이후 추가
-    filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금']   # 전일에 가격도 크게 움직이고, 돈도 많이 몰린 종목을 추리기 위해
+    #filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금']   # 전일에 가격도 크게 움직이고, 돈도 많이 몰린 종목을 추리기 위해
+    filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금'] * (1 + filtered['등락률'] / 100)
 
     # 점수 기준 정렬 → 상위 150개 추출
-    top_filtered = filtered.sort_values(by='점수', ascending=False).head(150)
-    #top_filtered = filtered.sort_values(by='점수', ascending=False)
+    #top_filtered = filtered.sort_values(by='점수', ascending=False).head(150)
+    top_filtered = filtered.sort_values(by='점수', ascending=False)
 
     send_message(f"✅ 최종 선정 종목 수: {len(top_filtered)}")
     #print("\n✅ 상위 점수 종목 샘플:")
@@ -725,7 +728,7 @@ try:
         TARGET_K3 = settings['TARGET_K3']
         # --- 설정 파일 로드 끝 ---------------------------------------------------------------------------------------------
 
-        if EXCLUDE_LIST:
+        if EXCLUDE_LIST and len(EXCLUDE_LIST) > 0:
             symbol_list = [sym for sym in symbol_list if sym not in EXCLUDE_LIST]
 
         bought_list = [] # 매수 완료된 종목 리스트
@@ -754,12 +757,12 @@ try:
         
         # 종목별 주문 금액 완화 로직 추가
         if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
+            buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT2), total_cash * 0.06)  # 매수 비중 줄임
         elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
+            buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT1), total_cash * 0.08)  # 매수 비중 줄임
         else:
-            buy_amount = int(total_cash * buy_percent)
-            
+            buy_amount = min(int(total_cash * buy_percent), total_cash * 0.1)
+
         soldout = False
 
         send_message("===국내 주식 자동매매 프로그램을 시작합니다===")
@@ -772,7 +775,7 @@ try:
         slippage_count = {}
         slippage_last_logged = {}
         # 추가: 휴일 종료 플래그
-        program_exit_due_to_holiday = False
+        program_exit = False
         # ✨ 추가: 익절 변동손절(Trailing Stop)을 위한 딕셔너리
         trailing_peaks = {} 
 
@@ -788,7 +791,7 @@ try:
             today = datetime.today()
             if today.weekday() >= 5 or is_holiday(today.strftime("%Y-%m-%d")):  # 토요일/일요일/휴일 이면 자동 종료
                 send_message("휴일이므로 프로그램을 종료합니다.")
-                program_exit_due_to_holiday = True # ✨ 플래그 설정 ✨
+                program_exit = True # ✨ 플래그 설정 ✨
                 break
 
             # --- ✨ SettingReload.ini 확인 및 재로드 로직 ✨ ---
@@ -839,11 +842,11 @@ try:
                                 total_cash = 0
                             # 종목별 주문 금액 완화 로직 추가
                             if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-                                buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)
+                                buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT2), total_cash * 0.06)  # 매수 비중 줄임
                             elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-                                buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)
+                                buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT1), total_cash * 0.08)  # 매수 비중 줄임
                             else:
-                                buy_amount = int(total_cash * buy_percent)
+                                buy_amount = min(int(total_cash * buy_percent), total_cash * 0.1)
                         else:
                             buy_amount = 0
 
@@ -881,11 +884,11 @@ try:
                                 total_cash = 0
                             # 종목별 주문 금액 완화 로직 추가
                             if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-                                buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
+                                buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT2), total_cash * 0.06)  # 매수 비중 줄임
                             elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-                                buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
+                                buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT1), total_cash * 0.08)  # 매수 비중 줄임
                             else:
-                                buy_amount = int(total_cash * buy_percent)
+                                buy_amount = min(int(total_cash * buy_percent), total_cash * 0.1)
                         else:
                             buy_amount = 0
                     
@@ -931,12 +934,12 @@ try:
                                     slippage_count[sym] += 1
                                 # 3회 이하까지는 무조건 출력
                                 if slippage_count[sym] <= 3:
-                                    send_message(f"🔄 {stock_name}({sym}) 슬리피지 초과 {slippage_count[sym]}회 (현재가 {current_price:.2f} > 허용가 {target_price * SLIPPAGE_LIMIT:.2f})")
+                                    send_message(f"🔄 {stock_name}({sym}) 슬리피지 초과 {slippage_count[sym]}회 (현재가:{current_price:.2f} > 허용가:{target_price * SLIPPAGE_LIMIT:.2f})")
                                 else:
                                     # 마지막으로 출력한 시간이 10분 지났으면 다시 출력
                                     last_log_time = slippage_last_logged.get(sym)
                                     if last_log_time is None or (t_now - last_log_time).total_seconds() >= 600:
-                                        send_message(f"🔄 {stock_name}({sym}) 슬리피지 반복 초과 중... 매수 조건이 너무 엄격할 수 있음")
+                                        send_message(f"🔄 {stock_name}({sym}) 슬리피지 반복 초과 중... (현재가:{current_price:.2f} > 허용가:{target_price * SLIPPAGE_LIMIT:.2f})")
                                         slippage_last_logged[sym] = t_now
                                 continue  # 슬리피지 초과 종목은 매수하지 않음
                             else:
@@ -944,11 +947,11 @@ try:
 
                                 # 종목별 주문 금액 완화 로직 추가
                                 if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-                                    buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
+                                    buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT2), total_cash * 0.06)  # 매수 비중 줄임
                                 elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-                                    buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
+                                    buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT1), total_cash * 0.08)  # 매수 비중 줄임
                                 else:
-                                    buy_amount = int(total_cash * buy_percent)
+                                    buy_amount = min(int(total_cash * buy_percent), total_cash * 0.1)
 
                                 buy_qty = int(buy_amount // current_price)
                                 if buy_qty > 0:
@@ -963,7 +966,22 @@ try:
 
                 # ✅ 30분마다 잔고 확인 (예: 09:15, 09:45, 10:15 ...)
                 if (t_now - last_balance_check_time).total_seconds() >= 1800:  # 1800초 = 30분
-                    get_stock_balance()
+                    stock_dict = get_stock_balance()  # 잔고 조회
+                    # ✨ 일일 손실 한도 체크 로직 추가 ✨
+                    if stock_dict:
+                        total_profit = sum(((get_current_price(sym) - stock_dict[sym]['매수가']) / stock_dict[sym]['매수가'] * 100) * stock_dict[sym]['현재수량'] for sym in stock_dict)
+                        if total_profit <= -5.0:
+                            send_message("🚨 일일 손실 한도(-5%) 도달! 보유 주식 전량 매도 후 프로그램을 종료합니다.")
+                            # 보유 주식 전량 매도
+                            for sym, details in stock_dict.items():
+                                qty = details.get('현재수량', '0')
+                                if int(qty) > 0:
+                                    sell(sym, qty)
+                                    time.sleep(1)
+                            soldout = True
+                            bought_list = []
+                            program_exit = True # ✨ 플래그 설정 ✨
+                            break  # 내부 루프 종료
                     last_balance_check_time = t_now
 
                 #send_message("루프 끝..................") #루프 시간 측정용
@@ -986,7 +1004,7 @@ try:
                 break
 
         # 내부 루프가 break로 종료되었을 때 처리
-        if program_exit_due_to_holiday: # ✨ 플래그 확인 ✨
+        if program_exit: # ✨ 플래그 확인 ✨
             break # 외부 루프도 종료하여 프로그램 완전히 끝냄
         elif t_exit > t_now: # 프로그램 종료 시간이 아닌데 break 되었다면 (즉, 재로드 때문)
             send_message("🔄 설정 재로드를 위해 메인 루프를 다시 시작합니다.")
