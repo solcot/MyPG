@@ -975,6 +975,7 @@ try:
                         qty = details.get('현재수량', '0') # '현재수량'을 추출하여 qty에 할당
                         if int(qty) > 0: # 수량이 0보다 큰 경우에만 매도 실행
                             sell(sym, qty)
+                            time.sleep(1)
                     soldout = True
                     bought_list = []
                     time.sleep(1)
