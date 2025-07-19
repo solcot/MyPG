@@ -52,7 +52,7 @@ def fetch_krx_data(mktId, trade_date):
 
 def get_all_symbols():
     #trade_date = get_last_trading_day()
-    trade_date = '20250714'
+    trade_date = '20250718'
     print(f"✅ 최종 거래일은 {trade_date} 입니다.")
 
     df_kospi = fetch_krx_data('STK', trade_date)
@@ -181,6 +181,7 @@ def get_all_symbols():
     # 기존 필터 이후 추가
     #filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금']   # 전일에 가격도 크게 움직이고, 돈도 많이 몰린 종목을 추리기 위해
     filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금'] * (1 + filtered['등락률'] / 100)
+    #filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금'] * (1 + max(0, filtered['등락률'] / 100)) # 음수 등락률은 1로 고정, 하락 종목의 점수 감소 최소화
 
     # 점수 기준 정렬 → 상위 30개 추출
     #top_filtered = filtered.sort_values(by='점수', ascending=False).head(150)
