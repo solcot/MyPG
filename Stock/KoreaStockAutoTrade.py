@@ -578,7 +578,8 @@ def load_settings():
             'TARGET_K2_TIME': {'hour': 13, 'minute': 0, 'second': 0},
             'TARGET_K2': 0.5,
             'TARGET_K3_TIME': {'hour': 13, 'minute': 30, 'second': 0},
-            'TARGET_K3': 0.3
+            'TARGET_K3': 0.3,
+            'TOTAL_LOSE_EXIT_PCT' : -2.2
         }
 
     settings = {}
@@ -612,6 +613,7 @@ def load_settings():
         settings['TARGET_K1'] = config.getfloat('StrategyParameters', 'TARGET_K1')
         settings['TARGET_K2'] = config.getfloat('StrategyParameters', 'TARGET_K2')
         settings['TARGET_K3'] = config.getfloat('StrategyParameters', 'TARGET_K3')
+        settings['TOTAL_LOSE_EXIT_PCT'] = config.getfloat('StrategyParameters', 'TOTAL_LOSE_EXIT_PCT')
 
     except (configparser.NoSectionError, configparser.NoOptionError, ValueError) as e:
         send_message(f"❌ 설정 파일 파싱 오류: {e}. 설정 값 확인이 필요합니다.")
@@ -635,7 +637,8 @@ def load_settings():
             'TARGET_K2_TIME': {'hour': 12, 'minute': 0, 'second': 0},
             'TARGET_K2': 0.5,
             'TARGET_K3_TIME': {'hour': 13, 'minute': 0, 'second': 0},
-            'TARGET_K3': 0.3
+            'TARGET_K3': 0.3,
+            'TOTAL_LOSE_EXIT_PCT' : -2.2
         }
 
     return settings
@@ -726,6 +729,8 @@ try:
         TARGET_K2 = settings['TARGET_K2']
         TARGET_K3_TIME = settings['TARGET_K3_TIME']
         TARGET_K3 = settings['TARGET_K3']
+
+        TOTAL_LOSE_EXIT_PCT = settings['TOTAL_LOSE_EXIT_PCT']
         # --- 설정 파일 로드 끝 ---------------------------------------------------------------------------------------------
 
         if EXCLUDE_LIST and len(EXCLUDE_LIST) > 0:
@@ -736,6 +741,13 @@ try:
         if total_cash < 0: # 잔액이 마이너스가 되는 경우 방지
             total_cash = 0
         stock_dict = get_stock_balance() # 보유 주식 조회
+        # ACCOUNT_AMT 계산
+        total_buy_value = sum(
+            stock_dict[sym]['현재수량'] * stock_dict[sym]['매수가']
+            for sym in stock_dict
+        )
+        ACCOUNT_AMT = total_cash + total_buy_value  # 초기 계좌 금액 설정
+        send_message(f"📋 프로그램 시작: ACCOUNT_AMT = {ACCOUNT_AMT:,}원 (현금: {total_cash:,}원, 주식구매가격: {total_buy_value:,}원)")
         for sym in stock_dict.keys():
             bought_list.append(sym)
 
@@ -969,9 +981,21 @@ try:
                     stock_dict = get_stock_balance()  # 잔고 조회
                     # ✨ 일일 손실 한도 체크 로직 추가 ✨
                     if stock_dict:
-                        total_profit = sum(((get_current_price(sym) - stock_dict[sym]['매수가']) / stock_dict[sym]['매수가'] * 100) * stock_dict[sym]['현재수량'] for sym in stock_dict)
-                        if total_profit <= -5.0:
-                            send_message("🚨 일일 손실 한도(-5%) 도달! 보유 주식 전량 매도 후 프로그램을 종료합니다.")
+                        total_cash = get_balance() - 10000  # 현금 잔고 조회 (10,000원 제외)
+                        if total_cash < 0:
+                            total_cash = 0
+                        # 보유 주식의 현재 평가 금액 계산
+                        total_stock_value = sum(
+                            stock_dict[sym]['현재수량'] * get_current_price(sym) 
+                            for sym in stock_dict 
+                            if get_current_price(sym) is not None
+                        )
+                        # 계좌 전체 금액 = 현금 + 주식 평가 금액
+                        total_account_value = total_cash + total_stock_value
+                        # 초기 계좌 금액 대비 손실률 계산
+                        loss_pct = ((total_account_value - ACCOUNT_AMT) / ACCOUNT_AMT) * 100
+                        if loss_pct <= TOTAL_LOSE_EXIT_PCT:
+                            send_message(f"🚨 계좌 전체 금액 손실 한도({TOTAL_LOSE_EXIT_PCT}%) 도달! 현재 손실률: {loss_pct:.2f}% | 보유 주식 전량 매도 후 프로그램을 종료합니다.")
                             # 보유 주식 전량 매도
                             for sym, details in stock_dict.items():
                                 qty = details.get('현재수량', '0')
