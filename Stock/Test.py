@@ -1,9 +1,35 @@
 import requests
 import pandas as pd
 import random
+import yaml
 from io import BytesIO
 from datetime import datetime, timedelta
 from holidayskr import is_holiday
+
+with open('C:\\StockPy\\config.yaml', encoding='UTF-8') as f:
+    _cfg = yaml.load(f, Loader=yaml.FullLoader)
+DISCORD_WEBHOOK_URL = _cfg['DISCORD_WEBHOOK_URL']
+DISCORD_WEBHOOK_URL_MAIN = _cfg['DISCORD_WEBHOOK_URL_MAIN']
+
+def send_message(msg):
+    """디스코드 메세지 전송"""
+    now = datetime.now()
+    message = {"content": f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] {str(msg)}"}
+    try:
+        requests.post(DISCORD_WEBHOOK_URL, data=message, timeout=5)
+    except Exception as e:
+        print(f"❌ Discord 전송 실패: {e}", flush=True)
+    print(message, flush=True)
+
+def send_message_main(msg):
+    """디스코드 메세지 전송"""
+    now = datetime.now()
+    message = {"content": f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] {str(msg)}"}
+    try:
+        requests.post(DISCORD_WEBHOOK_URL_MAIN, data=message, timeout=5)
+    except Exception as e:
+        print(f"❌ Discord 전송 실패: {e}", flush=True)
+    #print(message, flush=True)
 
 def get_last_trading_day():
     day = datetime.today() - timedelta(days=1)
@@ -52,7 +78,10 @@ def fetch_krx_data(mktId, trade_date):
 
 def get_all_symbols():
     #trade_date = get_last_trading_day()
-    trade_date = '20250718'
+    trade_date = '20250725'
+
+    #send_message(f"✅ 최종 거래일은 {trade_date} 입니다.")
+    #send_message_main(f"✅ 최종 거래일은 {trade_date} 입니다.")
     print(f"✅ 최종 거래일은 {trade_date} 입니다.")
 
     df_kospi = fetch_krx_data('STK', trade_date)
@@ -72,6 +101,8 @@ def get_all_symbols():
         print("❌ 데이터 로드 실패: 데이터프레임이 비어 있습니다.")
         return []
 
+    #send_message(f"✅ 전체 종목 수: {len(df)}")
+    #send_message_main(f"✅ 전체 종목 수: {len(df)}")
     print(f"\n✅ 전체 종목 수: {len(df)}")
     print("\n✅ 열 이름:")
     print(df.columns.tolist()) # ['종목코드', '종목명', '종가', '대비', '등락률', '시가', '고가', '저가', '거래량', '거래대금', '시가총액', '상장주식수', '소속부']
@@ -146,36 +177,26 @@ def get_all_symbols():
     #    (df['전일변동폭비율'] >= 0.05)                         # 전일 고가/저가 차이가 3% 이상: 변동성이 있었던 종목
     #].copy()  # .copy()는 SettingWithCopyWarning 방지를 위한 명시적 복사
 
-    ## 약 100~150개 정도 필터됨
-    #filtered = df[
-    #    #(df['등락률'] >= -5.0) & 
-    #    #(df['등락률'] >= -5.0) & (df['등락률'] <= 15.0) & 
-    #    (df['등락률'] >= -5.0) & (df['등락률'] <= 10.0) & 
-    #    #(df['종가'] >= 2500) & (df['종가'] <= 99000) &
-    #    #(df['종가'] >= 2500) & (df['종가'] <= 199000) &
-    #    #(df['종가'] >= 2500) & (df['종가'] <= 239000) &
-    #    #(df['종가'] >= 2500) & (df['종가'] <= 466000) &
-    #    #(df['종가'] >= 2500) & (df['종가'] <= 300000) &
-    #    (df['종가'] >= 2500) & (df['종가'] <= 150000) &
-    #    #(df['시가총액'] >= 5e10) &
-    #    (df['시가총액'] >= 5e10) & (df['시가총액'] <= 7e12) &
-    #    (df['거래량'] >= 30000) &
-    #    #(df['거래량'] >= 50000) &
-    #    (df['거래대금'] >= 3e9) &
-    #    #(df['거래대금'] >= 5e9) &
-    #    #(df['전일변동폭비율'] >= 0.05)
-    #    (df['전일변동폭비율'] >= 0.06)
-    #].copy()
-
-    # 거래대금 + 양봉
+    ## 약 120개 정도 필터됨
     filtered = df[
-        (df['등락률'] >= 1.0) & 
-        #(df['종가'] >= 2500) & (df['종가'] <= 550000) &
-        #(df['시가총액'] >= 3e10) &
-        (df['거래량'] >= 300000) &
-        (df['거래대금'] >= 2e10) &
-        (df['전일변동폭비율'] >= 0.03)
+        (df['등락률'] >= -1.5) & (df['등락률'] <= 70.0) &   # 0.5
+        (df['종가'] >= 2000) & (df['종가'] <= 333000) &   # 2500
+        (df['시가총액'] >= 5e10) & (df['시가총액'] <= 500e12) &   # 5e10
+        (df['거래량'] >= 100000) &   # 300000
+        (df['거래대금'] >= 3e9) &   # 7e9
+        (df['전일변동폭비율'] >= 0.05)   # 0.07
     ].copy()
+
+    ## 거래대금 + 양봉 : 약 40
+    #filtered = df[
+    #    (df['등락률'] >= 2.5) & # 1.0, 0.5
+    #    (df['종가'] >= 700) & 
+    #    #(df['종가'] <= 550000) &
+    #    #(df['시가총액'] >= 3e10) &
+    #    (df['거래량'] >= 1000000) & # 300000
+    #    (df['거래대금'] >= 7e9) & # 1e10
+    #    (df['전일변동폭비율'] >= 0.05) # 0.07
+    #].copy()
 
     #print(f"\n✅ 조건 만족 종목 수: {len(filtered)}")
     #print("\n✅ 조건 만족 상위 10개 샘플:")
@@ -197,6 +218,8 @@ def get_all_symbols():
     #top_filtered = filtered.sort_values(by='점수', ascending=False).head(150)
     top_filtered = filtered.sort_values(by='점수', ascending=False)
 
+    #send_message(f"✅ 최종 선정 종목 수: {len(top_filtered)}")
+    #send_message_main(f"✅ 최종 선정 종목 수: {len(top_filtered)}")
     print(f"\n✅ 최종 선정 종목 수: {len(top_filtered)}")
     print("\n✅ 상위 점수 종목 샘플:")
     #print(top_filtered[['종목명', '종목코드', '종가', '전일변동폭비율', '거래대금', '점수']].head(10))
