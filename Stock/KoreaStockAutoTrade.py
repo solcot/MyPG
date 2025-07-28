@@ -19,6 +19,7 @@ ACCESS_TOKEN = ""
 CANO = _cfg['CANO']
 ACNT_PRDT_CD = _cfg['ACNT_PRDT_CD']
 DISCORD_WEBHOOK_URL = _cfg['DISCORD_WEBHOOK_URL']
+DISCORD_WEBHOOK_URL_MAIN = _cfg['DISCORD_WEBHOOK_URL_MAIN']
 URL_BASE = _cfg['URL_BASE']
 
 # SettingReload.ini 파일을 위한 ConfigParser 객체 전역 선언 (또는 함수 바깥)
@@ -34,6 +35,16 @@ def send_message(msg):
     except Exception as e:
         print(f"❌ Discord 전송 실패: {e}", flush=True)
     print(message, flush=True)
+
+def send_message_main(msg):
+    """디스코드 메세지 전송"""
+    now = datetime.now()
+    message = {"content": f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] {str(msg)}"}
+    try:
+        requests.post(DISCORD_WEBHOOK_URL_MAIN, data=message, timeout=5)
+    except Exception as e:
+        print(f"❌ Discord 전송 실패: {e}", flush=True)
+    #print(message, flush=True)
 
 def get_access_token():
     """토큰 발급"""
@@ -108,6 +119,7 @@ def fetch_krx_data(mktId, trade_date):
 def get_all_symbols():
     trade_date = get_last_trading_day()
     send_message(f"✅ 최종 거래일은 {trade_date} 입니다.")
+    send_message_main(f"✅ 최종 거래일은 {trade_date} 입니다.")
 
     df_kospi = fetch_krx_data('STK', trade_date)
     df_kosdaq = fetch_krx_data('KSQ', trade_date)
@@ -127,6 +139,7 @@ def get_all_symbols():
         return []
 
     send_message(f"✅ 전체 종목 수: {len(df)}")
+    send_message_main(f"✅ 전체 종목 수: {len(df)}")
     #print("\n✅ 열 이름:")
     #print(df.columns.tolist())
     #print("\n✅ 원본 상위 10개 샘플:")
@@ -154,44 +167,16 @@ def get_all_symbols():
     df['전일변동폭비율'] = (df['고가'] - df['저가']) / df['저가']
 
     #*************************************************************************************************************
-    ## 약 100~150개 정도 필터됨
-    #filtered = df[
-    #    #(df['등락률'] >= -5.0) & 
-    #    #(df['등락률'] >= -5.0) & (df['등락률'] <= 15.0) & 
-    #    (df['등락률'] >= -5.0) & (df['등락률'] <= 10.0) & 
-    #    #(df['종가'] >= 2500) & (df['종가'] <= 99000) &
-    #    #(df['종가'] >= 2500) & (df['종가'] <= 199000) &
-    #    #(df['종가'] >= 2500) & (df['종가'] <= 239000) &
-    #    #(df['종가'] >= 2500) & (df['종가'] <= 466000) &
-    #    #(df['종가'] >= 2500) & (df['종가'] <= 300000) &
-    #    (df['종가'] >= 2500) & (df['종가'] <= 150000) &
-    #    #(df['시가총액'] >= 5e10) &
-    #    (df['시가총액'] >= 5e10) & (df['시가총액'] <= 7e12) &
-    #    (df['거래량'] >= 30000) &
-    #    #(df['거래량'] >= 50000) &
-    #    (df['거래대금'] >= 3e9) &
-    #    #(df['거래대금'] >= 5e9) &
-    #    #(df['전일변동폭비율'] >= 0.05)
-    #    (df['전일변동폭비율'] >= 0.06)
-    #].copy()
-    # 거래대금 + 양봉 : 약 50~60
+    ## 약 120개 정도 필터됨
     filtered = df[
-        (df['등락률'] >= 1.0) & 
-        #(df['종가'] >= 2500) & (df['종가'] <= 550000) &
-        #(df['시가총액'] >= 3e10) &
-        (df['거래량'] >= 300000) &
-        (df['거래대금'] >= 2e10) &
-        (df['전일변동폭비율'] >= 0.03)
+        (df['등락률'] >= -1.5) & (df['등락률'] <= 70.0) &   # 0.5
+        (df['종가'] >= 2000) & (df['종가'] <= 333000) &   # 2500
+        (df['시가총액'] >= 5e10) & (df['시가총액'] <= 500e12) &   # 5e10
+        (df['거래량'] >= 100000) &   # 300000
+        (df['거래대금'] >= 3e9) &   # 7e9
+        (df['전일변동폭비율'] >= 0.05)   # 0.07
     ].copy()
     #*************************************************************************************************************
-
-    ## 필터 조건
-    #filtered = df[
-    #    (df['등락률'] >= -1) & (df['등락률'] <= 0.5) &
-    #    (df['종가'] >= 3000) & (df['종가'] <= 30000) &
-    #    (df['시가총액'] >= 1e11) & (df['시가총액'] <= 1e12) &
-    #    (df['거래대금'] >= 1e9)  # 10억 원 이상
-    #]
 
     #print(f"\n✅ 조건 만족 종목 수: {len(filtered)}")
     #print("\n✅ 조건 만족 상위 10개 샘플:")
@@ -214,6 +199,7 @@ def get_all_symbols():
     top_filtered = filtered.sort_values(by='점수', ascending=False)
 
     send_message(f"✅ 최종 선정 종목 수: {len(top_filtered)}")
+    send_message_main(f"✅ 최종 선정 종목 수: {len(top_filtered)}")
     #print("\n✅ 상위 점수 종목 샘플:")
     #print(top_filtered[['종목명', '종목코드', '종가', '전일변동폭비율', '거래대금', '점수']].head(10))
     #print(top_filtered)
@@ -230,72 +216,139 @@ def get_all_symbols():
 
     return symbols
 
-# --- ✨ 손절 로직 함수 (수정) ✨ ---
-def check_stop_loss(stock_dict, threshold=-3.0):
+# --- ✨ 손절 (Trailing Stop) 로직 함수 ✨ ---
+def check_trailing_stop_loss(stock_dict, trailing_losses, stop_loss_threshold=-3.0, trailing_rebound=1.0, stop_abs_loss_threshold=-5.0):
     """
-    보유 종목 중 손절 기준 이하인 종목을 찾아서 리스트로 반환
-    :param stock_dict: 보유 주식 정보 딕셔너리
-    :param threshold: 손절 기준 수익률 (%)
-    :return: 손절 매도 대상 종목 리스트
+    손절 감시:
+    1. 지속적인 하락 중 -5% 초과 시 무조건 손절
+    2. 손실이 줄었다가 다시 악화되면 트레일링 손절
     """
-    stopped_out = []
-    
-    # API 호출 대신 전달받은 stock_dict 활용
-    for sym, stock in stock_dict.items():
-        qty = int(stock.get('현재수량', 0))
-        buy_price = float(stock.get('매수가', 0))
-        
-        current_price = get_current_price(sym)
-        if qty == 0 or buy_price == 0 or current_price is None:
-            continue
-        
-        profit_pct = ((current_price - buy_price) / buy_price) * 100
-        if profit_pct <= threshold:
-            send_message(f"😭 손절매 발동! {stock.get('종목명')}({sym}) 수익률 {profit_pct:.2f}% → 매도")
-            stopped_out.append(sym)
-            
-    return stopped_out
+    stopped = []
 
-# --- ✨ 익절 변동손절 (Trailing Stop) 로직 함수 ✨ ---
-def check_profit_taking_with_trailing_stop(stock_dict, profit_threshold, trailing_stop_percent, trailing_peak_prices):
+    for sym, info in stock_dict.items():
+        current_price = get_current_price(sym)
+        bought_price = info.get('매수가')
+        if current_price is None or bought_price is None:
+            continue
+
+        profit_pct = round(((current_price / bought_price) - 1) * 100, 2)
+
+        # 1️⃣ -5% 이상 손실 시 무조건 손절
+        if profit_pct <= stop_abs_loss_threshold:
+            send_message(f"😭😭 [손절2]{info.get('종목명')}({sym}) 손실 {stop_abs_loss_threshold:.2f}% 초과! 강제손절 (손절률 {profit_pct:.2f}%)")
+            send_message_main(f"😭😭 [손절2]{info.get('종목명')}({sym}) 손실 {stop_abs_loss_threshold:.2f}% 초과! 강제손절 (손절률 {profit_pct:.2f}%)")
+            stopped.append(sym)
+            continue  # 더 이상 체크할 필요 없음
+
+        # 2️⃣ 트레일링 손절 조건 확인
+        if profit_pct < 0:
+            # 최저 손실 갱신
+            if sym not in trailing_losses or profit_pct > trailing_losses[sym]:
+                trailing_losses[sym] = profit_pct
+
+            # 손실 반등 후 재하락 감지
+            if trailing_losses[sym] - profit_pct >= trailing_rebound and profit_pct <= stop_loss_threshold:
+                send_message(f"😭 [손절1]{info.get('종목명')}({sym}) 손실 반등후 재하락! 트레일링손절 (손절률 {profit_pct:.2f}%)")
+                send_message_main(f"😭 [손절1]{info.get('종목명')}({sym}) 손실 반등후 재하락! 트레일링손절 (손절률 {profit_pct:.2f}%)")
+                stopped.append(sym)
+        else:
+            # 손실이 아닌 경우 기록 제거
+            if sym in trailing_losses:
+                del trailing_losses[sym]
+
+    return stopped
+
+# --- ✨ 익절 (Trailing Stop) 로직 함수 ✨ ---
+def check_profit_taking_with_trailing_stop(
+    stock_dict,
+    trailing_peak_prices,
+    break_even_pct1,
+    break_even_lose_pct1,
+    break_even_pct2,
+    break_even_lose_pct2,
+    break_even_pct3,
+    break_even_lose_pct3,
+    take_profit_pct,
+    take_profit_lose_pct
+):
     """
-    익절 기준(threshold)을 넘어선 종목들에 대해
-    최고가 대비 일정 비율(trailing_stop_percent) 하락 시 매도합니다.
+    4단계 트레일링 스탑 로직
+    1단계: 0.5% 수익 시 추적 시작, -1% 하락 시 매도
+    2단계: 1.5% 수익 시 추적 재시작, -1.5% 하락 시 매도
+    3단계: 2.5% 수익 시 추적 재시작, -2% 하락 시 매도
+    4단계: 13% 수익 시 추적 재시작, -3% 하락 시 매도
     """
     profited = []
-    
-    # 보유 종목의 현재가 조회
-    for sym in stock_dict.keys():
+
+    for sym, info in stock_dict.items():
         current_price = get_current_price(sym)
         if current_price is None:
             continue
-            
-        bought_price = stock_dict.get(sym, {}).get('매수가', None)
-        if bought_price is None:
-            continue
-            
-        profit_pct = ((current_price / bought_price) - 1) * 100
-        
-        sym_name = stock_dict.get(sym, {}).get('종목명', None)
 
-        # 1) 이전에 5% 목표를 달성한 적이 없는 종목인 경우
+        bought_price = info.get('매수가')
+        if bought_price is None or bought_price == 0:
+            continue
+
+        profit_pct = round(((current_price / bought_price) - 1) * 100, 2)
+        sym_name = info.get('종목명', sym)
+
+        # 초기 상태 등록
         if sym not in trailing_peak_prices:
-            # 현재 수익률이 익절 기준치(5%)를 넘었을 경우
-            if profit_pct >= profit_threshold:
-                send_message(f"😄 {sym_name}({sym}) 익절 기준({profit_threshold}%) 달성! 최고가 추적 시작.")
-                trailing_peak_prices[sym] = current_price # 최고가로 기록
-            
-        # 2) 이미 5% 목표를 달성하여 최고가 추적 중인 종목인 경우
-        else:
-            # 새로운 현재가가 이전 최고가보다 높으면 갱신
-            if current_price > trailing_peak_prices[sym]:
-                trailing_peak_prices[sym] = current_price
-            
-            # 현재가가 최고가 대비 일정 비율(2%) 이상 하락했는지 확인
-            if current_price <= trailing_peak_prices[sym] * (1 - trailing_stop_percent / 100):
-                send_message(f"✨ {sym_name}({sym}) 최고가({trailing_peak_prices[sym]:.2f}) 대비 {trailing_stop_percent}% 하락. {profit_pct:,.2f}% 로 익절 매도합니다.")
+            if profit_pct >= break_even_pct1:
+                send_message(f"🟡 {sym_name}({sym}) {break_even_pct1}% 도달 → 1단계 트레일링 시작")
+                send_message_main(f"🟡 {sym_name}({sym}) {break_even_pct1}% 도달 → 1단계 트레일링 시작")
+                trailing_peak_prices[sym] = {'stage': 1, 'peak_price': current_price}
+            continue
+
+        # 상태 불러오기
+        stage = trailing_peak_prices[sym]['stage']
+        peak_price = trailing_peak_prices[sym]['peak_price']
+
+        # 최고가 갱신
+        if current_price > peak_price:
+            trailing_peak_prices[sym]['peak_price'] = current_price
+            peak_price = current_price
+
+        # --- 1단계 트레일링 ---
+        if stage == 1:
+            if profit_pct >= break_even_pct2:
+                send_message(f"🟡🟡 {sym_name}({sym}) {break_even_pct2}% 도달 → 2단계 트레일링 시작")
+                send_message_main(f"🟡🟡 {sym_name}({sym}) {break_even_pct2}% 도달 → 2단계 트레일링 시작")
+                trailing_peak_prices[sym] = {'stage': 2, 'peak_price': current_price}
+            elif current_price <= peak_price * (1 - abs(break_even_lose_pct1) / 100):
+                send_message(f"😄|😭 [단계1]{sym_name}({sym}) 1단계 최고가 대비 {abs(break_even_lose_pct1)}% 하락! (손익률 {profit_pct:.2f}%)")
+                send_message_main(f"😄|😭 [단계1]{sym_name}({sym}) 1단계 최고가 대비 {abs(break_even_lose_pct1)}% 하락! (손익률 {profit_pct:.2f}%)")
                 profited.append(sym)
-                
+
+        # --- 2단계 트레일링 ---
+        elif stage == 2:
+            if profit_pct >= break_even_pct3:
+                send_message(f"🟡🟡🟡 {sym_name}({sym}) {break_even_pct3}% 도달 → 3단계 트레일링 시작")
+                send_message_main(f"🟡🟡🟡 {sym_name}({sym}) {break_even_pct3}% 도달 → 3단계 트레일링 시작")
+                trailing_peak_prices[sym] = {'stage': 3, 'peak_price': current_price}
+            elif current_price <= peak_price * (1 - abs(break_even_lose_pct2) / 100):
+                send_message(f"😄😄 [단계2]{sym_name}({sym}) 2단계 최고가 대비 {abs(break_even_lose_pct2)}% 하락! (익절률 {profit_pct:.2f}%)")
+                send_message_main(f"😄😄 [단계2]{sym_name}({sym}) 2단계 최고가 대비 {abs(break_even_lose_pct2)}% 하락! (익절률 {profit_pct:.2f}%)")
+                profited.append(sym)
+
+        # --- 3단계 트레일링 ---
+        elif stage == 3:
+            if profit_pct >= take_profit_pct:
+                send_message(f"🟡🟡🟡🟡 {sym_name}({sym}) {take_profit_pct}% 도달 → 4단계 트레일링 시작")
+                send_message_main(f"🟡🟡🟡🟡 {sym_name}({sym}) {take_profit_pct}% 도달 → 4단계 트레일링 시작")
+                trailing_peak_prices[sym] = {'stage': 4, 'peak_price': current_price}
+            elif current_price <= peak_price * (1 - abs(break_even_lose_pct3) / 100):
+                send_message(f"😄😄😄 [단계3]{sym_name}({sym}) 3단계 최고가 대비 {abs(break_even_lose_pct3)}% 하락! (익절률 {profit_pct:.2f}%)")
+                send_message_main(f"😄😄😄 [단계3]{sym_name}({sym}) 3단계 최고가 대비 {abs(break_even_lose_pct3)}% 하락! (익절률 {profit_pct:.2f}%)")
+                profited.append(sym)
+
+        # --- 4단계 트레일링 ---
+        elif stage == 4:
+            if current_price <= peak_price * (1 - abs(take_profit_lose_pct) / 100):
+                send_message(f"😄😄😄😄 [단계4]{sym_name}({sym}) 4단계 최고가 대비 {abs(take_profit_lose_pct)}% 하락! (익절률 {profit_pct:.2f}%)")
+                send_message_main(f"😄😄😄😄 [단계4]{sym_name}({sym}) 4단계 최고가 대비 {abs(take_profit_lose_pct)}% 하락! (익절률 {profit_pct:.2f}%)")
+                profited.append(sym)
+
     return profited
 
 def get_current_price(code="005930"):
@@ -437,7 +490,8 @@ def get_stock_balance():
     stock_dict = {}
     send_message(f"====주식 보유잔고====")
     
-    item_count = 0 
+    item_count = 0
+    stock_info_list = []  # 주식 정보를 저장할 리스트
     for idx, stock in enumerate(stock_list, start=1):
         # API에서 받은 데이터에서 필요한 정보 추출
         symbol = stock.get('pdno')
@@ -454,10 +508,14 @@ def get_stock_balance():
                 '매수가': buy_price
             }
             #send_message(f"{item_count:02d}.{product_name}({symbol}): {hldg_qty}주, 매수가:{buy_price:,.2f}원")
+            # 리스트 형태로 저장
+            stock_info_list.append(f"{item_count:02d}.{product_name}({symbol})")
 
     # 수정: 보유 주식 건수를 요약해서 한 번만 메시지 전송
     if item_count > 0:
-        send_message(f"📋 현재 보유 주식은 {item_count:02d}건 입니다.")
+        # 보유 주식 리스트를 콜론으로 구분하여 출력
+        stock_list_str = ":".join(stock_info_list)
+        send_message(f"📋 현재 보유 주식은 {item_count:02d}건 입니다.\n{stock_list_str}")
     else:
         send_message("📋 현재 보유 주식은 없습니다.")
 
@@ -577,8 +635,16 @@ def load_settings():
             'T_EXIT_TIME': {'hour': 14, 'minute': 8, 'second': 0},
             'SLIPPAGE_LIMIT': 1.015,
             'STOP_LOSE_PCT': -3.0,
-            'TAKE_PROFIT_PCT': 7.0,
-            'TAKE_PROFIT_LOSE_PCT': 3.0,
+            'STOP_TRAILING_REBOUND': 1.0,
+            'STOP_ABS_LOSE_PCT': -5.0,
+            'BREAK_EVEN_PCT1' : 3.0,
+            'BREAK_EVEN_LOSE_PCT1' : 2.0,
+            'BREAK_EVEN_PCT2' : 5.0,
+            'BREAK_EVEN_LOSE_PCT2' : 2.0,
+            'BREAK_EVEN_PCT3' : 7.0,
+            'BREAK_EVEN_LOSE_PCT3' : 2.0,
+            'TAKE_PROFIT_PCT': 9.0,
+            'TAKE_PROFIT_LOSE_PCT': 2.0,
             'AMOUNT_LIMIT1_TIME': {'hour': 13, 'minute': 0, 'second': 0},
             'AMOUNT_LIMIT1': 0.7,
             'AMOUNT_LIMIT2_TIME': {'hour': 13, 'minute': 30, 'second': 0},
@@ -615,6 +681,14 @@ def load_settings():
 
         settings['SLIPPAGE_LIMIT'] = config.getfloat('StrategyParameters', 'SLIPPAGE_LIMIT')
         settings['STOP_LOSE_PCT'] = config.getfloat('StrategyParameters', 'STOP_LOSE_PCT')
+        settings['STOP_TRAILING_REBOUND'] = config.getfloat('StrategyParameters', 'STOP_TRAILING_REBOUND')
+        settings['STOP_ABS_LOSE_PCT'] = config.getfloat('StrategyParameters', 'STOP_ABS_LOSE_PCT')
+        settings['BREAK_EVEN_PCT1'] = config.getfloat('StrategyParameters', 'BREAK_EVEN_PCT1')
+        settings['BREAK_EVEN_LOSE_PCT1'] = config.getfloat('StrategyParameters', 'BREAK_EVEN_LOSE_PCT1')
+        settings['BREAK_EVEN_PCT2'] = config.getfloat('StrategyParameters', 'BREAK_EVEN_PCT2')
+        settings['BREAK_EVEN_LOSE_PCT2'] = config.getfloat('StrategyParameters', 'BREAK_EVEN_LOSE_PCT2')
+        settings['BREAK_EVEN_PCT3'] = config.getfloat('StrategyParameters', 'BREAK_EVEN_PCT3')
+        settings['BREAK_EVEN_LOSE_PCT3'] = config.getfloat('StrategyParameters', 'BREAK_EVEN_LOSE_PCT3')
         settings['TAKE_PROFIT_PCT'] = config.getfloat('StrategyParameters', 'TAKE_PROFIT_PCT')
         settings['TAKE_PROFIT_LOSE_PCT'] = config.getfloat('StrategyParameters', 'TAKE_PROFIT_LOSE_PCT')
         settings['AMOUNT_LIMIT1'] = config.getfloat('StrategyParameters', 'AMOUNT_LIMIT1')
@@ -636,8 +710,16 @@ def load_settings():
             'T_EXIT_TIME': {'hour': 14, 'minute': 8, 'second': 0},
             'SLIPPAGE_LIMIT': 1.015,
             'STOP_LOSE_PCT': -3.0,
-            'TAKE_PROFIT_PCT': 7.0,
-            'TAKE_PROFIT_LOSE_PCT': 3.0,
+            'STOP_TRAILING_REBOUND': 1.0,
+            'STOP_ABS_LOSE_PCT': -5.0,
+            'BREAK_EVEN_PCT1' : 3.0,
+            'BREAK_EVEN_LOSE_PCT1' : 2.0,
+            'BREAK_EVEN_PCT2' : 5.0,
+            'BREAK_EVEN_LOSE_PCT2' : 2.0,
+            'BREAK_EVEN_PCT3' : 7.0,
+            'BREAK_EVEN_LOSE_PCT3' : 2.0,
+            'TAKE_PROFIT_PCT': 9.0,
+            'TAKE_PROFIT_LOSE_PCT': 2.0,
             'AMOUNT_LIMIT1_TIME': {'hour': 12, 'minute': 0, 'second': 0},
             'AMOUNT_LIMIT1': 0.7,
             'AMOUNT_LIMIT2_TIME': {'hour': 13, 'minute': 0, 'second': 0},
@@ -673,10 +755,8 @@ def write_reload_setting(value):
     except Exception as e:
         send_message(f"❌ SettingReload.ini 쓰기 오류: {e}")
 
-#***********************************************************************************************************
-#***********************************************************************************************************
-#***********************************************************************************************************
-#***********************************************************************************************************
+
+
 #***********************************************************************************************************
 # 자동매매 시작
 try:
@@ -725,6 +805,15 @@ try:
         SLIPPAGE_LIMIT = settings['SLIPPAGE_LIMIT']
 
         STOP_LOSE_PCT = settings['STOP_LOSE_PCT']
+        STOP_TRAILING_REBOUND = settings['STOP_TRAILING_REBOUND']
+        STOP_ABS_LOSE_PCT = settings['STOP_ABS_LOSE_PCT']
+
+        BREAK_EVEN_PCT1 = settings['BREAK_EVEN_PCT1']
+        BREAK_EVEN_LOSE_PCT1 = settings['BREAK_EVEN_LOSE_PCT1']
+        BREAK_EVEN_PCT2 = settings['BREAK_EVEN_PCT2']
+        BREAK_EVEN_LOSE_PCT2 = settings['BREAK_EVEN_LOSE_PCT2']
+        BREAK_EVEN_PCT3 = settings['BREAK_EVEN_PCT3']
+        BREAK_EVEN_LOSE_PCT3 = settings['BREAK_EVEN_LOSE_PCT3']
         TAKE_PROFIT_PCT = settings['TAKE_PROFIT_PCT']
         TAKE_PROFIT_LOSE_PCT = settings['TAKE_PROFIT_LOSE_PCT']
 
@@ -778,15 +867,16 @@ try:
         
         # 종목별 주문 금액 완화 로직 추가
         if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-            buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT2), total_cash * 0.06)  # 매수 비중 줄임
+            buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT2), total_cash * 0.1)  # 매수 비중 줄임
         elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-            buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT1), total_cash * 0.08)  # 매수 비중 줄임
+            buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT1), total_cash * 0.1)  # 매수 비중 줄임
         else:
             buy_amount = min(int(total_cash * buy_percent), total_cash * 0.1)
 
         soldout = False
 
-        send_message("===국내 주식 자동매매 프로그램을 시작합니다===")
+        send_message("🚀 국내 주식 자동매매 프로그램을 시작합니다.")
+        send_message_main("🚀 국내 주식 자동매매 프로그램을 시작합니다.")
         last_stop_loss_check_time = datetime.now() - timedelta(seconds=15) # 손절 초기값 설정 
         last_profit_taking_check_time = datetime.now() - timedelta(seconds=45) # 익절 초기값 설정 
         last_balance_check_time = datetime.now() - timedelta(minutes=15)  # 초기화: 과거로 설정해서 15분후에 출력되도록 이후는 30분마다
@@ -797,8 +887,10 @@ try:
         slippage_last_logged = {}
         # 추가: 휴일 종료 플래그
         program_exit = False
-        # ✨ 추가: 익절 변동손절(Trailing Stop)을 위한 딕셔너리
+        # ✨ 추가: 익절 변동(Trailing Stop)을 위한 딕셔너리
         trailing_peaks = {} 
+        # ✨ 추가: 손절 변동(Trailing Stop)을 위한 딕셔너리
+        trailing_losses = {}  # 예: {'005930': -1.2}
 
         while True:
             t_now = datetime.now()
@@ -811,7 +903,8 @@ try:
             #today = datetime.today().weekday()
             today = datetime.today()
             if today.weekday() >= 5 or is_holiday(today.strftime("%Y-%m-%d")):  # 토요일/일요일/휴일 이면 자동 종료
-                send_message("휴일이므로 프로그램을 종료합니다.")
+                send_message("🛑 휴일이므로 프로그램을 종료합니다.")
+                send_message_main("🛑 휴일이므로 프로그램을 종료합니다.")
                 program_exit = True # ✨ 플래그 설정 ✨
                 break
 
@@ -840,7 +933,13 @@ try:
 
                 # 손절 감시 로직 -------------------------------------------------------       
                 if (t_now - last_stop_loss_check_time).total_seconds() >= 30: # 30초마다 체크
-                    stopped = check_stop_loss(stock_dict=stock_dict, threshold=STOP_LOSE_PCT)
+                    stopped = check_trailing_stop_loss(
+                        stock_dict=stock_dict,
+                        trailing_losses=trailing_losses,
+                        stop_loss_threshold=STOP_LOSE_PCT,
+                        trailing_rebound=STOP_TRAILING_REBOUND,  # 반등 후 다시 이 수치 이상 하락시 손절
+                        stop_abs_loss_threshold=STOP_ABS_LOSE_PCT
+                    )
                     if stopped:
                         for sym in stopped:
                             qty = stock_dict.get(sym, {}).get('현재수량', 0)
@@ -851,8 +950,12 @@ try:
                                         bought_list.remove(sym)
                                     if sym in symbol_list:
                                         symbol_list.remove(sym)
-                        stock_dict = get_stock_balance() # 손절 후 계좌 정보 최신화
-                        
+                                    if sym in trailing_losses:
+                                        del trailing_losses[sym]
+                                    if sym in trailing_peaks:
+                                        del trailing_peaks[sym]
+                        stock_dict = get_stock_balance()
+
                         # ✨ 손절 후 buy_amount 재계산 로직
                         time.sleep(5) # 급격한 재매수 방지용
                         remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
@@ -863,9 +966,9 @@ try:
                                 total_cash = 0
                             # 종목별 주문 금액 완화 로직 추가
                             if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-                                buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT2), total_cash * 0.06)  # 매수 비중 줄임
+                                buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT2), total_cash * 0.1)  # 매수 비중 줄임
                             elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-                                buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT1), total_cash * 0.08)  # 매수 비중 줄임
+                                buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT1), total_cash * 0.1)  # 매수 비중 줄임
                             else:
                                 buy_amount = min(int(total_cash * buy_percent), total_cash * 0.1)
                         else:
@@ -876,10 +979,16 @@ try:
                 # 익절 감시 로직 -----------------------------------------------------------
                 if (t_now - last_profit_taking_check_time).total_seconds() >= 30: # 30초마다 체크
                     profited = check_profit_taking_with_trailing_stop(
-                        stock_dict=stock_dict, 
-                        profit_threshold=TAKE_PROFIT_PCT,
-                        trailing_stop_percent=TAKE_PROFIT_LOSE_PCT,
-                        trailing_peak_prices=trailing_peaks
+                        stock_dict=stock_dict,
+                        trailing_peak_prices=trailing_peaks,
+                        break_even_pct1=BREAK_EVEN_PCT1,
+                        break_even_lose_pct1=BREAK_EVEN_LOSE_PCT1,
+                        break_even_pct2=BREAK_EVEN_PCT2,
+                        break_even_lose_pct2=BREAK_EVEN_LOSE_PCT2,
+                        break_even_pct3=BREAK_EVEN_PCT3,
+                        break_even_lose_pct3=BREAK_EVEN_LOSE_PCT3,
+                        take_profit_pct=TAKE_PROFIT_PCT,
+                        take_profit_lose_pct=TAKE_PROFIT_LOSE_PCT
                     )
                     if profited:
                         for sym in profited:
@@ -893,6 +1002,8 @@ try:
                                         symbol_list.remove(sym)
                                     if sym in trailing_peaks:
                                         del trailing_peaks[sym]
+                                    if sym in trailing_losses:
+                                        del trailing_losses[sym]
                         stock_dict = get_stock_balance() # 익절 후 계좌 정보 최신화
 
                         # ✨ 익절 후 buy_amount 재계산 로직
@@ -905,9 +1016,9 @@ try:
                                 total_cash = 0
                             # 종목별 주문 금액 완화 로직 추가
                             if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-                                buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT2), total_cash * 0.06)  # 매수 비중 줄임
+                                buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT2), total_cash * 0.1)  # 매수 비중 줄임
                             elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-                                buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT1), total_cash * 0.08)  # 매수 비중 줄임
+                                buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT1), total_cash * 0.1)  # 매수 비중 줄임
                             else:
                                 buy_amount = min(int(total_cash * buy_percent), total_cash * 0.1)
                         else:
@@ -941,9 +1052,9 @@ try:
                             continue 
 
                         # 갭상승 제외하고, 진짜 장중 돌파만 매수
-                        #if open_price < target_price < current_price:
+                        if open_price < target_price < current_price:
                         # 갭상승(or NXT) 포함해서 target_price 돌파 매수
-                        if target_price < current_price:
+                        #if target_price < current_price:
                             stock_name = symbol_name_map.get(sym, "Unknown")
 
                             # 돌파 조건은 만족했지만 슬리피지 체크
@@ -968,15 +1079,16 @@ try:
 
                                 # 종목별 주문 금액 완화 로직 추가
                                 if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-                                    buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT2), total_cash * 0.06)  # 매수 비중 줄임
+                                    buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT2), total_cash * 0.1)  # 매수 비중 줄임
                                 elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-                                    buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT1), total_cash * 0.08)  # 매수 비중 줄임
+                                    buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT1), total_cash * 0.1)  # 매수 비중 줄임
                                 else:
                                     buy_amount = min(int(total_cash * buy_percent), total_cash * 0.1)
 
                                 buy_qty = int(buy_amount // current_price)
                                 if buy_qty > 0:
                                     send_message(f"📈 {stock_name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
+                                    send_message_main(f"📈 {stock_name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
                                     result = buy(sym, buy_qty)
                                     if result:
                                         soldout = False
@@ -1005,6 +1117,7 @@ try:
                         loss_pct = ((total_account_value - ACCOUNT_AMT) / ACCOUNT_AMT) * 100
                         if loss_pct <= TOTAL_LOSE_EXIT_PCT:
                             send_message(f"🚨 계좌 전체 금액 손실 한도({TOTAL_LOSE_EXIT_PCT}%) 도달! 현재 손실률: {loss_pct:.2f}% | 보유 주식 전량 매도 후 프로그램을 종료합니다.")
+                            send_message_main(f"🚨 계좌 전체 금액 손실 한도({TOTAL_LOSE_EXIT_PCT}%) 도달! 현재 손실률: {loss_pct:.2f}% | 보유 주식 전량 매도 후 프로그램을 종료합니다.")
                             # 보유 주식 전량 매도
                             for sym, details in stock_dict.items():
                                 qty = details.get('현재수량', '0')
@@ -1033,14 +1146,16 @@ try:
             if t_exit < t_now:  # PM 03:03 ~ :프로그램 종료
                 send_message("종료시점 보유주식 조회내역은 아래와 같습니다.")
                 get_stock_balance()
-                send_message("프로그램을 종료합니다.")
+                send_message("🛑 운영시간이 아니므로 프로그램을 종료합니다.")
+                send_message_main("🛑 운영시간이 아니므로 프로그램을 종료합니다.")
                 break
 
         # 내부 루프가 break로 종료되었을 때 처리
         if program_exit: # ✨ 플래그 확인 ✨
             break # 외부 루프도 종료하여 프로그램 완전히 끝냄
         elif t_exit > t_now: # 프로그램 종료 시간이 아닌데 break 되었다면 (즉, 재로드 때문)
-            send_message("🔄 설정 재로드를 위해 메인 루프를 다시 시작합니다.")
+            send_message("🛠️ 설정 재로드를 위해 메인 루프를 다시 시작합니다.")
+            send_message_main("🛠️ 설정 재로드를 위해 메인 루프를 다시 시작합니다.")
             continue # 외부 while True 루프의 다음 반복으로 이동
         else: # 프로그램 종료 시간이라면 외부 루프도 종료
             break
