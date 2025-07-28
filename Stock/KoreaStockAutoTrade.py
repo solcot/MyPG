@@ -204,17 +204,14 @@ def get_all_symbols():
     #print(top_filtered[['종목명', '종목코드', '종가', '전일변동폭비율', '거래대금', '점수']].head(10))
     #print(top_filtered)
 
-    # 종목코드 리스트 생성 (정렬 순서 유지)
-    symbols = top_filtered['종목코드'].astype(str).str.zfill(6).tolist()
-    global symbol_name_map
-    symbol_name_map = dict(zip(
-        top_filtered['종목코드'].astype(str).str.zfill(6),
-        top_filtered['종목명']
-    ))
-    #print(f"\n✅ 최종 선정 종목코드 수: {len(symbols)}")
-    #print("\n✅ 예시 종목코드:", symbols)
+    # **여기부터 변경 시작:** 종목코드를 키로, 종목명을 값으로 하는 딕셔너리 생성
+    symbols_name_dict = {} # 새로운 딕셔너리 생성
+    for _, row in top_filtered.iterrows():
+        symbol = str(row['종목코드']).zfill(6) # 종목코드를 가져와 6자리 문자열로 만듭니다.
+        name = row['종목명'] # 종목명을 가져옵니다.
+        symbols_name_dict[symbol] = name # 딕셔너리에 '종목코드': '종목명' 형태로 저장합니다.
 
-    return symbols
+    return symbols_name_dict # **변경 끝:** 이 딕셔너리를 반환합니다.
 
 # --- ✨ 손절 (Trailing Stop) 로직 함수 ✨ ---
 def check_trailing_stop_loss(stock_dict, trailing_losses, stop_loss_threshold=-3.0, trailing_rebound=1.0, stop_abs_loss_threshold=-5.0):
@@ -762,7 +759,7 @@ def write_reload_setting(value):
 try:
     ACCESS_TOKEN = get_access_token()
 
-    symbol_list = get_all_symbols()  # 거래량, 시총, 조건 필터링된 종목들
+    selected_symbols_map = get_all_symbols()  # ✅ 변경: 종목코드:종목명 딕셔너리 형태로 받아옵니다.
 
     # --- ✨ 메인 자동매매 루프 시작 ✨ ---
     # 외부 루프: 설정 재로드를 위해 전체 로직을 감쌈
@@ -832,7 +829,12 @@ try:
         # --- 설정 파일 로드 끝 ---------------------------------------------------------------------------------------------
 
         if EXCLUDE_LIST and len(EXCLUDE_LIST) > 0:
-            symbol_list = [sym for sym in symbol_list if sym not in EXCLUDE_LIST]
+            # ✅ 변경: 딕셔너리에서 제외할 종목들을 필터링하여 새로운 딕셔너리 생성
+            selected_symbols_map = {
+                sym: name
+                for sym, name in selected_symbols_map.items()
+                if sym not in EXCLUDE_LIST
+            }
 
         bought_list = [] # 매수 완료된 종목 리스트
         total_cash = get_balance() - 10000 # 보유 현금 조회 (10,000원 제외)
@@ -948,8 +950,9 @@ try:
                                 if result:
                                     if sym in bought_list:
                                         bought_list.remove(sym)
-                                    if sym in symbol_list:
-                                        symbol_list.remove(sym)
+                                    # ✅ 변경: selected_symbols_map에서 해당 종목 제거
+                                    if sym in selected_symbols_map:
+                                        del selected_symbols_map[sym]
                                     if sym in trailing_losses:
                                         del trailing_losses[sym]
                                     if sym in trailing_peaks:
@@ -998,8 +1001,9 @@ try:
                                 if result:
                                     if sym in bought_list:
                                         bought_list.remove(sym)
-                                    if sym in symbol_list:
-                                        symbol_list.remove(sym)
+                                    # ✅ 변경: selected_symbols_map에서 해당 종목 제거
+                                    if sym in selected_symbols_map:
+                                        del selected_symbols_map[sym]
                                     if sym in trailing_peaks:
                                         del trailing_peaks[sym]
                                     if sym in trailing_losses:
@@ -1027,7 +1031,8 @@ try:
                     last_profit_taking_check_time = t_now # 마지막 체크 시간 업데이트
                 # 익절 감시 로직 끝 -------------------------------------------------------------
 
-                for sym in symbol_list:
+                # ✅ 변경: 딕셔너리의 (키, 값)을 순회하며 종목코드(sym)와 종목명(stock_name)을 가져옵니다.
+                for sym, stock_name in selected_symbols_map.items():
                     if len(bought_list) < TARGET_BUY_COUNT:
                         if sym in bought_list:
                             continue
@@ -1055,7 +1060,8 @@ try:
                         if open_price < target_price < current_price:
                         # 갭상승(or NXT) 포함해서 target_price 돌파 매수
                         #if target_price < current_price:
-                            stock_name = symbol_name_map.get(sym, "Unknown")
+                            # ✅ 변경: stock_name은 이미 for 루프에서 가져왔으므로 이 줄은 필요 없습니다.
+                            # stock_name = symbol_name_map.get(sym, "Unknown") 
 
                             # 돌파 조건은 만족했지만 슬리피지 체크
                             if current_price > target_price * SLIPPAGE_LIMIT:
