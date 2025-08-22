@@ -1,4 +1,5 @@
 import requests
+from requests.exceptions import ConnectTimeout, ReadTimeout, Timeout, ConnectionError
 import json
 import time
 import yaml
@@ -118,6 +119,7 @@ def fetch_krx_data(mktId, trade_date):
 
 def get_all_symbols():
     trade_date = get_last_trading_day()
+    #trade_date = '20250804'
     send_message(f"✅ 최종 거래일은 {trade_date} 입니다.")
     send_message_main(f"✅ 최종 거래일은 {trade_date} 입니다.")
 
@@ -167,37 +169,32 @@ def get_all_symbols():
     df['전일변동폭비율'] = (df['고가'] - df['저가']) / df['저가']
 
     #*************************************************************************************************************
-    ## 약 120개 정도 필터됨
+    # [1번계좌] 미니주
     filtered = df[
-        (df['등락률'] >= -1.5) & (df['등락률'] <= 70.0) &   # 0.5
-        (df['종가'] >= 2000) & (df['종가'] <= 333000) &   # 2500
-        (df['시가총액'] >= 5e10) & (df['시가총액'] <= 500e12) &   # 5e10
-        (df['거래량'] >= 100000) &   # 300000
-        (df['거래대금'] >= 3e9) &   # 7e9
-        (df['전일변동폭비율'] >= 0.05)   # 0.07
+        (df['등락률'] >= 0.2) &          # -3~7 등락률 범위를 소폭 확장하여 더 많은 잠재 후보군을 포함
+        (df['등락률'] <= 12) &
+        (df['종가'] >= 100) &          # 동전주를 회피하는 최소 가격
+        (df['시가총액'] >= 1e9) &      # 시가총액 10억 이상 (너무 작은 종목 제외)
+        (df['시가총액'] < 3e10) &       # 시가총액 300억 이하 (너무 무거운 대형주 제외, 중소형주 집중)
+        (df['거래대금'] >= 6e7) &        # 거래대금 5천 이상 (최소한의 유동성 확보)
+        (df['전일변동폭비율'] >= 0.03) &   # 전일 변동폭이 최소 5% 이상인 종목
+        (df['전일변동폭비율'] <= 0.20)    # 전일 변동폭이 20% 이하 (지나치게 과열된 종목 제외)
     ].copy()
     #*************************************************************************************************************
 
-    #print(f"\n✅ 조건 만족 종목 수: {len(filtered)}")
-    #print("\n✅ 조건 만족 상위 10개 샘플:")
-    #print(filtered[['종목명', '종목코드', '종가', '등락률', '시가총액', '거래대금']].head(10))
-    #
-    ## 종목코드 리스트 생성
-    #symbols = filtered['종목코드'].astype(str).str.zfill(6).tolist()
-    #random.shuffle(symbols)
+    #filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금'] * (1 + filtered['등락률'] / 100)
+    # 안정성 점수 계산 (기존 공격적 점수 대신)
+    filtered['안정성점수'] = (
+        filtered['시가총액'] * 0.3 +  # 시총 가중치
+        filtered['거래대금'] * 0.3 +   # 유동성 가중치  
+        (1 / (abs(filtered['등락률']) + 1)) * filtered['거래대금'] * 0.4  # 안정성 가중치
+    )
 
-    #print("\n✅ 예시 종목코드:", symbols[:5])
-    #return symbols
-
-    # 기존 필터 이후 추가
-    #filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금']   # 전일에 가격도 크게 움직이고, 돈도 많이 몰린 종목을 추리기 위해
-    filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금'] * (1 + filtered['등락률'] / 100)
-    #filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금'] * (1 + max(0, filtered['등락률'] / 100)) # 음수 등락률은 1로 고정, 하락 종목의 점수 감소 최소화
-
-    # 점수 기준 정렬 → 상위 150개 추출
     #top_filtered = filtered.sort_values(by='점수', ascending=False).head(150)
-    top_filtered = filtered.sort_values(by='점수', ascending=False)
-
+    #top_filtered = filtered.sort_values(by='점수', ascending=False)
+    # 점수 기준 정렬
+    top_filtered = filtered.sort_values(by='안정성점수', ascending=False)
+ 
     send_message(f"✅ 최종 선정 종목 수: {len(top_filtered)}")
     send_message_main(f"✅ 최종 선정 종목 수: {len(top_filtered)}")
     #print("\n✅ 상위 점수 종목 샘플:")
@@ -245,8 +242,10 @@ def check_trailing_stop_loss(stock_dict, trailing_losses, stop_loss_threshold=-3
 
             # 손실 반등 후 재하락 감지
             if trailing_losses[sym] - profit_pct >= trailing_rebound and profit_pct <= stop_loss_threshold:
-                send_message(f"😭 [손절1]{info.get('종목명')}({sym}) 손실 반등후 재하락! 트레일링손절 (손절률 {profit_pct:.2f}%)")
-                send_message_main(f"😭 [손절1]{info.get('종목명')}({sym}) 손실 반등후 재하락! 트레일링손절 (손절률 {profit_pct:.2f}%)")
+                #send_message(f"😭 [손절1]{info.get('종목명')}({sym}) 트레일링 손절 (손절률 {profit_pct:.2f}%)")
+                send_message(f"😭 [손절1]{info.get('종목명')}({sym}) 트레일링 손절 (반등률 {trailing_losses[sym]:.2f}%)-(손절률 {profit_pct:.2f}%)")
+                #send_message_main(f"😭 [손절1]{info.get('종목명')}({sym}) 트레일링 손절 (손절률 {profit_pct:.2f}%)")
+                send_message_main(f"😭 [손절1]{info.get('종목명')}({sym}) 트레일링 손절 (반등률 {trailing_losses[sym]:.2f}%)-(손절률 {profit_pct:.2f}%)")
                 stopped.append(sym)
         else:
             # 손실이 아닌 경우 기록 제거
@@ -255,7 +254,7 @@ def check_trailing_stop_loss(stock_dict, trailing_losses, stop_loss_threshold=-3
 
     return stopped
 
-# --- ✨ 익절 (Trailing Stop) 로직 함수 ✨ ---
+# --- ✨ 익절 (Trailing Stop) 로직 함수 + 불타기 ✨ ---
 def check_profit_taking_with_trailing_stop(
     stock_dict,
     trailing_peak_prices,
@@ -269,13 +268,10 @@ def check_profit_taking_with_trailing_stop(
     take_profit_lose_pct
 ):
     """
-    4단계 트레일링 스탑 로직
-    1단계: 0.5% 수익 시 추적 시작, -1% 하락 시 매도
-    2단계: 1.5% 수익 시 추적 재시작, -1.5% 하락 시 매도
-    3단계: 2.5% 수익 시 추적 재시작, -2% 하락 시 매도
-    4단계: 13% 수익 시 추적 재시작, -3% 하락 시 매도
+    4단계 트레일링 스탑 로직 + 불타기 신호 생성
     """
     profited = []
+    burn_in_list = []
 
     for sym, info in stock_dict.items():
         current_price = get_current_price(sym)
@@ -295,6 +291,7 @@ def check_profit_taking_with_trailing_stop(
                 send_message(f"🟡 {sym_name}({sym}) {break_even_pct1}% 도달 → 1단계 트레일링 시작")
                 send_message_main(f"🟡 {sym_name}({sym}) {break_even_pct1}% 도달 → 1단계 트레일링 시작")
                 trailing_peak_prices[sym] = {'stage': 1, 'peak_price': current_price}
+                burn_in_list.append(sym)  # 1단계 도달시만 불타기 수행
             continue
 
         # 상태 불러오기
@@ -313,8 +310,8 @@ def check_profit_taking_with_trailing_stop(
                 send_message_main(f"🟡🟡 {sym_name}({sym}) {break_even_pct2}% 도달 → 2단계 트레일링 시작")
                 trailing_peak_prices[sym] = {'stage': 2, 'peak_price': current_price}
             elif current_price <= peak_price * (1 - abs(break_even_lose_pct1) / 100):
-                send_message(f"😄|😭 [단계1]{sym_name}({sym}) 1단계 최고가 대비 {abs(break_even_lose_pct1)}% 하락! (손익률 {profit_pct:.2f}%)")
-                send_message_main(f"😄|😭 [단계1]{sym_name}({sym}) 1단계 최고가 대비 {abs(break_even_lose_pct1)}% 하락! (손익률 {profit_pct:.2f}%)")
+                send_message(f"😄 [단계1]{sym_name}({sym}) 1단계 최고가 대비 {abs(break_even_lose_pct1)}% 하락! (익절률 {profit_pct:.2f}%)")
+                send_message_main(f"😄 [단계1]{sym_name}({sym}) 1단계 최고가 대비 {abs(break_even_lose_pct1)}% 하락! (익절률 {profit_pct:.2f}%)")
                 profited.append(sym)
 
         # --- 2단계 트레일링 ---
@@ -346,7 +343,7 @@ def check_profit_taking_with_trailing_stop(
                 send_message_main(f"😄😄😄😄 [단계4]{sym_name}({sym}) 4단계 최고가 대비 {abs(take_profit_lose_pct)}% 하락! (익절률 {profit_pct:.2f}%)")
                 profited.append(sym)
 
-    return profited
+    return profited, burn_in_list
 
 def get_current_price(code="005930"):
     """
@@ -394,7 +391,7 @@ def get_current_price(code="005930"):
     send_message(f"[{code}] ❌ 현재가 조회 최종 실패. 해당 종목은 건너뜁니다.")
     return None
 
-def get_price_info(code="005930", k=0.5):
+def get_price_info(code="005930", k_base=0.5):
     """
     변동성 돌파 전략 목표가 + 당일 시가를 함께 반환
     :param code: 종목 코드 (6자리 문자열)
@@ -434,20 +431,87 @@ def get_price_info(code="005930", k=0.5):
             send_message(f"[{code}] 일봉 데이터 부족 또는 없음.")
             return None, None
 
+        # 1. 필요한 가격들 정의
         # 오늘 시가
         open_price = int(output[0]['stck_oprc'])
+        # 전일 시가/종가/고가/저가
+        prev_open  = int(output[1]['stck_oprc'])
+        prev_close = int(output[1]['stck_clpr'])
+        prev_high  = int(output[1]['stck_hgpr'])
+        prev_low   = int(output[1]['stck_lwpr'])
 
-        # 전일 고가/저가로 변동폭 계산
-        prev_high = int(output[1]['stck_hgpr'])
-        prev_low  = int(output[1]['stck_lwpr'])
+        #### 갭 상황 분석
+        ###gap_ratio = (open_price - prev_close) / prev_close
+        ###
+        #### 개선된 k값 결정 로직
+        ###if gap_ratio < -0.02:  # 2% 이상 갭하락 -> 반등 기대로 k값 상향
+        ###    k_dynamic = k_base + 0.05
+        ###elif gap_ratio > 0.03:  # 3% 이상 갭상승 -> 과열 우려로 k값 하향
+        ###    k_dynamic = max(k_base - 0.05, 0.1)
+        ###else:
+        ###    k_dynamic = k_base
+        ###
+        #### 보수적인 목표가 설정
+        ###body = abs(prev_close - prev_open)
+        ###target_price = int(open_price + body * k_dynamic)
+        ###
+        ###return target_price, open_price
 
-        # 목표가 = 오늘 시가 + (전일 고가 - 전일 저가) * k
-        target_price = open_price + (prev_high - prev_low) * k
-
+        # 몸통(body)과 꼬리(shadow) 계산
+        body = abs(prev_close - prev_open)
+        shadow = (prev_high - prev_low) - body
+        total_range = prev_high - prev_low
+        
+        # 0으로 나누기 방지
+        shadow_ratio = shadow / (total_range + 1e-6)  # 0~1
+        
+        # 꼬리 비율에 따른 동적 k 조정
+        if shadow_ratio >= 0.6:       # 꼬리가 몸통보다 훨씬 긴 경우
+            k_dynamic = k_base + 0.1
+        elif shadow_ratio <= 0.3:     # 몸통이 큰 장대봉
+            k_dynamic = max(k_base - 0.1, 0.1)
+        else:
+            k_dynamic = k_base
+        
+        # 목표가 계산 (시가/종가 변동폭 * k_dynamic)
+        target_price = int(open_price + body * k_dynamic)
+        
         return target_price, open_price
 
+        #+++++ # 2. 전체 변동폭과 몸통 크기 계산
+        #+++++ volatility_range = prev_high - prev_low
+        #+++++ body_size = abs(prev_close - prev_open)
+        #+++++ 
+        #+++++ # 3. ✨ K값 동적 조정 (하이브리드 로직) ✨
+        #+++++ k_dynamic = k_base # Setting.ini의 기본 K값(0.5)으로 시작
+        #+++++ 
+        #+++++ # 0으로 나누기 오류 방지
+        #+++++ if volatility_range > 0:
+        #+++++     # Case 1: 꼬리가 몸통보다 훨씬 길면 (변동성은 컸지만 방향성은 없었던 날)
+        #+++++     if (body_size / volatility_range) < 0.3: 
+        #+++++         # -> 더 신중하게 접근하기 위해 K값을 높여 목표가를 상향 조정
+        #+++++         k_dynamic = k_base + 0.1 # 예: 0.6
+        #+++++     
+        #+++++     # Case 2: 몸통이 변동폭의 대부분이면 (방향성에 대한 확신이 강했던 날)
+        #+++++     elif (body_size / volatility_range) > 0.7:
+        #+++++         # -> 더 공격적으로 진입하기 위해 K값을 낮춰 목표가를 하향 조정
+        #+++++         k_dynamic = k_base - 0.1 # 예: 0.4
+        #+++++ 
+        #+++++ # 4. 최종 목표가 계산
+        #+++++ target_price = open_price + int(volatility_range * k_dynamic)
+        #+++++ 
+        #+++++ return target_price, open_price
+
+    except (ConnectTimeout, ReadTimeout, Timeout, ConnectionError) as e:
+        send_message(f"[{code}] 네트워크 연결 오류/타임아웃: {e}")
+        return None, None
+        
     except (KeyError, ValueError) as e:
         send_message(f"[{code}] 가격 정보 파싱 오류: {e}")
+        return None, None
+        
+    except Exception as e:
+        send_message(f"[{code}] 예상치 못한 오류: {e}")
         return None, None
 
 def get_stock_balance():
@@ -513,12 +577,14 @@ def get_stock_balance():
         # 보유 주식 리스트를 콜론으로 구분하여 출력
         stock_list_str = ":".join(stock_info_list)
         send_message(f"📋 현재 보유 주식은 {item_count:02d}건 입니다.\n{stock_list_str}")
+        send_message_main(f"📋 현재 보유 주식은 {item_count:02d}건 입니다.")
     else:
         send_message("📋 현재 보유 주식은 없습니다.")
 
     if evaluation:
         send_message(f"💰 주식 평가 금액: {evaluation[0].get('scts_evlu_amt', 'N/A')}원")
         send_message(f"💰 평가 손익 합계: {evaluation[0].get('evlu_pfls_smtl_amt', 'N/A')}원")
+        send_message_main(f"💰 평가 손익 합계: {evaluation[0].get('evlu_pfls_smtl_amt', 'N/A')}원")
         send_message(f"💰 총 평가 금액: {evaluation[0].get('tot_evlu_amt', 'N/A')}원")
     else:
         send_message("평가 정보가 없습니다.")
@@ -526,7 +592,7 @@ def get_stock_balance():
 
     return stock_dict
 
-def get_balance():
+def get_balance(pdno="005930", ord_unpr="65500"):
     """현금 잔고조회"""
     PATH = "uapi/domestic-stock/v1/trading/inquire-psbl-order"
     URL = f"{URL_BASE}/{PATH}"
@@ -540,16 +606,25 @@ def get_balance():
     params = {
         "CANO": CANO,
         "ACNT_PRDT_CD": ACNT_PRDT_CD,
-        "PDNO": "005930",
-        "ORD_UNPR": "65500",
+        "PDNO": pdno,
+        "ORD_UNPR": str(ord_unpr),   # 주문가(혹은 0)
         "ORD_DVSN": "01",
-        "CMA_EVLU_AMT_ICLD_YN": "Y",
-        "OVRS_ICLD_YN": "Y"
+        "CMA_EVLU_AMT_ICLD_YN": "N",
+        "OVRS_ICLD_YN": "N"
     }
     res = requests.get(URL, headers=headers, params=params)
-    cash = res.json()['output']['ord_psbl_cash']
-    send_message(f"💰 주문 가능 현금 잔고: {cash}원")
-    return int(cash)
+    if res.status_code != 200:
+        send_message(f"주문 가능금액 조회 실패(HTTP {res.status_code})")
+        return 0
+    j = res.json()
+    cash = j.get('output', {}).get('ord_psbl_cash')
+    if cash is None:
+        send_message("주문 가능금액 응답에 값 없음")
+        return 0
+    try:
+        return int(cash)
+    except:
+        return 0
 
 def buy(code="005930", qty="1"):
     """주식 시장가 매수"""  
@@ -580,6 +655,52 @@ def buy(code="005930", qty="1"):
     else:
         send_message(f"[매수 실패]{str(res.json())}")
         return False
+
+def safe_buy(sym, buy_amount, current_price):
+    """
+    주문 가능 금액을 확인하고 안전하게 매수
+    - 최초 주문은 버퍼 0% (1.00) 적용
+    - 실패할 때마다 3%씩 더 보수적으로 줄여서 재시도 (최대 6회)
+    """
+    if current_price is None or current_price <= 0:
+        send_message(f"⚠️ {sym} 매수 불가: 현재가 오류 ({current_price}), 매수풀에서 제거")
+        selected_symbols_map.pop(sym, None)
+        return False
+
+    # 최초 주문가능금액 조회
+    #max_cash = get_balance(pdno=sym, ord_unpr=current_price)
+    max_cash = buy_amount
+    if max_cash <= 0:
+        send_message(f"⚠️ {sym} 매수 불가: 주문가능금액이 0원으로 조회됨, 매수풀에서 제거")
+        selected_symbols_map.pop(sym, None)
+        return False
+
+    attempts = 0
+    base_ratio = 1.00  # 첫 시도는 100% 버퍼
+    while attempts < 6:
+        # 시도 횟수에 따라 버퍼를 점점 늘려감 (예: 100% -> 97% → 94% → 91% ...)
+        ratio = base_ratio - (attempts * 0.03)
+
+        safe_cash = int(min(buy_amount, max_cash) * ratio)
+        qty_to_buy = safe_cash // current_price
+
+        if qty_to_buy <= 0:
+            send_message(f"⚠️ {sym} 매수 불가: (safe_cash {safe_cash}원, 현재가 {current_price}원), 매수풀에서 제거")
+            selected_symbols_map.pop(sym, None)
+            return False
+
+        send_message(f"🟢 {sym} 주문시도({attempts+1}회차): 수량={qty_to_buy}, 단가={current_price}, 총액={qty_to_buy*current_price:,}원, 잔고={buy_amount:,}원")
+        ok = buy(sym, qty_to_buy)
+        if ok:
+            return True
+
+        # 실패 → 다음 루프에서 더 보수적으로 줄여서 재시도
+        attempts += 1
+        time.sleep(0.2)  # API 호출 간격 확보
+
+    send_message(f"⚠️ {sym} 매수 실패(6회 재시도 후). 매수풀에서 제거")
+    selected_symbols_map.pop(sym, None)
+    return False
 
 def sell(code="005930", qty="1"):
     """주식 시장가 매도"""
@@ -636,6 +757,7 @@ def load_settings():
             'STOP_ABS_LOSE_PCT': -5.0,
             'BREAK_EVEN_PCT1' : 3.0,
             'BREAK_EVEN_LOSE_PCT1' : 2.0,
+            'BURN_IN_RATIO' : 0.5,
             'BREAK_EVEN_PCT2' : 5.0,
             'BREAK_EVEN_LOSE_PCT2' : 2.0,
             'BREAK_EVEN_PCT3' : 7.0,
@@ -682,6 +804,7 @@ def load_settings():
         settings['STOP_ABS_LOSE_PCT'] = config.getfloat('StrategyParameters', 'STOP_ABS_LOSE_PCT')
         settings['BREAK_EVEN_PCT1'] = config.getfloat('StrategyParameters', 'BREAK_EVEN_PCT1')
         settings['BREAK_EVEN_LOSE_PCT1'] = config.getfloat('StrategyParameters', 'BREAK_EVEN_LOSE_PCT1')
+        settings['BURN_IN_RATIO'] = config.getfloat('StrategyParameters', 'BURN_IN_RATIO')
         settings['BREAK_EVEN_PCT2'] = config.getfloat('StrategyParameters', 'BREAK_EVEN_PCT2')
         settings['BREAK_EVEN_LOSE_PCT2'] = config.getfloat('StrategyParameters', 'BREAK_EVEN_LOSE_PCT2')
         settings['BREAK_EVEN_PCT3'] = config.getfloat('StrategyParameters', 'BREAK_EVEN_PCT3')
@@ -711,6 +834,7 @@ def load_settings():
             'STOP_ABS_LOSE_PCT': -5.0,
             'BREAK_EVEN_PCT1' : 3.0,
             'BREAK_EVEN_LOSE_PCT1' : 2.0,
+            'BURN_IN_RATIO' : 0.5,
             'BREAK_EVEN_PCT2' : 5.0,
             'BREAK_EVEN_LOSE_PCT2' : 2.0,
             'BREAK_EVEN_PCT3' : 7.0,
@@ -816,6 +940,7 @@ try:
 
         BREAK_EVEN_PCT1 = settings['BREAK_EVEN_PCT1']
         BREAK_EVEN_LOSE_PCT1 = settings['BREAK_EVEN_LOSE_PCT1']
+        BURN_IN_RATIO = settings['BURN_IN_RATIO']
         BREAK_EVEN_PCT2 = settings['BREAK_EVEN_PCT2']
         BREAK_EVEN_LOSE_PCT2 = settings['BREAK_EVEN_LOSE_PCT2']
         BREAK_EVEN_PCT3 = settings['BREAK_EVEN_PCT3']
@@ -868,21 +993,21 @@ try:
         t_sell = t_now.replace(**T_SELL_TIME)
         t_exit = t_now.replace(**T_EXIT_TIME)
 
-        # 이미 매수한 종목 수를 고려하여 buy_percent 계산
-        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
-        if remaining_buy_count <= 0:
-            buy_percent = 0 # 더 이상 매수할 종목이 없으면 비율을 0으로 설정
-        else:
-            # 소수점 셋째 자리까지 유지하고 넷째 자리부터 버림
-            buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
-        
-        # 종목별 주문 금액 완화 로직 추가
-        if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-            buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT2), total_cash * 0.1)  # 매수 비중 줄임
-        elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-            buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT1), total_cash * 0.1)  # 매수 비중 줄임
-        else:
-            buy_amount = min(int(total_cash * buy_percent), total_cash * 0.1)
+        #---# 이미 매수한 종목 수를 고려하여 buy_percent 계산
+        #---remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
+        #---if remaining_buy_count <= 0:
+        #---    buy_percent = 0 # 더 이상 매수할 종목이 없으면 비율을 0으로 설정
+        #---else:
+        #---    # 소수점 셋째 자리까지 유지하고 넷째 자리부터 버림
+        #---    buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
+        #---
+        #---# 종목별 주문 금액 완화 로직 추가
+        #---if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
+        #---    buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
+        #---elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
+        #---    buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
+        #---else:
+        #---    buy_amount = int(total_cash * buy_percent)
 
         soldout = False
 
@@ -936,6 +1061,7 @@ try:
                         sell(sym, qty)
                 soldout = True
                 bought_list = []
+                time.sleep(0.1)
                 stock_dict = get_stock_balance()
 
             if t_start < t_now < t_sell:  # AM 09:03 ~ PM 02:58 : 매수     
@@ -943,111 +1069,144 @@ try:
                 #send_message("루프 시작..................") #루프 시간 측정용
 
                 # 손절 감시 로직 -------------------------------------------------------       
-                if (t_now - last_stop_loss_check_time).total_seconds() >= 30: # 30초마다 체크
-                    stopped = check_trailing_stop_loss(
-                        stock_dict=stock_dict,
-                        trailing_losses=trailing_losses,
-                        stop_loss_threshold=STOP_LOSE_PCT,
-                        trailing_rebound=STOP_TRAILING_REBOUND,  # 반등 후 다시 이 수치 이상 하락시 손절
-                        stop_abs_loss_threshold=STOP_ABS_LOSE_PCT
-                    )
-                    if stopped:
-                        for sym in stopped:
-                            qty = stock_dict.get(sym, {}).get('현재수량', 0)
-                            if qty > 0:
-                                result = sell(sym, qty)
-                                if result:
-                                    if sym in bought_list:
-                                        bought_list.remove(sym)
-                                    # ✅ 변경: selected_symbols_map에서 해당 종목 제거
-                                    if sym in selected_symbols_map:
-                                        del selected_symbols_map[sym]
-                                    if sym in trailing_losses:
-                                        del trailing_losses[sym]
-                                    if sym in trailing_peaks:
-                                        del trailing_peaks[sym]
-                        stock_dict = get_stock_balance()
+                if (t_now - last_stop_loss_check_time).total_seconds() >= 15: # 15초마다 체크
+                    if STOP_LOSE_PCT < 0:
+                        stopped = check_trailing_stop_loss(
+                            stock_dict=stock_dict,
+                            trailing_losses=trailing_losses,
+                            stop_loss_threshold=STOP_LOSE_PCT,
+                            trailing_rebound=STOP_TRAILING_REBOUND,  # 반등 후 다시 이 수치 이상 하락시 손절
+                            stop_abs_loss_threshold=STOP_ABS_LOSE_PCT
+                        )
+                        if stopped:
+                            for sym in stopped:
+                                qty = stock_dict.get(sym, {}).get('현재수량', 0)
+                                if qty > 0:
+                                    result = sell(sym, qty)
+                                    if result:
+                                        if sym in bought_list:
+                                            bought_list.remove(sym)
+                                        # ✅ 변경: selected_symbols_map에서 해당 종목 제거
+                                        if sym in selected_symbols_map:
+                                            selected_symbols_map.pop(sym, None)
+                                        if sym in trailing_losses:
+                                            del trailing_losses[sym]
+                                        if sym in trailing_peaks:
+                                            del trailing_peaks[sym]
+                            time.sleep(0.1)
+                            stock_dict = get_stock_balance()
 
-                        # ✨ 손절 후 buy_amount 재계산 로직
-                        time.sleep(5) # 급격한 재매수 방지용
-                        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
-                        if remaining_buy_count > 0:
-                            buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
-                            total_cash = get_balance() - 10000
-                            if total_cash < 0:
-                                total_cash = 0
-                            # 종목별 주문 금액 완화 로직 추가
-                            if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-                                buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT2), total_cash * 0.1)  # 매수 비중 줄임
-                            elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-                                buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT1), total_cash * 0.1)  # 매수 비중 줄임
-                            else:
-                                buy_amount = min(int(total_cash * buy_percent), total_cash * 0.1)
-                        else:
-                            buy_amount = 0
+                            #---# ✨ 손절 후 buy_amount 재계산 로직
+                            #---time.sleep(5) # 급격한 재매수 방지용
+                            #---remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
+                            #---if remaining_buy_count > 0:
+                            #---    buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
+                            #---    total_cash = get_balance() - 10000
+                            #---    if total_cash < 0:
+                            #---        total_cash = 0
+                            #---    # 종목별 주문 금액 완화 로직 추가
+                            #---    if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
+                            #---        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
+                            #---    elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
+                            #---        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
+                            #---    else:
+                            #---        buy_amount = int(total_cash * buy_percent)
+                            #---else:
+                            #---    buy_amount = 0
 
                     last_stop_loss_check_time = t_now # 마지막 체크 시간 업데이트
                 # 손절 감시 로직 끝 ------------------------------------------------------------------
                 # 익절 감시 로직 -----------------------------------------------------------
-                if (t_now - last_profit_taking_check_time).total_seconds() >= 30: # 30초마다 체크
-                    profited = check_profit_taking_with_trailing_stop(
-                        stock_dict=stock_dict,
-                        trailing_peak_prices=trailing_peaks,
-                        break_even_pct1=BREAK_EVEN_PCT1,
-                        break_even_lose_pct1=BREAK_EVEN_LOSE_PCT1,
-                        break_even_pct2=BREAK_EVEN_PCT2,
-                        break_even_lose_pct2=BREAK_EVEN_LOSE_PCT2,
-                        break_even_pct3=BREAK_EVEN_PCT3,
-                        break_even_lose_pct3=BREAK_EVEN_LOSE_PCT3,
-                        take_profit_pct=TAKE_PROFIT_PCT,
-                        take_profit_lose_pct=TAKE_PROFIT_LOSE_PCT
-                    )
-                    if profited:
-                        for sym in profited:
-                            qty = stock_dict.get(sym, {}).get('현재수량', 0)
-                            if qty > 0:
-                                result = sell(sym, qty)
-                                if result:
-                                    if sym in bought_list:
-                                        bought_list.remove(sym)
-                                    # ✅ 변경: selected_symbols_map에서 해당 종목 제거
-                                    if sym in selected_symbols_map:
-                                        del selected_symbols_map[sym]
-                                    if sym in trailing_peaks:
-                                        del trailing_peaks[sym]
-                                    if sym in trailing_losses:
-                                        del trailing_losses[sym]
-                        stock_dict = get_stock_balance() # 익절 후 계좌 정보 최신화
+                if (t_now - last_profit_taking_check_time).total_seconds() >= 15: # 15초마다 체크
+                    profited_flag = 0
+                    burn_in_list_flag = 0
+                    if BREAK_EVEN_PCT1 > 0:
+                        profited, burn_in_list = check_profit_taking_with_trailing_stop(
+                            stock_dict=stock_dict,
+                            trailing_peak_prices=trailing_peaks,
+                            break_even_pct1=BREAK_EVEN_PCT1,
+                            break_even_lose_pct1=BREAK_EVEN_LOSE_PCT1,
+                            break_even_pct2=BREAK_EVEN_PCT2,
+                            break_even_lose_pct2=BREAK_EVEN_LOSE_PCT2,
+                            break_even_pct3=BREAK_EVEN_PCT3,
+                            break_even_lose_pct3=BREAK_EVEN_LOSE_PCT3,
+                            take_profit_pct=TAKE_PROFIT_PCT,
+                            take_profit_lose_pct=TAKE_PROFIT_LOSE_PCT
+                        )
+                        if profited:
+                            profited_flag = 1
+                            for sym in profited:
+                                qty = stock_dict.get(sym, {}).get('현재수량', 0)
+                                if qty > 0:
+                                    result = sell(sym, qty)
+                                    if result:
+                                        if sym in bought_list:
+                                            bought_list.remove(sym)
+                                        # ✅ 변경: selected_symbols_map에서 해당 종목 제거
+                                        if sym in selected_symbols_map:
+                                            selected_symbols_map.pop(sym, None)
+                                        if sym in trailing_peaks:
+                                            del trailing_peaks[sym]
+                                        if sym in trailing_losses:
+                                            del trailing_losses[sym]
+                        if BURN_IN_RATIO > 0:
+                            if burn_in_list:
+                                burn_in_list_flag = 1
+                                for sym in burn_in_list:
+                                    ratio = BURN_IN_RATIO
+                                    current_price = get_current_price(sym)
+                                    info = stock_dict.get(sym, {})
+                                    if current_price is None or not info:
+                                        continue
 
-                        # ✨ 익절 후 buy_amount 재계산 로직
-                        time.sleep(5) # 급격한 재매수 방지용
-                        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
-                        if remaining_buy_count > 0:
-                            buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
-                            total_cash = get_balance() - 10000
-                            if total_cash < 0:
-                                total_cash = 0
-                            # 종목별 주문 금액 완화 로직 추가
-                            if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-                                buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT2), total_cash * 0.1)  # 매수 비중 줄임
-                            elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-                                buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT1), total_cash * 0.1)  # 매수 비중 줄임
-                            else:
-                                buy_amount = min(int(total_cash * buy_percent), total_cash * 0.1)
-                        else:
-                            buy_amount = 0
+                                    bought_name = info.get('종목명')
+                                    bought_qty = info.get('현재수량', 0)
+                                    bought_price = info.get('매수가')
+
+                                    if bought_price and bought_qty:
+                                        invested = bought_price * bought_qty
+                                        amount_to_buy = int(invested * ratio)
+                                        #qty_to_buy = int(amount_to_buy // current_price)
+                                        if amount_to_buy > 0:
+                                            send_message(f"🔥 {bought_name}({sym}) 불타기 매수 진행 ({ratio*100:.1f}%, {amount_to_buy:,}원)")
+                                            send_message_main(f"🔥 {bought_name}({sym}) 불타기 매수 진행 ({ratio*100:.1f}%, {amount_to_buy:,}원)")
+                                            result = safe_buy(sym, amount_to_buy, current_price)
+                                            if result:
+                                                soldout = False
+                        if profited_flag > 0 or burn_in_list_flag > 0:
+                            time.sleep(0.1)
+                            stock_dict = get_stock_balance() # 익절/불타기 후 계좌 정보 최신화
+
+                            #---# ✨ 익절 후 buy_amount 재계산 로직
+                            #---time.sleep(5) # 급격한 재매수 방지용
+                            #---remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
+                            #---if remaining_buy_count > 0:
+                            #---    buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
+                            #---    total_cash = get_balance() - 10000
+                            #---    if total_cash < 0:
+                            #---        total_cash = 0
+                            #---    # 종목별 주문 금액 완화 로직 추가
+                            #---    if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
+                            #---        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
+                            #---    elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
+                            #---        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
+                            #---    else:
+                            #---        buy_amount = int(total_cash * buy_percent)
+                            #---else:
+                            #---    buy_amount = 0
                     
                     last_profit_taking_check_time = t_now # 마지막 체크 시간 업데이트
                 # 익절 감시 로직 끝 -------------------------------------------------------------
 
                 # ✅ 변경: 딕셔너리의 (키, 값)을 순회하며 종목코드(sym)와 종목명(stock_name)을 가져옵니다.
-                for sym, stock_name in selected_symbols_map.items():
-                    if len(bought_list) < TARGET_BUY_COUNT:
+                for sym, stock_name in list(selected_symbols_map.items()):
+                    remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
+                    if remaining_buy_count > 1:
                         if sym in bought_list:
                             continue
 
                         # 🔁 k값 점진적 완화 로직 추가
-                        if len(bought_list) < TARGET_BUY_COUNT:
+                        if remaining_buy_count > 1:
                             if t_now >= t_now.replace(**TARGET_K3_TIME):
                                 k = TARGET_K3
                             elif t_now >= t_now.replace(**TARGET_K2_TIME):
@@ -1090,24 +1249,27 @@ try:
                                         slippage_last_logged[sym] = t_now
                                 continue  # 슬리피지 초과 종목은 매수하지 않음
                             else:
-                                buy_qty = 0  # 매수할 수량 초기화  
+                                #buy_qty = 0  # 매수할 수량 초기화  
+                                total_cash = get_balance(pdno=sym, ord_unpr=current_price) - 10000
+                                buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
 
                                 # 종목별 주문 금액 완화 로직 추가
                                 if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-                                    buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT2), total_cash * 0.1)  # 매수 비중 줄임
+                                    buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
                                 elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-                                    buy_amount = min(int(total_cash * buy_percent * AMOUNT_LIMIT1), total_cash * 0.1)  # 매수 비중 줄임
+                                    buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
                                 else:
-                                    buy_amount = min(int(total_cash * buy_percent), total_cash * 0.1)
+                                    buy_amount = int(total_cash * buy_percent)
 
-                                buy_qty = int(buy_amount // current_price)
-                                if buy_qty > 0:
+                                #buy_qty = int(buy_amount // current_price)
+                                if buy_amount > 0:
                                     send_message(f"📈 {stock_name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
                                     send_message_main(f"📈 {stock_name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
-                                    result = buy(sym, buy_qty)
+                                    result = safe_buy(sym, buy_amount, current_price)
                                     if result:
                                         soldout = False
                                         bought_list.append(sym)
+                                        time.sleep(0.1)
                                         stock_dict = get_stock_balance()
                         time.sleep(0.025)
                 time.sleep(0.025)
