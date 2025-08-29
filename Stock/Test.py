@@ -77,8 +77,8 @@ def fetch_krx_data(mktId, trade_date):
         return None
 
 def get_all_symbols(p_pool_count=15):
-    #trade_date = get_last_trading_day()
-    trade_date = '20250827'
+    trade_date = get_last_trading_day()
+    #trade_date = '20250827'
 
     #send_message(f"✅ 최종 거래일은 {trade_date} 입니다.")
     #send_message_main(f"✅ 최종 거래일은 {trade_date} 입니다.")
@@ -284,7 +284,8 @@ def get_all_symbols(p_pool_count=15):
         #(df['거래대금'] >= 67e8)         # 거래대금 67억 이상 (최소한의 유동성 확보)
         #(df['전일변동폭비율'] >= 0.03) &   # 전일 변동폭이 최소 5% 이상인 종목
         #(df['전일변동폭비율'] <= 0.20)    # 전일 변동폭이 20% 이하 (지나치게 과열된 종목 제외)
-        (df['윗꼬리비율'] < 1.5)     # 윗꼬리/바디 비율이 1.5 미만인 종목만
+        #(df['윗꼬리비율'] < 1.5)     # 윗꼬리/바디 비율이 1.5 미만인 종목만
+        (df['아래꼬리'] >= df['윗꼬리'] * 1.3)     # 아래꼬리가 윗꼬리+윗꼬리의30% 보다 큰 종목만 포함
     ].copy()
 
     top_filtered = filtered.sort_values(by='거래대금', ascending=False).head(p_pool_count)
@@ -312,5 +313,5 @@ def get_all_symbols(p_pool_count=15):
     return symbols_name_dict # **변경 끝:** 이 딕셔너리를 반환합니다.
 
 if __name__ == "__main__":
-    pool_count = 5
+    pool_count = 10
     symbols = get_all_symbols(p_pool_count=pool_count)
