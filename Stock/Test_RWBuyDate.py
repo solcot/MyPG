@@ -60,9 +60,9 @@ if os.path.exists(BUYDATE_FILE):
 print("=== BUYDATE_FILE 테스트 시작 ===")
 
 # 1. 기록 추가 테스트
-add_buy_record("005930", " 삼성 전자 ")
-add_buy_record("000660", " SK 하이닉 스 ")
-add_buy_record("035720", " 카 카 오 ")
+add_buy_record("005930", "            삼성 전자 ")
+add_buy_record("000660", " SK 하     이&닉 스 ")
+add_buy_record("035720", " 카 카 오     ")
 
 print("\n[1] 기록 추가 후 내용 확인:")
 with open(BUYDATE_FILE, "r", encoding="utf-8") as f:
@@ -78,7 +78,10 @@ with open(BUYDATE_FILE, "r", encoding="utf-8") as f:
 # 파일에 임의로 6일 전 기록 추가
 six_days_ago = (datetime.now() - timedelta(days=6)).strftime("%Y%m%d")
 with open(BUYDATE_FILE, "a", encoding="utf-8") as f:
-    f.write(f"{six_days_ago} 068270     셀 트 리 온\n")
+    f.write(f"{six_days_ago} 068270     셀*트& 리 온\n")
+print("\n[3] 6일 전 기록 추가 후 내용 확인:")
+with open(BUYDATE_FILE, "r", encoding="utf-8") as f:
+    print(f.read())
 
 old_symbols = get_old_symbols(days=5)
 print("\n[3] 5일 이상 보유 종목 조회 결과:")
