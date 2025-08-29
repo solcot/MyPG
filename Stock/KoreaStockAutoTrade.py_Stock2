@@ -695,7 +695,7 @@ def sell(code="005930", qty="1"):
 def load_settings():
     """Setting.ini 파일에서 설정을 읽어옵니다."""
     config = configparser.ConfigParser()
-    config_path = 'C:\\StockPy\\Setting.ini'
+    config_path = 'C:\\StockPy2\\Setting.ini'
 
     try:
         config.read(config_path, encoding='utf-8')
@@ -841,7 +841,7 @@ def write_reload_setting(value):
 
 
 
-BUYDATE_FILE = "C:\\StockPy\\BuyDate.ini"
+BUYDATE_FILE = "C:\\StockPy2\\BuyDate.ini"
 
 def add_buy_record(sym, stock_name):
     """매수 기록 추가 (이미 있으면 추가 안 함: 최초 매수일 유지)"""
