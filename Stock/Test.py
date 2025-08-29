@@ -76,7 +76,7 @@ def fetch_krx_data(mktId, trade_date):
         print(f"CSV 파싱 오류: {e}")
         return None
 
-def get_all_symbols():
+def get_all_symbols(p_pool_count=15):
     #trade_date = get_last_trading_day()
     trade_date = '20250827'
 
@@ -276,7 +276,7 @@ def get_all_symbols():
         #(df['전일변동폭비율'] <= 0.20)    # 전일 변동폭이 20% 이하 (지나치게 과열된 종목 제외)
     ].copy()
 
-    top_filtered = filtered.sort_values(by='거래대금', ascending=False).head(15)
+    top_filtered = filtered.sort_values(by='거래대금', ascending=False).head(p_pool_count)
 
     # 안정성 점수 계산 (기존 공격적 점수 대신)
     top_filtered['안정성점수'] = (
@@ -301,4 +301,5 @@ def get_all_symbols():
     return symbols_name_dict # **변경 끝:** 이 딕셔너리를 반환합니다.
 
 if __name__ == "__main__":
-    symbols = get_all_symbols()
+    pool_count = 20
+    symbols = get_all_symbols(p_pool_count=pool_count)
