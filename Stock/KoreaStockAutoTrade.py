@@ -117,7 +117,7 @@ def fetch_krx_data(mktId, trade_date):
         send_message(f"CSV 파싱 오류: {e}")
         return None
 
-def get_all_symbols():
+def get_all_symbols(p_pool_count=15):
     trade_date = get_last_trading_day()
     #trade_date = '20250804'
     send_message(f"✅ 최종 거래일은 {trade_date} 입니다.")
@@ -183,7 +183,7 @@ def get_all_symbols():
     ].copy()
     #*************************************************************************************************************
 
-    top_filtered = filtered.sort_values(by='거래대금', ascending=False).head(15)
+    top_filtered = filtered.sort_values(by='거래대금', ascending=False).head(p_pool_count)
 
     # 안정성 점수 계산 (기존 공격적 점수 대신)
     top_filtered['안정성점수'] = (
@@ -728,7 +728,8 @@ def load_settings():
             'TARGET_K2': 0.5,
             'TARGET_K3_TIME': {'hour': 13, 'minute': 30, 'second': 0},
             'TARGET_K3': 0.3,
-            'TOTAL_LOSE_EXIT_PCT' : -2.2
+            'TOTAL_LOSE_EXIT_PCT' : -2.2,
+            'POOL_COUNT' : 15
         }
 
     settings = {}
@@ -772,6 +773,7 @@ def load_settings():
         settings['TARGET_K2'] = config.getfloat('StrategyParameters', 'TARGET_K2')
         settings['TARGET_K3'] = config.getfloat('StrategyParameters', 'TARGET_K3')
         settings['TOTAL_LOSE_EXIT_PCT'] = config.getfloat('StrategyParameters', 'TOTAL_LOSE_EXIT_PCT')
+        settings['POOL_COUNT'] = config.getint('StrategyParameters', 'POOL_COUNT')
 
     except (configparser.NoSectionError, configparser.NoOptionError, ValueError) as e:
         send_message(f"❌ 설정 파일 파싱 오류: {e}. 설정 값 확인이 필요합니다.")
@@ -805,7 +807,8 @@ def load_settings():
             'TARGET_K2': 0.5,
             'TARGET_K3_TIME': {'hour': 13, 'minute': 0, 'second': 0},
             'TARGET_K3': 0.3,
-            'TOTAL_LOSE_EXIT_PCT' : -2.2
+            'TOTAL_LOSE_EXIT_PCT' : -2.2,
+            'POOL_COUNT' : 15
         }
 
     return settings
@@ -838,22 +841,23 @@ def write_reload_setting(value):
 try:
     ACCESS_TOKEN = get_access_token()
 
-    selected_symbols_map = get_all_symbols()  # ✅ 변경: 종목코드:종목명 딕셔너리 형태로 받아옵니다.
-    #selected_symbols_map = {
-    #    "005930": "삼성전자",
-    #    "035720": "카카오",
-    #    "000660": "SK하이닉스",
-    #    "068270": "셀트리온",
-    #    "005380": "현대차",
-    #    # 필요에 따라 더 많은 종목을 여기에 추가합니다.
-    #    # "종목코드": "종목명" 형식으로 추가하세요.
-    #}
-
     # --- ✨ 메인 자동매매 루프 시작 ✨ ---
     # 외부 루프: 설정 재로드를 위해 전체 로직을 감쌈
     while True:
         # --- 설정 파일에서 값 로드 ---------------------------------------------------------------------------------------------
         settings = load_settings()
+
+        POOL_COUNT = settings['POOL_COUNT']
+        selected_symbols_map = get_all_symbols(p_pool_count=POOL_COUNT)  # ✅ 변경: 종목코드:종목명 딕셔너리 형태로 받아옵니다.
+        #selected_symbols_map = {
+        #    "005930": "삼성전자",
+        #    "035720": "카카오",
+        #    "000660": "SK하이닉스",
+        #    "068270": "셀트리온",
+        #    "005380": "현대차",
+        #    # 필요에 따라 더 많은 종목을 여기에 추가합니다.
+        #    # "종목코드": "종목명" 형식으로 추가하세요.
+        #}
 
         ## --- ✨ 테스트 출력 시작 ✨ ---
         #send_message("--- [setting.ini] 로드된 설정 값 ---")
