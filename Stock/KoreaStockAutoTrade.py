@@ -119,7 +119,6 @@ def fetch_krx_data(mktId, trade_date):
 
 def get_all_symbols(p_pool_count=15):
     trade_date = get_last_trading_day()
-    #trade_date = '20250804'
     send_message(f"✅ 최종 거래일은 {trade_date} 입니다.")
     send_message_main(f"✅ 최종 거래일은 {trade_date} 입니다.")
 
@@ -142,10 +141,6 @@ def get_all_symbols(p_pool_count=15):
 
     send_message(f"✅ 전체 종목 수: {len(df)}")
     send_message_main(f"✅ 전체 종목 수: {len(df)}")
-    #print("\n✅ 열 이름:")
-    #print(df.columns.tolist())
-    #print("\n✅ 원본 상위 10개 샘플:")
-    #print(df.head(10))
 
     try:
         df['등락률'] = df['등락률'].astype(str).str.replace('%', '', regex=False).astype(float)
@@ -161,50 +156,52 @@ def get_all_symbols(p_pool_count=15):
         send_message("사용 가능한 열:", df.columns.tolist())
         return []
 
-    # 거래대금 단위가 억/천 단위일 수 있으므로 조정 확인 필요
-    #print("\n✅ 거래대금 단위 확인 (상위 5개):")
-    #print(df['거래대금'].head(5))
-
-    # 추가 컬럼 계산
-    #df['전일변동폭비율'] = (df['고가'] - df['저가']) / df['저가']
+    # 금일 등락률
     df['금일등락률'] = (df['종가'] - df['시가']) / df['종가'] * 100
 
+    # ---------------------- 캔들 꼬리 계산 ----------------------
+    df['바디'] = (df['종가'] - df['시가']).abs()
+    df['윗꼬리'] = df['고가'] - df[['시가', '종가']].max(axis=1)
+    df['아래꼬리'] = df[['시가', '종가']].min(axis=1) - df['저가']
+
+    # 윗꼬리 비율 (바디가 0일 경우 0으로 처리)
+    df['윗꼬리비율'] = df.apply(
+        lambda x: x['윗꼬리'] / x['바디'] if x['바디'] > 0 else 0, axis=1
+    )
+
     #*************************************************************************************************************
-    # [1번계좌] 중소형주
+    # [1번계좌] 중소형주 + 윗꼬리 필터
     filtered = df[
-        (df['금일등락률'] >= 0.5) &          # -3~7 등락률 범위를 소폭 확장하여 더 많은 잠재 후보군을 포함
+        (df['금일등락률'] >= 0.5) &
         (df['금일등락률'] <= 1.5) &
-        (df['종가'] <= 300000) &          # 동전주를 회피하는 최소 가격
-        #(df['시가총액'] >= 50e10) &      # 시가총액 5천억 이상 (너무 작은 종목 제외)
-        (df['시가총액'] < 200e10)        # 시가총액 2조 이하 (너무 무거운 대형주 제외, 중소형주 집중)
-        #(df['거래대금'] >= 67e8)         # 거래대금 67억 이상 (최소한의 유동성 확보)
-        #(df['전일변동폭비율'] >= 0.03) &   # 전일 변동폭이 최소 5% 이상인 종목
-        #(df['전일변동폭비율'] <= 0.20)    # 전일 변동폭이 20% 이하 (지나치게 과열된 종목 제외)
+        (df['종가'] <= 300000) &
+        (df['시가총액'] < 200e10) &
+        (df['윗꼬리비율'] < 1.5)     # 윗꼬리/바디 비율이 1.5 미만인 종목만 포함
     ].copy()
     #*************************************************************************************************************
 
     top_filtered = filtered.sort_values(by='거래대금', ascending=False).head(p_pool_count)
 
-    # 안정성 점수 계산 (기존 공격적 점수 대신)
+    # 안정성 점수 계산
     top_filtered['안정성점수'] = (
-        top_filtered['시가총액'] * 0.3 +  # 시총 가중치
-        top_filtered['거래대금'] * 0.3 +   # 유동성 가중치  
-        (1 / (abs(top_filtered['금일등락률']) + 1)) * top_filtered['거래대금'] * 0.4  # 안정성 가중치
+        top_filtered['시가총액'] * 0.3 +
+        top_filtered['거래대금'] * 0.3 +
+        (1 / (abs(top_filtered['금일등락률']) + 1)) * top_filtered['거래대금'] * 0.4
     )
-  
+
     return_filtered = top_filtered.sort_values(by='안정성점수', ascending=False)
 
     send_message(f"✅ 최종 선정 종목 수: {len(return_filtered)}")
     send_message_main(f"✅ 최종 선정 종목 수: {len(return_filtered)}")
 
-    # **여기부터 변경 시작:** 종목코드를 키로, 종목명을 값으로 하는 딕셔너리 생성
-    symbols_name_dict = {} # 새로운 딕셔너리 생성
+    # 종목코드:종목명 딕셔너리 반환
+    symbols_name_dict = {}
     for _, row in return_filtered.iterrows():
-        symbol = str(row['종목코드']).zfill(6) # 종목코드를 가져와 6자리 문자열로 만듭니다.
-        name = row['종목명'] # 종목명을 가져옵니다.
-        symbols_name_dict[symbol] = name # 딕셔너리에 '종목코드': '종목명' 형태로 저장합니다.
+        symbol = str(row['종목코드']).zfill(6)
+        name = row['종목명']
+        symbols_name_dict[symbol] = name
 
-    return symbols_name_dict # **변경 끝:** 이 딕셔너리를 반환합니다.
+    return symbols_name_dict
 
 # --- ✨ 손절 (Trailing Stop) 로직 함수 ✨ ---
 def check_trailing_stop_loss(stock_dict, trailing_losses, stop_loss_threshold=-3.0, trailing_rebound=1.0, stop_abs_loss_threshold=-5.0):
@@ -949,6 +946,10 @@ try:
         # 주식 매수/매도 시간
         t_9 = t_now.replace(**T_9_TIME)
         t_start = t_now.replace(**T_START_TIME)
+
+        t_notbuy = t_now.replace(hour=14, minute=30, second=0,microsecond=0)
+        t_notstoploss = t_now.replace(hour=15, minute=10, second=0,microsecond=0)
+
         t_sell = t_now.replace(**T_SELL_TIME)
         t_exit = t_now.replace(**T_EXIT_TIME)
 
@@ -1027,7 +1028,11 @@ try:
             
                 #send_message("루프 시작..................") #루프 시간 측정용
 
-                # 손절 감시 로직 -------------------------------------------------------       
+                # 손절 감시 로직 -------------------------------------------------------  
+                if t_notstoploss < t_now < t_sell:  # PM 03:10 ~ PM 03:23 : BREAK_EVEN_PCT 조정
+                    STOP_LOSE_PCT = -30.0
+                    STOP_TRAILING_REBOUND = 1.0
+                    STOP_ABS_LOSE_PCT = -50.0
                 if (t_now - last_stop_loss_check_time).total_seconds() >= 15: # 15초마다 체크
                     if STOP_LOSE_PCT < 0:
                         stopped = check_trailing_stop_loss(
@@ -1078,7 +1083,16 @@ try:
 
                     last_stop_loss_check_time = t_now # 마지막 체크 시간 업데이트
                 # 손절 감시 로직 끝 ------------------------------------------------------------------
-                # 익절 감시 로직 -----------------------------------------------------------
+                # 익절 감시 로직 -----------------------------------------------------------                
+                if t_notbuy < t_now < t_sell:  # PM 02:30 ~ PM 03:23 : BREAK_EVEN_PCT 조정
+                    BREAK_EVEN_PCT1 = 3.0
+                    BREAK_EVEN_LOSE_PCT1 = 1.0
+                    BREAK_EVEN_PCT2 = 5.0
+                    BREAK_EVEN_LOSE_PCT2 = 1.0
+                    BREAK_EVEN_PCT3 = 7.0
+                    BREAK_EVEN_LOSE_PCT3 = 1.0
+                    TAKE_PROFIT_PCT = 9.0
+                    TAKE_PROFIT_LOSE_PCT = 1.0
                 if (t_now - last_profit_taking_check_time).total_seconds() >= 15: # 15초마다 체크
                     profited_flag = 0
                     burn_in_list_flag = 0
@@ -1163,84 +1177,98 @@ try:
                     last_profit_taking_check_time = t_now # 마지막 체크 시간 업데이트
                 # 익절 감시 로직 끝 -------------------------------------------------------------
 
-                # ✅ 변경: 딕셔너리의 (키, 값)을 순회하며 종목코드(sym)와 종목명(stock_name)을 가져옵니다.
-                for sym, stock_name in list(selected_symbols_map.items()):
-                    remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
-                    if remaining_buy_count > 1:
-                        if sym in bought_list:
-                            selected_symbols_map.pop(sym, None)
-                            continue
 
-                        # 🔁 k값 점진적 완화 로직 추가
+
+
+
+                if t_start < t_now < t_notbuy:  # AM 09:03 ~ PM 02:30 : 매수    
+
+
+
+
+
+                    # ✅ 변경: 딕셔너리의 (키, 값)을 순회하며 종목코드(sym)와 종목명(stock_name)을 가져옵니다.
+                    for sym, stock_name in list(selected_symbols_map.items()):
+                        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
                         if remaining_buy_count > 1:
-                            if t_now >= t_now.replace(**TARGET_K3_TIME):
-                                k = TARGET_K3
-                            elif t_now >= t_now.replace(**TARGET_K2_TIME):
-                                k = TARGET_K2
+                            if sym in bought_list:
+                                selected_symbols_map.pop(sym, None)
+                                continue
+
+                            # 🔁 k값 점진적 완화 로직 추가
+                            if remaining_buy_count > 1:
+                                if t_now >= t_now.replace(**TARGET_K3_TIME):
+                                    k = TARGET_K3
+                                elif t_now >= t_now.replace(**TARGET_K2_TIME):
+                                    k = TARGET_K2
+                                else:
+                                    k = TARGET_K1
                             else:
                                 k = TARGET_K1
-                        else:
-                            k = TARGET_K1
 
-                        target_price, open_price = get_price_info(sym, k, 0.03)
-                        #time.sleep(0.1)
-                        current_price = get_current_price(sym)
-                        if open_price is None or target_price is None or current_price is None: # 가격을 가져오지 못했으면 다음 종목으로 넘어감
-                            send_message(f"[{sym}] 가격 수신 실패. 다음 종목으로 넘어갑니다.")
-                            #time.sleep(1) # API 호출 빈도 조절
-                            continue 
+                            target_price, open_price = get_price_info(sym, k, 0.03)
+                            #time.sleep(0.1)
+                            current_price = get_current_price(sym)
+                            if open_price is None or target_price is None or current_price is None: # 가격을 가져오지 못했으면 다음 종목으로 넘어감
+                                send_message(f"[{sym}] 가격 수신 실패. 다음 종목으로 넘어갑니다.")
+                                #time.sleep(1) # API 호출 빈도 조절
+                                continue 
 
-                        # 갭상승 제외하고, 진짜 장중 돌파만 매수
-                        if open_price < target_price < current_price:
-                        # 갭상승(or NXT) 포함해서 target_price 돌파 매수
-                        #if target_price < current_price:
-                            # ✅ 변경: stock_name은 이미 for 루프에서 가져왔으므로 이 줄은 필요 없습니다.
-                            # stock_name = symbol_name_map.get(sym, "Unknown") 
+                            # 갭상승 제외하고, 진짜 장중 돌파만 매수
+                            if open_price < target_price < current_price:
+                            # 갭상승(or NXT) 포함해서 target_price 돌파 매수
+                            #if target_price < current_price:
+                                # ✅ 변경: stock_name은 이미 for 루프에서 가져왔으므로 이 줄은 필요 없습니다.
+                                # stock_name = symbol_name_map.get(sym, "Unknown") 
 
-                            # 돌파 조건은 만족했지만 슬리피지 체크
-                            if current_price > target_price * SLIPPAGE_LIMIT:
-                                # 슬리피지 횟수 기록
-                                if sym not in slippage_count:
-                                    slippage_count[sym] = 1
+                                # 돌파 조건은 만족했지만 슬리피지 체크
+                                if current_price > target_price * SLIPPAGE_LIMIT:
+                                    # 슬리피지 횟수 기록
+                                    if sym not in slippage_count:
+                                        slippage_count[sym] = 1
+                                    else:
+                                        slippage_count[sym] += 1
+                                    # 3회 이하까지는 무조건 출력
+                                    if slippage_count[sym] <= 3:
+                                        send_message(f"🔄 {stock_name}({sym}) 슬리피지 초과 {slippage_count[sym]}회 (현재가:{current_price:.2f} > 허용가:{target_price * SLIPPAGE_LIMIT:.2f})")
+                                    else:
+                                        # 마지막으로 출력한 시간이 10분 지났으면 다시 출력
+                                        last_log_time = slippage_last_logged.get(sym)
+                                        if last_log_time is None or (t_now - last_log_time).total_seconds() >= 600:
+                                            send_message(f"🔄 {stock_name}({sym}) 슬리피지 반복 초과 중... (현재가:{current_price:.2f} > 허용가:{target_price * SLIPPAGE_LIMIT:.2f})")
+                                            slippage_last_logged[sym] = t_now
+                                    continue  # 슬리피지 초과 종목은 매수하지 않음
                                 else:
-                                    slippage_count[sym] += 1
-                                # 3회 이하까지는 무조건 출력
-                                if slippage_count[sym] <= 3:
-                                    send_message(f"🔄 {stock_name}({sym}) 슬리피지 초과 {slippage_count[sym]}회 (현재가:{current_price:.2f} > 허용가:{target_price * SLIPPAGE_LIMIT:.2f})")
-                                else:
-                                    # 마지막으로 출력한 시간이 10분 지났으면 다시 출력
-                                    last_log_time = slippage_last_logged.get(sym)
-                                    if last_log_time is None or (t_now - last_log_time).total_seconds() >= 600:
-                                        send_message(f"🔄 {stock_name}({sym}) 슬리피지 반복 초과 중... (현재가:{current_price:.2f} > 허용가:{target_price * SLIPPAGE_LIMIT:.2f})")
-                                        slippage_last_logged[sym] = t_now
-                                continue  # 슬리피지 초과 종목은 매수하지 않음
-                            else:
-                                #buy_qty = 0  # 매수할 수량 초기화  
-                                total_cash = get_balance()
-                                buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
+                                    #buy_qty = 0  # 매수할 수량 초기화  
+                                    total_cash = get_balance()
+                                    buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
 
-                                # 종목별 주문 금액 완화 로직 추가
-                                if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-                                    buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
-                                elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-                                    buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
-                                else:
-                                    buy_amount = int(total_cash * buy_percent)
+                                    # 종목별 주문 금액 완화 로직 추가
+                                    if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
+                                        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
+                                    elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
+                                        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
+                                    else:
+                                        buy_amount = int(total_cash * buy_percent)
 
-                                #buy_qty = int(buy_amount // current_price)
-                                if buy_amount > 0:
-                                    send_message(f"📈 {stock_name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
-                                    send_message_main(f"📈 {stock_name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
-                                    result = safe_buy(sym, buy_amount, current_price)
-                                    if result:
-                                        soldout = False
-                                        time.sleep(0.1)
-                                        bought_list = []
-                                        stock_dict = get_stock_balance() # 보유 주식 조회
-                                        for sym in stock_dict.keys():
-                                            bought_list.append(sym)
-                        time.sleep(0.025)
-                time.sleep(0.025)
+                                    #buy_qty = int(buy_amount // current_price)
+                                    if buy_amount > 0:
+                                        send_message(f"📈 {stock_name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
+                                        send_message_main(f"📈 {stock_name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
+                                        result = safe_buy(sym, buy_amount, current_price)
+                                        if result:
+                                            soldout = False
+                                            time.sleep(0.1)
+                                            bought_list = []
+                                            stock_dict = get_stock_balance() # 보유 주식 조회
+                                            for sym in stock_dict.keys():
+                                                bought_list.append(sym)
+                            time.sleep(0.025)
+                    time.sleep(0.025)
+
+
+
+
 
                 # ✅ 10분마다 잔고 확인 (예: 09:15, 09:25, 09:35 ...), HTS에서 직접 매수/매도 종목 최신화
                 if (t_now - last_balance_check_time).total_seconds() >= 600:  # 1800초 = 30분
