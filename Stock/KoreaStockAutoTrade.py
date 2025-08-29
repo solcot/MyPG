@@ -634,7 +634,7 @@ def safe_buy(sym, buy_amount, current_price):
         ratio = base_ratio - (attempts * 0.03)
 
         safe_cash = int(min(buy_amount, max_cash) * ratio)
-        qty_to_buy = safe_cash // current_price
+        qty_to_buy = int(safe_cash // current_price)
 
         if qty_to_buy <= 0:
             send_message(f"⚠️ {sym} 매수 불가: (safe_cash {safe_cash}원, 현재가 {current_price}원), 매수풀에서 제거")
@@ -644,6 +644,13 @@ def safe_buy(sym, buy_amount, current_price):
         send_message(f"🟢 {sym} 주문시도({attempts+1}회차): 수량={qty_to_buy}, 단가={current_price}, 총액={qty_to_buy*current_price:,}원, 잔고={buy_amount:,}원")
         ok = buy(sym, qty_to_buy)
         if ok:
+            # ✅ 종목명 확보 & 중복 기록 방지
+            stock_name = (
+                selected_symbols_map.get(sym)
+                or (get_stock_balance().get(sym, {}).get('종목명') if callable(get_stock_balance) else None)
+                or "Unknown"
+            )
+            add_buy_record(sym, stock_name)
             return True
 
         # 실패 → 다음 루프에서 더 보수적으로 줄여서 재시도
@@ -679,6 +686,7 @@ def sell(code="005930", qty="1"):
     res = requests.post(URL, headers=headers, data=json.dumps(data))
     if res.json()['rt_cd'] == '0':
         send_message(f"[매도 성공]{str(res.json())}")
+        remove_sell_record(code)
         return True
     else:
         send_message(f"[매도 실패]{str(res.json())}")
@@ -833,6 +841,64 @@ def write_reload_setting(value):
 
 
 
+BUYDATE_FILE = "C:\\StockPy\\BuyDate.ini"
+
+def add_buy_record(sym, stock_name):
+    """매수 기록 추가 (이미 있으면 추가 안 함: 최초 매수일 유지)"""
+    today_str = datetime.now().strftime("%Y%m%d")
+    existed = False
+
+    if os.path.exists(BUYDATE_FILE):
+        with open(BUYDATE_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                parts = line.strip().split(maxsplit=2)  # ✅ 공백 포함 종목명 안전
+                if len(parts) >= 2 and parts[1] == sym:
+                    existed = True
+                    break
+
+    if not existed:
+        with open(BUYDATE_FILE, "a", encoding="utf-8") as f:
+            f.write(f"{today_str} {sym} {stock_name}\n")
+
+def remove_sell_record(sym):
+    """매도 시 해당 종목 기록 삭제"""
+    if not os.path.exists(BUYDATE_FILE):
+        return
+    with open(BUYDATE_FILE, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    with open(BUYDATE_FILE, "w", encoding="utf-8") as f:
+        for line in lines:
+            if not line.strip():
+                continue
+            parts = line.strip().split(maxsplit=2)  # ✅
+            if len(parts) >= 2 and parts[1] == sym:
+                continue
+            f.write(line)
+
+def get_old_symbols(days=5):
+    """
+    BUYDATE_FILE에서 days일 이상 보유한 종목 조회
+    """
+    old_symbols = []
+    six_days_ago = (datetime.now() - timedelta(days=days)).strftime("%Y%m%d")
+
+    if not os.path.exists(BUYDATE_FILE):
+        return old_symbols
+
+    with open(BUYDATE_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            parts = line.strip().split()
+            if len(parts) < 3:
+                continue
+            buy_date = parts[0]
+            symbol = parts[1]
+            stock_name = " ".join(parts[2:])  # 띄어쓰기 있는 종목명 합치기
+            if buy_date <= six_days_ago:
+                old_symbols.append((symbol, stock_name))
+
+    return old_symbols
 #***********************************************************************************************************
 # 자동매매 시작
 try:
@@ -841,6 +907,9 @@ try:
     # --- ✨ 메인 자동매매 루프 시작 ✨ ---
     # 외부 루프: 설정 재로드를 위해 전체 로직을 감쌈
     while True:
+        # 루프 시작 직후 추가
+        old_sell_done = False  # 5일 이상 보유 종목 매도 플래그
+
         # --- 설정 파일에서 값 로드 ---------------------------------------------------------------------------------------------
         settings = load_settings()
 
@@ -948,6 +1017,7 @@ try:
         t_start = t_now.replace(**T_START_TIME)
 
         t_notbuy = t_now.replace(hour=14, minute=30, second=0,microsecond=0)
+        t_oldstocksell = t_now.replace(hour=15, minute=0, second=0, microsecond=0)
         t_notstoploss = t_now.replace(hour=15, minute=10, second=0,microsecond=0)
 
         t_sell = t_now.replace(**T_SELL_TIME)
@@ -1181,7 +1251,7 @@ try:
 
 
 
-                if t_start < t_now < t_notbuy:  # AM 09:03 ~ PM 02:30 : 매수    
+                if t_start < t_now < t_notbuy:  # AM 09:03 ~ PM 02:30 : 매수, 이시간 이후에는 매수금지 
 
 
 
@@ -1307,6 +1377,27 @@ try:
                     last_balance_check_time = t_now
 
                 #send_message("루프 끝..................") #루프 시간 측정용
+
+            #5일이상된주식매도 # 루프 내부, t_sell < t_now < t_exit 직전에 추가
+            #5일이상된주식매도 if not old_sell_done and t_now >= t_oldstocksell:
+            #5일이상된주식매도     old_syms = get_old_symbols(days=5)
+            #5일이상된주식매도     if old_syms:
+            #5일이상된주식매도         send_message(f"⏰ 5일 이상 보유 종목 매도 실행: {len(old_syms)}개")
+            #5일이상된주식매도         send_message_main(f"⏰ 5일 이상 보유 종목 매도 실행: {len(old_syms)}개")
+            #5일이상된주식매도         for sym, stock_name in old_syms:
+            #5일이상된주식매도             qty = stock_dict.get(sym, {}).get('현재수량', 0)
+            #5일이상된주식매도             if qty and int(qty) > 0:
+            #5일이상된주식매도                 result = sell(sym, qty)
+            #5일이상된주식매도                 time.sleep(1)
+            #5일이상된주식매도                 if result:
+            #5일이상된주식매도                     send_message(f"📉 {stock_name}({sym}) 보유 5일 경과 → 전량 매도 완료")
+            #5일이상된주식매도                     send_message_main(f"📉 {stock_name}({sym}) 보유 5일 경과 → 전량 매도 완료")
+            #5일이상된주식매도     # ✅ 매도 직후 보유 최신화
+            #5일이상된주식매도     bought_list = []
+            #5일이상된주식매도     stock_dict = get_stock_balance() # 보유 주식 조회
+            #5일이상된주식매도     for sym in stock_dict.keys():
+            #5일이상된주식매도         bought_list.append(sym)
+            #5일이상된주식매도     old_sell_done = True
 
             if t_sell < t_now < t_exit:  # PM 02:58 ~ PM 03:03 : 일괄 매도
                 if soldout == False:
