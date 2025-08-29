@@ -78,7 +78,7 @@ def fetch_krx_data(mktId, trade_date):
 
 def get_all_symbols():
     #trade_date = get_last_trading_day()
-    trade_date = '20250821'
+    trade_date = '20250827'
 
     #send_message(f"✅ 최종 거래일은 {trade_date} 입니다.")
     #send_message_main(f"✅ 최종 거래일은 {trade_date} 입니다.")
@@ -126,9 +126,6 @@ def get_all_symbols():
     # 거래대금 단위가 억/천 단위일 수 있으므로 조정 확인 필요
     print("\n✅ 거래대금 단위 확인 (상위 5개):")
     print(df['거래대금'].head(5))
-
-    # 변동폭 비율 계산
-    df['전일변동폭비율'] = (df['고가'] - df['저가']) / df['저가']
 
     ##📌 [A] 장기 투자용 필터 (우량 + 성장성)
     ##목적: 장기 보유, 분할 매수, 저평가/성장 기업 탐색
@@ -239,61 +236,69 @@ def get_all_symbols():
     #+++     (df['전일변동폭비율'] <= 0.20)    # 전일 변동폭이 20% 이하 (지나치게 과열된 종목 제외)
     #+++ ].copy()
 
-    # [1번계좌] 미니주
+    #!!! # [1번계좌] 미니주
+    #!!! filtered = df[
+    #!!!     (df['등락률'] >= 0.5) &          # -3~7 등락률 범위를 소폭 확장하여 더 많은 잠재 후보군을 포함
+    #!!!     (df['등락률'] <= 3.5) &
+    #!!!     #(df['종가'] >= 100) &          # 동전주를 회피하는 최소 가격
+    #!!!     (df['시가총액'] >= 1e9) &      # 시가총액 10억 이상 (너무 작은 종목 제외)
+    #!!!     (df['시가총액'] < 10e10) &       # 시가총액 1천억 이하 (너무 무거운 대형주 제외, 중소형주 집중)
+    #!!!     (df['거래대금'] >= 17e8)         # 거래대금 17억 이상 (최소한의 유동성 확보)
+    #!!!     #(df['전일변동폭비율'] >= 0.03) &   # 전일 변동폭이 최소 5% 이상인 종목
+    #!!!     #(df['전일변동폭비율'] <= 0.20)    # 전일 변동폭이 20% 이하 (지나치게 과열된 종목 제외)
+    #!!! ].copy()
+
+    #*** # [1번계좌] 중형주
+    #*** filtered = df[
+    #***     (df['등락률'] >= 0.5) &          # -3~7 등락률 범위를 소폭 확장하여 더 많은 잠재 후보군을 포함
+    #***     (df['등락률'] <= 1.5) &
+    #***     #(df['종가'] >= 100) &          # 동전주를 회피하는 최소 가격
+    #***     (df['시가총액'] >= 50e10) &      # 시가총액 5천억 이상 (너무 작은 종목 제외)
+    #***     (df['시가총액'] < 200e10) &       # 시가총액 2조 이하 (너무 무거운 대형주 제외, 중소형주 집중)
+    #***     (df['거래대금'] >= 70e8)         # 거래대금 70억 이상 (최소한의 유동성 확보)
+    #***     #(df['전일변동폭비율'] >= 0.03) &   # 전일 변동폭이 최소 5% 이상인 종목
+    #***     #(df['전일변동폭비율'] <= 0.20)    # 전일 변동폭이 20% 이하 (지나치게 과열된 종목 제외)
+    #*** ].copy()
+
+    # 추가 컬럼 계산
+    #df['전일변동폭비율'] = (df['고가'] - df['저가']) / df['저가']
+    df['금일등락률'] = (df['종가'] - df['시가']) / df['종가'] * 100
+
+    # [1번계좌] 중소형주
     filtered = df[
-        (df['등락률'] >= 0.2) &          # -3~7 등락률 범위를 소폭 확장하여 더 많은 잠재 후보군을 포함
-        (df['등락률'] <= 12) &
-        (df['종가'] >= 100) &          # 동전주를 회피하는 최소 가격
-        (df['시가총액'] >= 1e9) &      # 시가총액 10억 이상 (너무 작은 종목 제외)
-        (df['시가총액'] < 3e10) &       # 시가총액 300억 이하 (너무 무거운 대형주 제외, 중소형주 집중)
-        (df['거래대금'] >= 1e8) &        # 거래대금 5천 이상 (최소한의 유동성 확보)
-        (df['전일변동폭비율'] >= 0.03) &   # 전일 변동폭이 최소 5% 이상인 종목
-        (df['전일변동폭비율'] <= 0.20)    # 전일 변동폭이 20% 이하 (지나치게 과열된 종목 제외)
+        (df['금일등락률'] >= 0.5) &          # -3~7 등락률 범위를 소폭 확장하여 더 많은 잠재 후보군을 포함
+        (df['금일등락률'] <= 1.5) &
+        (df['종가'] <= 300000) &          # 동전주를 회피하는 최소 가격
+        #(df['시가총액'] >= 50e10) &      # 시가총액 5천억 이상 (너무 작은 종목 제외)
+        (df['시가총액'] < 200e10)        # 시가총액 2조 이하 (너무 무거운 대형주 제외, 중소형주 집중)
+        #(df['거래대금'] >= 67e8)         # 거래대금 67억 이상 (최소한의 유동성 확보)
+        #(df['전일변동폭비율'] >= 0.03) &   # 전일 변동폭이 최소 5% 이상인 종목
+        #(df['전일변동폭비율'] <= 0.20)    # 전일 변동폭이 20% 이하 (지나치게 과열된 종목 제외)
     ].copy()
-    
-    #print(f"\n✅ 조건 만족 종목 수: {len(filtered)}")
-    #print("\n✅ 조건 만족 상위 10개 샘플:")
-    #print(filtered[['종목명', '종목코드', '종가', '등락률', '시가총액', '거래대금']].head(10))
-    #
-    ## 종목코드 리스트 생성
-    #symbols = filtered['종목코드'].astype(str).str.zfill(6).tolist()
-    #random.shuffle(symbols)
 
-    #print("\n✅ 예시 종목코드:", symbols[:5])
-    #return symbols
-
-    # 기존 필터 이후 추가
-    #filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금']   # 전일에 가격도 크게 움직이고, 돈도 많이 몰린 종목을 추리기 위해
-    #filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금'] * (1 + filtered['등락률'] / 100)
-    #filtered['점수'] = filtered['전일변동폭비율'] * filtered['거래대금'] * (1 + max(0, filtered['등락률'] / 100)) # 음수 등락률은 1로 고정, 하락 종목의 점수 감소 최소화
+    top_filtered = filtered.sort_values(by='거래대금', ascending=False).head(15)
 
     # 안정성 점수 계산 (기존 공격적 점수 대신)
-    filtered['안정성점수'] = (
-        filtered['시가총액'] * 0.3 +  # 시총 가중치
-        filtered['거래대금'] * 0.3 +   # 유동성 가중치  
-        (1 / (abs(filtered['등락률']) + 1)) * filtered['거래대금'] * 0.4  # 안정성 가중치
+    top_filtered['안정성점수'] = (
+        top_filtered['시가총액'] * 0.3 +  # 시총 가중치
+        top_filtered['거래대금'] * 0.3 +   # 유동성 가중치  
+        (1 / (abs(top_filtered['금일등락률']) + 1)) * top_filtered['거래대금'] * 0.4  # 안정성 가중치
     )
-    
-    # 점수 기준 정렬 → 상위 30개 추출
-    #top_filtered = filtered.sort_values(by='점수', ascending=False).head(150)
-    #top_filtered = filtered.sort_values(by='점수', ascending=False)
-    top_filtered = filtered.sort_values(by='안정성점수', ascending=False)
+  
+    return_filtered = top_filtered.sort_values(by='안정성점수', ascending=False)
 
-    #send_message(f"✅ 최종 선정 종목 수: {len(top_filtered)}")
-    #send_message_main(f"✅ 최종 선정 종목 수: {len(top_filtered)}")
-    print(f"\n✅ 최종 선정 종목 수: {len(top_filtered)}")
+    print(f"\n✅ 최종 선정 종목 수: {len(return_filtered)}")
     print("\n✅ 상위 점수 종목 샘플:")
-    #print(top_filtered[['종목명', '종목코드', '종가', '전일변동폭비율', '거래대금', '점수']].head(10))
-    #pd.set_option('display.max_rows', None)      # 모든 행 출력
-    #pd.set_option('display.max_columns', None)   # 모든 열 출력
-    print(top_filtered)
+    print(return_filtered)
 
-    # 종목코드 리스트 생성 (정렬 순서 유지)
-    symbols = top_filtered['종목코드'].astype(str).str.zfill(6).tolist()
-    print(f"\n✅ 최종 선정 종목코드 수: {len(symbols)}")
-    print("\n✅ 예시 종목코드:", symbols)
+    # **여기부터 변경 시작:** 종목코드를 키로, 종목명을 값으로 하는 딕셔너리 생성
+    symbols_name_dict = {} # 새로운 딕셔너리 생성
+    for _, row in return_filtered.iterrows():
+        symbol = str(row['종목코드']).zfill(6) # 종목코드를 가져와 6자리 문자열로 만듭니다.
+        name = row['종목명'] # 종목명을 가져옵니다.
+        symbols_name_dict[symbol] = name # 딕셔너리에 '종목코드': '종목명' 형태로 저장합니다.
 
-    return symbols
+    return symbols_name_dict # **변경 끝:** 이 딕셔너리를 반환합니다.
 
 if __name__ == "__main__":
     symbols = get_all_symbols()
