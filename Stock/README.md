@@ -7,6 +7,8 @@ pip install html5lib
 pip install beautifulsoup4
 pip install holidayskr
 
+🚀 : “출발!”, “시작!” 느낌
+
 📉 하락/손실/경고
 📉 🔻 🚨 ❌ 🛑
 
