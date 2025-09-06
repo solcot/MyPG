@@ -94,7 +94,7 @@ def fetch_krx_data(mktId, trade_date):
         'User-Agent': 'Mozilla/5.0'
     }
 
-    send_message(f"OTP 코드 생성 요청 중... 시장: {mktId}, 날짜: {trade_date}")
+    #send_message(f"OTP 코드 생성 요청 중... 시장: {mktId}, 날짜: {trade_date}")
     otp_response = requests.post(otp_url, data=otp_form_data, headers=headers)
     if otp_response.status_code != 200:
         send_message(f"OTP 요청 실패: 상태 코드 {otp_response.status_code}")
@@ -102,7 +102,7 @@ def fetch_krx_data(mktId, trade_date):
         return None
     otp_code = otp_response.text
 
-    send_message(f"CSV 파일 다운로드 중... 시장: {mktId}")
+    #send_message(f"CSV 파일 다운로드 중... 시장: {mktId}")
     csv_url = 'http://data.krx.co.kr/comm/fileDn/download_csv/download.cmd'
     csv_response = requests.post(csv_url, data={'code': otp_code}, headers=headers)
     if csv_response.status_code != 200:
@@ -119,8 +119,8 @@ def fetch_krx_data(mktId, trade_date):
 
 def get_all_symbols(p_pool_count=15):
     trade_date = get_last_trading_day()
-    send_message(f"✅ 최종 거래일은 {trade_date} 입니다.")
-    send_message_main(f"✅ 최종 거래일은 {trade_date} 입니다.")
+    send_message(f"✅ 매수Pool(symbol) 수신 거래일은 {trade_date} 입니다.")
+    send_message_main(f"✅ 매수Pool(symbol) 수신 거래일은 {trade_date} 입니다.")
 
     df_kospi = fetch_krx_data('STK', trade_date)
     df_kosdaq = fetch_krx_data('KSQ', trade_date)
@@ -170,27 +170,32 @@ def get_all_symbols(p_pool_count=15):
     )
 
     #*************************************************************************************************************
-    # [1번계좌] 중소형주 + 윗꼬리 필터
+    # [1번계좌] 소형주
     filtered = df[
-        (df['금일등락률'] >= 0.5) &
-        (df['금일등락률'] <= 1.5) &
-        (df['종가'] <= 300000) &
-        (df['시가총액'] < 200e10) &
+        (df['금일등락률'] >= 0.3) &          # -3~7 등락률 범위를 소폭 확장하여 더 많은 잠재 후보군을 포함
+        (df['금일등락률'] <= 3.0) &
+        (df['종가'] <= 300000) &          # 동전주를 회피하는 최소 가격
+        #(df['시가총액'] >= 50e10) &      # 시가총액 5천억 이상 (너무 작은 종목 제외)
+        (df['시가총액'] < 50e10) &        # 시가총액 2조 이하 (너무 무거운 대형주 제외, 중소형주 집중)
+        #(df['거래대금'] >= 67e8)         # 거래대금 67억 이상 (최소한의 유동성 확보)
+        #(df['전일변동폭비율'] >= 0.03) &   # 전일 변동폭이 최소 5% 이상인 종목
+        #(df['전일변동폭비율'] <= 0.20)    # 전일 변동폭이 20% 이하 (지나치게 과열된 종목 제외)
         #(df['윗꼬리비율'] < 1.5)     # 윗꼬리/바디 비율이 1.5 미만인 종목만
-        (df['아래꼬리'] >= df['윗꼬리'] * 1.3)     # 아래꼬리가 윗꼬리+윗꼬리의30% 보다 큰 종목만 포함
+        (df['아래꼬리'] >= df['윗꼬리'] * 1.1)     # 아래꼬리가 윗꼬리+윗꼬리의30% 보다 큰 종목만 포함
     ].copy()
     #*************************************************************************************************************
 
     top_filtered = filtered.sort_values(by='거래대금', ascending=False).head(p_pool_count)
 
-    # 안정성 점수 계산
-    top_filtered['안정성점수'] = (
-        top_filtered['시가총액'] * 0.3 +
-        top_filtered['거래대금'] * 0.3 +
-        (1 / (abs(top_filtered['금일등락률']) + 1)) * top_filtered['거래대금'] * 0.4
-    )
-
-    return_filtered = top_filtered.sort_values(by='안정성점수', ascending=False)
+    #--- # 안정성 점수 계산
+    #--- top_filtered['안정성점수'] = (
+    #---     top_filtered['시가총액'] * 0.3 +
+    #---     top_filtered['거래대금'] * 0.3 +
+    #---     (1 / (abs(top_filtered['금일등락률']) + 1)) * top_filtered['거래대금'] * 0.4
+    #--- )
+    #--- 
+    #--- return_filtered = top_filtered.sort_values(by='안정성점수', ascending=False)
+    return_filtered = top_filtered
 
     send_message(f"✅ 최종 선정 종목 수: {len(return_filtered)}")
     send_message_main(f"✅ 최종 선정 종목 수: {len(return_filtered)}")
@@ -422,11 +427,13 @@ def get_price_info(code="005930", k_base=0.5, gap_threshold=0.03):
             send_message(f"[{code}] 일봉 데이터 부족 또는 없음.")
             return None, None
 
+        # 1. 필요한 가격들 정의
         # 오늘 시가
         open_price = int(output[0]['stck_oprc'])
-        # 전일 종가
+        stock_name = output[0].get('hts_kor_isnm', '')  # 종목명 추가
+        # 전일 시가/종가/고가/저가
+        prev_open  = int(output[1]['stck_oprc'])
         prev_close = int(output[1]['stck_clpr'])
-        # 전일 고가/저가
         prev_high  = int(output[1]['stck_hgpr'])
         prev_low   = int(output[1]['stck_lwpr'])
 
@@ -436,13 +443,24 @@ def get_price_info(code="005930", k_base=0.5, gap_threshold=0.03):
         target_price = int(open_price + kplusvalue)
 
         # -------------------------------
-        # 📌 갭 하락 필터 (전일 종가 대비 % 기준)
+        # 📌 갭 하락/갭 상승 필터 (전일 종가 대비 % 기준)
         # -------------------------------
         gap_rate = (open_price - prev_close) / prev_close
+
+        # 갭 하락
         if gap_rate <= -gap_threshold:
-            send_message(f"[{code}] 갭하락 {gap_rate*100:.2f}% 발생 -> 매수풀에서 제거")
-            send_message_main(f"[{code}] 갭하락 {gap_rate*100:.2f}% 발생 -> 매수풀에서 제거")
-            selected_symbols_map.pop(code, None)            
+            msg = f"[{code}] {stock_name} 갭하락 {gap_rate*100:.2f}% 발생 -> 매수풀에서 제거"
+            send_message(msg)
+            send_message_main(msg)
+            selected_symbols_map.pop(code, None)
+            return None, None
+
+        # 갭 상승
+        if gap_rate >= gap_threshold:
+            msg = f"[{code}] {stock_name} 갭상승 {gap_rate*100:.2f}% 발생 -> 매수풀에서 제거"
+            send_message(msg)
+            send_message_main(msg)
+            selected_symbols_map.pop(code, None)
             return None, None
 
         return target_price, open_price
@@ -458,6 +476,30 @@ def get_price_info(code="005930", k_base=0.5, gap_threshold=0.03):
     except Exception as e:
         send_message(f"[{code}] 예상치 못한 오류: {e}")
         return None, None
+
+def format_krw(val):
+    """숫자(또는 숫자 문자열)를 천 단위 콤마로 포맷하여 문자열 반환.
+       숫자가 아니면 'N/A' 반환 (단위은 함수에서 붙임)."""
+    if val is None:
+        return "N/A"
+    # 문자열이면 쉼표/공백 제거 후 숫자 변환 시도
+    try:
+        if isinstance(val, str):
+            s = val.strip()
+            if s == "":
+                return "N/A"
+            s = s.replace(",", "")         # "1,000" 같은 경우 제거
+            num = float(s)
+        else:
+            num = float(val)
+    except Exception:
+        return "N/A"
+
+    # 정수이면 정수 형태로 포맷, 아니면 소수 2자리로 포맷 (필요하면 조정)
+    if num.is_integer():
+        return f"{int(num):,}원"
+    else:
+        return f"{num:,.2f}원"
 
 def get_stock_balance():
     """주식 잔고조회"""
@@ -527,13 +569,17 @@ def get_stock_balance():
         send_message("📋 현재 보유 주식은 없습니다.")
 
     if evaluation:
-        send_message(f"💰 주식 평가 금액: {evaluation[0].get('scts_evlu_amt', 'N/A')}원")
-        send_message(f"💰 평가 손익 합계: {evaluation[0].get('evlu_pfls_smtl_amt', 'N/A')}원")
-        send_message_main(f"💰 평가 손익 합계: {evaluation[0].get('evlu_pfls_smtl_amt', 'N/A')}원")
-        send_message(f"💰 총 평가 금액: {evaluation[0].get('tot_evlu_amt', 'N/A')}원")
+        scts = evaluation[0].get('scts_evlu_amt')   # 기본값으로 'N/A' 넣지 않기
+        evlu = evaluation[0].get('evlu_pfls_smtl_amt')
+        tot  = evaluation[0].get('tot_evlu_amt')
+
+        send_message(f"💰 주식 평가 금액: {format_krw(scts)}")
+        send_message(f"💰 평가 손익 합계: {format_krw(evlu)}")
+        send_message_main(f"💰 평가 손익 합계: {format_krw(evlu)}")
+        send_message(f"💰 총 평가 금액: {format_krw(tot)}")
     else:
         send_message("평가 정보가 없습니다.")
-    send_message(f"=================")
+    send_message("=================")
 
     return stock_dict
 
@@ -662,8 +708,13 @@ def safe_buy(sym, buy_amount, current_price):
     selected_symbols_map.pop(sym, None)
     return False
 
-def sell(code="005930", qty="1"):
-    """주식 시장가 매도"""
+def sell(code="005930", qty="1", stock_dict_cache=None, div="모름"):
+    """주식 시장가 매도 (매도 전 보유정보 스냅샷 → 매도 후 기록)"""
+    # ✅ 1) 매도 직전 스냅샷 확보
+    pos = get_position_snapshot(code, stock_dict_cache=stock_dict_cache)
+    pre_buy_price = pos['매수가']
+    pre_stock_name = pos['종목명']
+
     PATH = "uapi/domestic-stock/v1/trading/order-cash"
     URL = f"{URL_BASE}/{PATH}"
     data = {
@@ -685,8 +736,23 @@ def sell(code="005930", qty="1"):
 
     time.sleep(0.05)
     res = requests.post(URL, headers=headers, data=json.dumps(data))
-    if res.json()['rt_cd'] == '0':
+    if res.json().get('rt_cd') == '0':
         send_message(f"[매도 성공]{str(res.json())}")
+
+        # ✅ 2) 체결단가는 주문응답에 정확히 없으니, 기존대로 현재가로 기록 (원하면 체결조회 API로 대체 가능)
+        sell_price = get_current_price(code) or 0
+
+        # ✅ 3) 매도 이력 기록 (스냅샷 사용)
+        write_sell_history(
+            code=code,
+            qty=qty,
+            sell_price=sell_price,
+            buy_price=pre_buy_price,
+            stock_name=pre_stock_name,
+            div=div
+        )
+
+        # ✅ 4) BuyDate.ini 에서 제거
         remove_sell_record(code)
         return True
     else:
@@ -843,7 +909,101 @@ def write_reload_setting(value):
 
 
 BUYDATE_FILE = "C:\\StockPy\\BuyDate.ini"
+SELLHISTORY_FILE = "C:\\StockPy\\SellHistory.ini"
 
+def get_position_snapshot(code, stock_dict_cache=None):
+    """
+    매도 전에 보유정보 스냅샷을 확보.
+    - stock_dict_cache 가 있으면 그걸 우선 사용(루프에서 이미 조회한 최신 보유목록 전달)
+    - 없으면 get_stock_balance()로 조회
+    """
+    stock_dict = stock_dict_cache if stock_dict_cache is not None else get_stock_balance()
+    info = stock_dict.get(code, {}) if isinstance(stock_dict, dict) else {}
+
+    # 키 명 보호적으로 처리 (환경 따라 '평균단가' 등일 수 있어 백업 키도 확인)
+    buy_price = (
+        info.get('매수가')
+        or info.get('평균단가')
+        or info.get('매입단가')
+        or 0
+    )
+    stock_name = (
+        info.get('종목명')
+        or (selected_symbols_map.get(code) if 'selected_symbols_map' in globals() else None)
+        or "Unknown"
+    )
+    hold_qty = info.get('현재수량') or info.get('보유수량') or 0
+
+    # 정수/문자 혼합 안전 처리
+    try:
+        buy_price = int(buy_price)
+    except Exception:
+        buy_price = 0
+    try:
+        hold_qty = int(hold_qty)
+    except Exception:
+        hold_qty = 0
+
+    return {
+        '종목명': stock_name,
+        '매수가': buy_price,
+        '현재수량': hold_qty,
+    }
+
+def write_sell_history(code, qty, sell_price, buy_price, stock_name, div):
+    """
+    매도 이력 기록 (사전에 캡처한 보유정보를 인자로 받음)
+    매수일/매도일/보유일 + 기존 항목 기록
+    """
+    today_str = datetime.now().strftime("%Y%m%d")  # 매도일
+    
+    # ✅ BuyDate.ini 에서 매수일 찾기
+    buy_date_str = None
+    if os.path.exists(BUYDATE_FILE):
+        with open(BUYDATE_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                parts = line.strip().split(maxsplit=2)
+                if len(parts) >= 2 and parts[1] == code:
+                    buy_date_str = parts[0]  # 첫 번째 컬럼이 매수일
+                    break
+
+    # 매수일이 없으면 오늘로 처리
+    if not buy_date_str:
+        buy_date_str = "20200101"
+
+    # ✅ 보유일 계산 (매도일 - 매수일)
+    try:
+        d_buy = datetime.strptime(buy_date_str, "%Y%m%d")
+        d_sell = datetime.strptime(today_str, "%Y%m%d")
+        hold_days = (d_sell - d_buy).days
+    except Exception:
+        hold_days = 0
+
+    try:
+        qty = int(qty)
+    except Exception:
+        qty = 0
+    try:
+        sell_price = int(sell_price) if sell_price is not None else 0
+    except Exception:
+        sell_price = 0
+    try:
+        buy_price = int(buy_price) if buy_price is not None else 0
+    except Exception:
+        buy_price = 0
+
+    buy_total = buy_price * qty
+    sell_total = sell_price * qty
+    profit_rate = ( (sell_price / buy_price - 1) * 100 ) if buy_price > 0 else 0.0
+    profit_amt = sell_total - buy_total
+
+    # ✅ 매도 로그 기록: [매수일 매도일 보유일 ... 기존 항목]
+    with open(SELLHISTORY_FILE, "a", encoding="utf-8") as f:
+        f.write(
+            f"{buy_date_str} {today_str} {hold_days} {code} {qty:,} {buy_price:,} {buy_total:,} "
+            f"{sell_price:,} {sell_total:,} {profit_amt:,} {profit_rate:.2f}% {div} {stock_name}\n"
+        )
+        
 def add_buy_record(sym, stock_name):
     """매수 기록 추가 (이미 있으면 추가 안 함: 최초 매수일 유지)"""
     today_str = datetime.now().strftime("%Y%m%d")
@@ -903,6 +1063,10 @@ def get_old_symbols(days=5):
 #***********************************************************************************************************
 # 자동매매 시작
 try:
+    msg = f"🚀🚀🚀🚀🚀🚀🚀 StockPy 자동매매 시작"
+    send_message(msg)
+    send_message_main(msg)
+
     ACCESS_TOKEN = get_access_token()
 
     # --- ✨ 메인 자동매매 루프 시작 ✨ ---
@@ -1007,7 +1171,7 @@ try:
             for sym in stock_dict
         ))
         ACCOUNT_AMT = total_cash + total_buy_value  # 초기 계좌 금액 설정
-        send_message(f"📋 프로그램 시작: ACCOUNT_AMT = {ACCOUNT_AMT:,}원 (현금: {total_cash:,}원, 주식구매가격: {total_buy_value:,}원)")
+        #send_message(f"📋 프로그램 시작: ACCOUNT_AMT = {ACCOUNT_AMT:,}원 (현금: {total_cash:,}원, 주식구매가격: {total_buy_value:,}원)")
         for sym in stock_dict.keys():
             bought_list.append(sym)
 
@@ -1089,7 +1253,7 @@ try:
                 #~~~ for sym, details in stock_dict.items():
                 #~~~     qty = details.get('현재수량', '0') # '현재수량'을 추출하여 qty에 할당
                 #~~~     if int(qty) > 0: # 수량이 0보다 큰 경우에만 매도 실행
-                #~~~         sell(sym, qty)
+                #~~~         sell(sym, qty, stock_dict_cache=stock_dict, div="장시작")  # ← 캐시 전달
                 soldout = True
                 #~~~ bought_list = []
                 #~~~ time.sleep(0.1)
@@ -1101,9 +1265,9 @@ try:
 
                 # 손절 감시 로직 -------------------------------------------------------  
                 if t_notstoploss < t_now < t_sell:  # PM 03:10 ~ PM 03:23 : BREAK_EVEN_PCT 조정
-                    STOP_LOSE_PCT = -30.0
+                    STOP_LOSE_PCT = -3000.0
                     STOP_TRAILING_REBOUND = 1.0
-                    STOP_ABS_LOSE_PCT = -50.0
+                    STOP_ABS_LOSE_PCT = -5000.0
                 if (t_now - last_stop_loss_check_time).total_seconds() >= 15: # 15초마다 체크
                     if STOP_LOSE_PCT < 0:
                         stopped = check_trailing_stop_loss(
@@ -1117,7 +1281,7 @@ try:
                             for sym in stopped:
                                 qty = stock_dict.get(sym, {}).get('현재수량', 0)
                                 if qty > 0:
-                                    result = sell(sym, qty)
+                                    result = sell(sym, qty, stock_dict_cache=stock_dict, div="손절")  # ← 캐시 전달
                                     if result:
                                         if sym in bought_list:
                                             bought_list.remove(sym)
@@ -1157,13 +1321,13 @@ try:
                 # 익절 감시 로직 -----------------------------------------------------------                
                 if t_notbuy < t_now < t_sell:  # PM 02:30 ~ PM 03:23 : BREAK_EVEN_PCT 조정
                     BREAK_EVEN_PCT1 = 3.0
-                    BREAK_EVEN_LOSE_PCT1 = 1.0
+                    BREAK_EVEN_LOSE_PCT1 = 0.3
                     BREAK_EVEN_PCT2 = 5.0
-                    BREAK_EVEN_LOSE_PCT2 = 1.0
+                    BREAK_EVEN_LOSE_PCT2 = 0.3
                     BREAK_EVEN_PCT3 = 7.0
-                    BREAK_EVEN_LOSE_PCT3 = 1.0
+                    BREAK_EVEN_LOSE_PCT3 = 0.3
                     TAKE_PROFIT_PCT = 9.0
-                    TAKE_PROFIT_LOSE_PCT = 1.0
+                    TAKE_PROFIT_LOSE_PCT = 0.3
                 if (t_now - last_profit_taking_check_time).total_seconds() >= 15: # 15초마다 체크
                     profited_flag = 0
                     burn_in_list_flag = 0
@@ -1185,7 +1349,7 @@ try:
                             for sym in profited:
                                 qty = stock_dict.get(sym, {}).get('현재수량', 0)
                                 if qty > 0:
-                                    result = sell(sym, qty)
+                                    result = sell(sym, qty, stock_dict_cache=stock_dict, div="익절")  # ← 캐시 전달
                                     if result:
                                         if sym in bought_list:
                                             bought_list.remove(sym)
@@ -1281,7 +1445,7 @@ try:
                             #time.sleep(0.1)
                             current_price = get_current_price(sym)
                             if open_price is None or target_price is None or current_price is None: # 가격을 가져오지 못했으면 다음 종목으로 넘어감
-                                send_message(f"[{sym}] 가격 수신 실패. 다음 종목으로 넘어갑니다.")
+                                send_message(f"[{sym}] 갭상승/갭하락/가격수신실패. 다음 종목으로 넘어갑니다.")
                                 #time.sleep(1) # API 호출 빈도 조절
                                 continue 
 
@@ -1369,7 +1533,7 @@ try:
                             #~~~ for sym, details in stock_dict.items():
                             #~~~     qty = details.get('현재수량', '0')
                             #~~~     if int(qty) > 0:
-                            #~~~         sell(sym, qty)
+                            #~~~         sell(sym, qty, stock_dict_cache=stock_dict, div="손실한도초과")  # ← 캐시 전달
                             #~~~         time.sleep(1)
                             soldout = True
                             #~~~ bought_list = []
@@ -1379,26 +1543,26 @@ try:
 
                 #send_message("루프 끝..................") #루프 시간 측정용
 
-            #5일이상된주식매도 # 루프 내부, t_sell < t_now < t_exit 직전에 추가
-            #5일이상된주식매도 if not old_sell_done and t_now >= t_oldstocksell:
-            #5일이상된주식매도     old_syms = get_old_symbols(days=5)
-            #5일이상된주식매도     if old_syms:
-            #5일이상된주식매도         send_message(f"⏰ 5일 이상 보유 종목 매도 실행: {len(old_syms)}개")
-            #5일이상된주식매도         send_message_main(f"⏰ 5일 이상 보유 종목 매도 실행: {len(old_syms)}개")
-            #5일이상된주식매도         for sym, stock_name in old_syms:
-            #5일이상된주식매도             qty = stock_dict.get(sym, {}).get('현재수량', 0)
-            #5일이상된주식매도             if qty and int(qty) > 0:
-            #5일이상된주식매도                 result = sell(sym, qty)
-            #5일이상된주식매도                 time.sleep(1)
-            #5일이상된주식매도                 if result:
-            #5일이상된주식매도                     send_message(f"📉 {stock_name}({sym}) 보유 5일 경과 → 전량 매도 완료")
-            #5일이상된주식매도                     send_message_main(f"📉 {stock_name}({sym}) 보유 5일 경과 → 전량 매도 완료")
-            #5일이상된주식매도     # ✅ 매도 직후 보유 최신화
-            #5일이상된주식매도     bought_list = []
-            #5일이상된주식매도     stock_dict = get_stock_balance() # 보유 주식 조회
-            #5일이상된주식매도     for sym in stock_dict.keys():
-            #5일이상된주식매도         bought_list.append(sym)
-            #5일이상된주식매도     old_sell_done = True
+            # 루프 내부, t_sell < t_now < t_exit 직전에 추가
+            if not old_sell_done and t_oldstocksell < t_now < t_sell:
+                old_syms = get_old_symbols(days=31)
+                if old_syms:
+                    send_message(f"⏰ 31일 이상 보유 종목 매도 실행: {len(old_syms)}개")
+                    send_message_main(f"⏰ 31일 이상 보유 종목 매도 실행: {len(old_syms)}개")
+                    for sym, stock_name in old_syms:
+                        qty = stock_dict.get(sym, {}).get('현재수량', 0)
+                        if qty and int(qty) > 0:
+                            result = sell(sym, qty, stock_dict_cache=stock_dict, div="보유기간초과")  # ← 캐시 전달
+                            time.sleep(1)
+                            if result:
+                                send_message(f"📉 {stock_name}({sym}) 보유 31일 경과 → 전량 매도 완료")
+                                send_message_main(f"📉 {stock_name}({sym}) 보유 31일 경과 → 전량 매도 완료")
+                # ✅ 매도 직후 보유 최신화
+                bought_list = []
+                stock_dict = get_stock_balance() # 보유 주식 조회
+                for sym in stock_dict.keys():
+                    bought_list.append(sym)
+                old_sell_done = True
 
             if t_sell < t_now < t_exit:  # PM 02:58 ~ PM 03:03 : 일괄 매도
                 if soldout == False:
@@ -1406,7 +1570,7 @@ try:
                     #~~~ for sym, details in stock_dict.items():
                     #~~~     qty = details.get('현재수량', '0') # '현재수량'을 추출하여 qty에 할당
                     #~~~     if int(qty) > 0: # 수량이 0보다 큰 경우에만 매도 실행
-                    #~~~         sell(sym, qty)
+                    #~~~         sell(sym, qty, stock_dict_cache=stock_dict, div="장종료")  # ← 캐시 전달
                     #~~~         time.sleep(1)
                     soldout = True
                     #~~~ bought_list = []
