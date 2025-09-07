@@ -53,7 +53,7 @@ CREATE TABLE stockmain (
     trade_value   BIGINT,               -- 거래대금
     market_cap    BIGINT,               -- 시가총액
     shares_out    BIGINT,               -- 상장주식수
-    sector        VARCHAR(50),          -- 소속부 (영문)
+    sector        VARCHAR(100),          -- 소속부
     created_at    TIMESTAMP NOT NULL DEFAULT now(), -- 데이터 입력 시간
     PRIMARY KEY (trade_date, code)
 );
