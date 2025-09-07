@@ -6,6 +6,7 @@ pip install lxml
 pip install html5lib
 pip install beautifulsoup4
 pip install holidayskr
+pip install psycopg2-binary   # pg 연동시 필요
 
 🚀 : “출발!”, “시작!” 느낌
 
@@ -36,3 +37,23 @@ pip install holidayskr
 😥: 슬픔을 느끼는 얼굴
 😭: 흐느껴 우는 얼굴 (아주 슬플 때)
 😞: 실망한 얼굴
+
+--------------------------------------------------------------------------
+CREATE TABLE stockmain (
+    trade_date    DATE NOT NULL,        -- 거래일
+    code          VARCHAR(20) NOT NULL, -- 종목코드
+    name          VARCHAR(100),         -- 종목명
+    close_price   NUMERIC(15,2),        -- 종가
+    change_price  NUMERIC(15,2),        -- 전일 대비
+    change_rate   NUMERIC(7,4),         -- 등락률 (%)
+    open_price    NUMERIC(15,2),        -- 시가
+    high_price    NUMERIC(15,2),        -- 고가
+    low_price     NUMERIC(15,2),        -- 저가
+    volume        BIGINT,               -- 거래량
+    trade_value   BIGINT,               -- 거래대금
+    market_cap    BIGINT,               -- 시가총액
+    shares_out    BIGINT,               -- 상장주식수
+    sector        VARCHAR(50),          -- 소속부 (영문)
+    created_at    TIMESTAMP NOT NULL DEFAULT now(), -- 데이터 입력 시간
+    PRIMARY KEY (trade_date, code)
+);
