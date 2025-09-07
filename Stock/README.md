@@ -57,3 +57,17 @@ CREATE TABLE stockmain (
     created_at    TIMESTAMP NOT NULL DEFAULT now(), -- 데이터 입력 시간
     PRIMARY KEY (trade_date, code)
 );
+
+CREATE TABLE stock_ma (
+    trade_date DATE NOT NULL,             -- 거래일
+    code       VARCHAR(20) NOT NULL,      -- 종목코드
+    ma5       NUMERIC(15,2),             -- 5일 이동평균
+    ma10      NUMERIC(15,2),             -- 10일 이동평균
+    ma20      NUMERIC(15,2),             -- 20일 이동평균
+    ma60      NUMERIC(15,2),             -- 60일 이동평균
+    ma120     NUMERIC(15,2),             -- 120일 이동평균
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    PRIMARY KEY (trade_date, code)
+);
+
+
