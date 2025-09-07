@@ -71,3 +71,28 @@ CREATE TABLE stock_ma (
 );
 
 
+select a.close_price, b.* 
+from stockmain a join stock_ma b 
+    on a.trade_date = b.trade_date
+    and a.code = b.code
+where a.trade_date = '2025-09-05' and a.code = '005930';
+
+select a.name, a.close_price
+    , b.* 
+from stockmain a join stock_ma b 
+    on a.trade_date = b.trade_date
+    and a.code = b.code
+where a.trade_date = '2025-09-05' 
+and a.close_price >= b.ma5
+and a.close_price >= b.ma10
+and a.close_price >= b.ma20
+and a.close_price >= b.ma60
+and a.close_price >= b.ma120
+
+and b.ma5 >= b.ma10
+and b.ma10 >= b.ma20
+and b.ma20 >= b.ma60
+and b.ma60 >= b.ma120
+
+;
+
