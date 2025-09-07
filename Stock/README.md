@@ -93,6 +93,44 @@ and b.ma5 >= b.ma10
 and b.ma10 >= b.ma20
 and b.ma20 >= b.ma60
 and b.ma60 >= b.ma120
-
 ;
+
+
+WITH ma5_check AS (
+    SELECT
+        code,
+        trade_date,
+        ma5,
+        LAG(ma5, 1) OVER (PARTITION BY code ORDER BY trade_date) AS prev1,
+        LAG(ma5, 2) OVER (PARTITION BY code ORDER BY trade_date) AS prev2,
+        LAG(ma5, 3) OVER (PARTITION BY code ORDER BY trade_date) AS prev3,
+        LAG(ma5, 4) OVER (PARTITION BY code ORDER BY trade_date) AS prev4,
+        LAG(ma5, 5) OVER (PARTITION BY code ORDER BY trade_date) AS prev5,
+        ma10, ma20, ma60, ma120
+    FROM stock_ma
+)
+SELECT
+    sm.name,
+    m.code,
+    m.ma5 AS ma5_today,
+    (abs(sm.close_price - m.ma5) / sm.close_price
+     + abs(sm.close_price - m.ma10) / sm.close_price
+     + abs(sm.close_price - m.ma20) / sm.close_price
+     + abs(sm.close_price - m.ma60) / sm.close_price
+     + abs(sm.close_price - m.ma120) / sm.close_price
+    ) AS total_gap_ratio
+FROM ma5_check m
+JOIN stockmain sm
+    ON sm.code = m.code AND sm.trade_date = m.trade_date
+WHERE
+    m.trade_date = '2025-09-05'
+    AND prev4 > prev3
+    AND prev3 > prev2
+    AND prev2 > prev1
+    AND prev1 < ma5
+    AND sm.close_price > m.ma5
+    AND sm.close_price > m.ma10
+    AND sm.close_price > m.ma20
+    AND sm.trade_value > 500000000
+ORDER BY total_gap_ratio ASC;
 
