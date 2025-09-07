@@ -70,7 +70,6 @@ CREATE TABLE stock_ma (
     PRIMARY KEY (trade_date, code)
 );
 
-
 select a.close_price, b.* 
 from stockmain a join stock_ma b 
     on a.trade_date = b.trade_date
@@ -95,7 +94,6 @@ and b.ma20 >= b.ma60
 and b.ma60 >= b.ma120
 ;
 
-
 WITH ma5_check AS (
     SELECT
         code,
@@ -110,20 +108,23 @@ WITH ma5_check AS (
     FROM stock_ma
 )
 SELECT
+    sm.trade_date,
     sm.name,
     m.code,
-    m.ma5 AS ma5_today,
+    sm.close_price,
+    m.ma5, m.ma10, m.ma20,
     (abs(sm.close_price - m.ma5) / sm.close_price
      + abs(sm.close_price - m.ma10) / sm.close_price
      + abs(sm.close_price - m.ma20) / sm.close_price
      + abs(sm.close_price - m.ma60) / sm.close_price
      + abs(sm.close_price - m.ma120) / sm.close_price
-    ) AS total_gap_ratio
+    ) AS total_gap_ratio_per_closeprice,
+    (sm.close_price - sm.open_price) / sm.close_price * 100 AS today_change_rate
 FROM ma5_check m
 JOIN stockmain sm
     ON sm.code = m.code AND sm.trade_date = m.trade_date
 WHERE
-    m.trade_date = '2025-09-05'
+    m.trade_date = '2025-09-04'
     AND prev4 > prev3
     AND prev3 > prev2
     AND prev2 > prev1
@@ -131,6 +132,17 @@ WHERE
     AND sm.close_price > m.ma5
     AND sm.close_price > m.ma10
     AND sm.close_price > m.ma20
-    AND sm.trade_value > 500000000
-ORDER BY total_gap_ratio ASC;
+    AND sm.trade_value > 1000000000
+    AND ((close_price - open_price) / close_price * 100) > 0.3
+    AND ((close_price - open_price) / close_price * 100) < 3.0
+    AND close_price < 350000
+    AND market_cap > 100000000000 
+    AND     (abs(sm.close_price - m.ma5) / sm.close_price
+     + abs(sm.close_price - m.ma10) / sm.close_price
+     + abs(sm.close_price - m.ma20) / sm.close_price
+     + abs(sm.close_price - m.ma60) / sm.close_price
+     + abs(sm.close_price - m.ma120) / sm.close_price
+    ) < 0.10
+ORDER BY total_gap_ratio_per_closeprice ASC;
+--ORDER BY trade_date DESC;
 
