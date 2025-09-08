@@ -96,189 +96,164 @@ and b.ma20 >= b.ma60
 and b.ma60 >= b.ma120
 ;
 
-WITH ma5_check AS (
-    SELECT
-        code,
-        trade_date,
-        ma5,
-        LAG(ma5, 1) OVER (PARTITION BY code ORDER BY trade_date) AS prev1,
-        LAG(ma5, 2) OVER (PARTITION BY code ORDER BY trade_date) AS prev2,
-        LAG(ma5, 3) OVER (PARTITION BY code ORDER BY trade_date) AS prev3,
-        LAG(ma5, 4) OVER (PARTITION BY code ORDER BY trade_date) AS prev4,
-        LAG(ma5, 5) OVER (PARTITION BY code ORDER BY trade_date) AS prev5,
-        ma10, ma20, ma60, ma120
-    FROM stock_ma
+with ma_check as (
+select
+trade_date,
+code,
+lag(ma40,	1)	over	(partition	by	code	order	by	trade_date)	as	prev1,
+lag(ma40,	2)	over	(partition	by	code	order	by	trade_date)	as	prev2,
+lag(ma40,	3)	over	(partition	by	code	order	by	trade_date)	as	prev3,
+lag(ma40,	4)	over	(partition	by	code	order	by	trade_date)	as	prev4,
+lag(ma40,	5)	over	(partition	by	code	order	by	trade_date)	as	prev5,
+lag(ma40,	6)	over	(partition	by	code	order	by	trade_date)	as	prev6,
+lag(ma40,	7)	over	(partition	by	code	order	by	trade_date)	as	prev7,
+lag(ma40,	8)	over	(partition	by	code	order	by	trade_date)	as	prev8,
+lag(ma40,	9)	over	(partition	by	code	order	by	trade_date)	as	prev9,
+lag(ma40,	10)	over	(partition	by	code	order	by	trade_date)	as	prev10,
+lag(ma40,	11)	over	(partition	by	code	order	by	trade_date)	as	prev11,
+lag(ma40,	12)	over	(partition	by	code	order	by	trade_date)	as	prev12,
+lag(ma40,	13)	over	(partition	by	code	order	by	trade_date)	as	prev13,
+lag(ma40,	14)	over	(partition	by	code	order	by	trade_date)	as	prev14,
+lag(ma40,	15)	over	(partition	by	code	order	by	trade_date)	as	prev15,
+lag(ma40,	16)	over	(partition	by	code	order	by	trade_date)	as	prev16,
+lag(ma40,	17)	over	(partition	by	code	order	by	trade_date)	as	prev17,
+lag(ma40,	18)	over	(partition	by	code	order	by	trade_date)	as	prev18,
+lag(ma40,	19)	over	(partition	by	code	order	by	trade_date)	as	prev19,
+lag(ma40,	20)	over	(partition	by	code	order	by	trade_date)	as	prev20,
+lag(ma40,	21)	over	(partition	by	code	order	by	trade_date)	as	prev21,
+lag(ma40,	22)	over	(partition	by	code	order	by	trade_date)	as	prev22,
+lag(ma40,	23)	over	(partition	by	code	order	by	trade_date)	as	prev23,
+lag(ma40,	24)	over	(partition	by	code	order	by	trade_date)	as	prev24,
+lag(ma40,	25)	over	(partition	by	code	order	by	trade_date)	as	prev25,
+lag(ma40,	26)	over	(partition	by	code	order	by	trade_date)	as	prev26,
+lag(ma40,	27)	over	(partition	by	code	order	by	trade_date)	as	prev27,
+lag(ma40,	28)	over	(partition	by	code	order	by	trade_date)	as	prev28,
+lag(ma40,	29)	over	(partition	by	code	order	by	trade_date)	as	prev29,
+lag(ma40,	30)	over	(partition	by	code	order	by	trade_date)	as	prev30,
+lag(ma40,	31)	over	(partition	by	code	order	by	trade_date)	as	prev31,
+lag(ma40,	32)	over	(partition	by	code	order	by	trade_date)	as	prev32,
+lag(ma40,	33)	over	(partition	by	code	order	by	trade_date)	as	prev33,
+lag(ma40,	34)	over	(partition	by	code	order	by	trade_date)	as	prev34,
+lag(ma40,	35)	over	(partition	by	code	order	by	trade_date)	as	prev35,
+lag(ma40,	36)	over	(partition	by	code	order	by	trade_date)	as	prev36,
+lag(ma40,	37)	over	(partition	by	code	order	by	trade_date)	as	prev37,
+lag(ma40,	38)	over	(partition	by	code	order	by	trade_date)	as	prev38,
+lag(ma40,	39)	over	(partition	by	code	order	by	trade_date)	as	prev39,
+lag(ma40,	40)	over	(partition	by	code	order	by	trade_date)	as	prev40,
+lag(ma40,	41)	over	(partition	by	code	order	by	trade_date)	as	prev41,
+lag(ma40,	42)	over	(partition	by	code	order	by	trade_date)	as	prev42,
+lag(ma40,	43)	over	(partition	by	code	order	by	trade_date)	as	prev43,
+lag(ma40,	44)	over	(partition	by	code	order	by	trade_date)	as	prev44,
+lag(ma40,	45)	over	(partition	by	code	order	by	trade_date)	as	prev45,
+lag(ma40,	46)	over	(partition	by	code	order	by	trade_date)	as	prev46,
+lag(ma40,	47)	over	(partition	by	code	order	by	trade_date)	as	prev47,
+lag(ma40,	48)	over	(partition	by	code	order	by	trade_date)	as	prev48,
+lag(ma40,	49)	over	(partition	by	code	order	by	trade_date)	as	prev49,
+lag(ma40,	50)	over	(partition	by	code	order	by	trade_date)	as	prev50,
+lag(ma40,	51)	over	(partition	by	code	order	by	trade_date)	as	prev51,
+lag(ma40,	52)	over	(partition	by	code	order	by	trade_date)	as	prev52,
+lag(ma40,	53)	over	(partition	by	code	order	by	trade_date)	as	prev53,
+lag(ma40,	54)	over	(partition	by	code	order	by	trade_date)	as	prev54,
+lag(ma40,	55)	over	(partition	by	code	order	by	trade_date)	as	prev55,
+lag(ma40,	56)	over	(partition	by	code	order	by	trade_date)	as	prev56,
+lag(ma40,	57)	over	(partition	by	code	order	by	trade_date)	as	prev57,
+lag(ma40,	58)	over	(partition	by	code	order	by	trade_date)	as	prev58,
+lag(ma40,	59)	over	(partition	by	code	order	by	trade_date)	as	prev59,
+lag(ma40,	60)	over	(partition	by	code	order	by	trade_date)	as	prev60,
+ma5,ma10,ma20,ma40,ma60,ma90,ma120
+from stock_ma
+), close_price_check as (
+select
+trade_date, code,
+lag(close_price,	40)	over	(partition	by	code	order	by	trade_date)	as	price_prev40
+from stockmain
 )
-SELECT
+select
     sm.trade_date,
+    sm.code,
     sm.name,
-    m.code,
     sm.close_price,
-    m.ma5, m.ma10, m.ma20,
-    (abs(sm.close_price - m.ma5) / sm.close_price
-     + abs(sm.close_price - m.ma10) / sm.close_price
-     + abs(sm.close_price - m.ma20) / sm.close_price
-     + abs(sm.close_price - m.ma60) / sm.close_price
-     + abs(sm.close_price - m.ma120) / sm.close_price
-    ) AS total_gap_ratio_per_closeprice,
-    (sm.close_price - sm.open_price) / sm.close_price * 100 AS today_change_rate
-FROM ma5_check m
-JOIN stockmain sm
-    ON sm.code = m.code AND sm.trade_date = m.trade_date
-WHERE
-    m.trade_date = '2025-09-04'
-    AND prev4 > prev3
-    AND prev3 > prev2
-    AND prev2 > prev1
-    AND prev1 < ma5
-    AND sm.close_price > m.ma5
-    AND sm.close_price > m.ma10
-    AND sm.close_price > m.ma20
-    AND sm.trade_value > 1000000000
-    AND ((close_price - open_price) / close_price * 100) > 0.3
-    AND ((close_price - open_price) / close_price * 100) < 3.0
-    AND close_price < 350000
-    AND market_cap > 100000000000 
-    AND     (abs(sm.close_price - m.ma5) / sm.close_price
-     + abs(sm.close_price - m.ma10) / sm.close_price
-     + abs(sm.close_price - m.ma20) / sm.close_price
-     + abs(sm.close_price - m.ma60) / sm.close_price
-     + abs(sm.close_price - m.ma120) / sm.close_price
-    ) < 0.10
-ORDER BY total_gap_ratio_per_closeprice ASC;
+    mc.ma5, mc.ma10, mc.ma20, mc.ma40
+from stockmain sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
+    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+where
+    sm.trade_date > '2025-08-05'
+--and	prev59	>	prev58
+--and	prev58	>	prev57
+--and	prev57	>	prev56
+--and	prev56	>	prev55
+--and	prev55	>	prev54
+--and	prev54	>	prev53
+--and	prev53	>	prev52
+--and	prev52	>	prev51
+--and	prev51	>	prev50
+--and	prev50	>	prev49
+--and	prev49	>	prev48
+--and	prev48	>	prev47
+--and	prev47	>	prev46
+--and	prev46	>	prev45
+--and	prev45	>	prev44
+--and	prev44	>	prev43
+--and	prev43	>	prev42
+--and	prev42	>	prev41
+--and	prev41	>	prev40
+and	prev40	>	prev39
+and	prev39	>	prev38
+and	prev38	>	prev37
+and	prev37	>	prev36
+and	prev36	>	prev35
+and	prev35	>	prev34
+and	prev34	>	prev33
+and	prev33	>	prev32
+and	prev32	>	prev31
+and	prev31	>	prev30
+and	prev30	>	prev29
+and	prev29	>	prev28
+and	prev28	>	prev27
+and	prev27	>	prev26
+and	prev26	>	prev25
+and	prev25	>	prev24
+and	prev24	>	prev23
+and	prev23	>	prev22
+and	prev22	>	prev21
+and	prev21	>	prev20
+and	prev20	>	prev19
+and	prev19	>	prev18
+and	prev18	>	prev17
+and	prev17	>	prev16
+and	prev16	>	prev15
+and	prev15	>	prev14
+and	prev14	>	prev13
+and	prev13	>	prev12
+and	prev12	>	prev11
+and	prev11	>	prev10
+and	prev10	>	prev9
+and	prev9	>	prev8
+and	prev8	>	prev7
+and	prev7	>	prev6
+and	prev6	>	prev5
+and	prev5	>	prev4
+--and	prev4	>	prev3
+--and	prev3	>	prev2
+--and	prev2	>	prev1
+and prev1 < ma40
+and price_prev40 < close_price
 
+and close_price > ma5
+and close_price > ma10
+and close_price > ma20
+and close_price > ma40
+and ma5 > ma10
+and ma10 > ma20
+and ma10 > ma40
 
-WITH ma10_check AS (
-    SELECT
-        code,
-        trade_date,
-        LAG(ma60, 1) OVER (PARTITION BY code ORDER BY trade_date) AS prev1,
-        LAG(ma60, 2) OVER (PARTITION BY code ORDER BY trade_date) AS prev2,
-        LAG(ma60, 3) OVER (PARTITION BY code ORDER BY trade_date) AS prev3,
-        LAG(ma60, 4) OVER (PARTITION BY code ORDER BY trade_date) AS prev4,
-        LAG(ma60, 5) OVER (PARTITION BY code ORDER BY trade_date) AS prev5,
-        LAG(ma60, 6) OVER (PARTITION BY code ORDER BY trade_date) AS prev6,
-        LAG(ma60, 7) OVER (PARTITION BY code ORDER BY trade_date) AS prev7,
-        LAG(ma60, 8) OVER (PARTITION BY code ORDER BY trade_date) AS prev8,
-        LAG(ma60, 9) OVER (PARTITION BY code ORDER BY trade_date) AS prev9,
-        LAG(ma60, 10) OVER (PARTITION BY code ORDER BY trade_date) AS prev10,
-        LAG(ma60, 11) OVER (PARTITION BY code ORDER BY trade_date) AS prev11,
-        LAG(ma60, 12) OVER (PARTITION BY code ORDER BY trade_date) AS prev12,
-        LAG(ma60, 13) OVER (PARTITION BY code ORDER BY trade_date) AS prev13,
-        LAG(ma60, 14) OVER (PARTITION BY code ORDER BY trade_date) AS prev14,
-        LAG(ma60, 15) OVER (PARTITION BY code ORDER BY trade_date) AS prev15,
-        LAG(ma60, 16) OVER (PARTITION BY code ORDER BY trade_date) AS prev16,
-        LAG(ma60, 17) OVER (PARTITION BY code ORDER BY trade_date) AS prev17,
-        LAG(ma60, 18) OVER (PARTITION BY code ORDER BY trade_date) AS prev18,
-        LAG(ma60, 19) OVER (PARTITION BY code ORDER BY trade_date) AS prev19,
-        LAG(ma60, 20) OVER (PARTITION BY code ORDER BY trade_date) AS prev20,
-        LAG(ma60, 21) OVER (PARTITION BY code ORDER BY trade_date) AS prev21,
-        LAG(ma60, 22) OVER (PARTITION BY code ORDER BY trade_date) AS prev22,
-        LAG(ma60, 23) OVER (PARTITION BY code ORDER BY trade_date) AS prev23,
-        LAG(ma60, 24) OVER (PARTITION BY code ORDER BY trade_date) AS prev24,
-        LAG(ma60, 25) OVER (PARTITION BY code ORDER BY trade_date) AS prev25,
-        LAG(ma60, 26) OVER (PARTITION BY code ORDER BY trade_date) AS prev26,
-        LAG(ma60, 27) OVER (PARTITION BY code ORDER BY trade_date) AS prev27,
-        LAG(ma60, 28) OVER (PARTITION BY code ORDER BY trade_date) AS prev28,
-        LAG(ma60, 29) OVER (PARTITION BY code ORDER BY trade_date) AS prev29,
-        LAG(ma60, 30) OVER (PARTITION BY code ORDER BY trade_date) AS prev30,
-        LAG(ma60, 31) OVER (PARTITION BY code ORDER BY trade_date) AS prev31,
-        LAG(ma60, 32) OVER (PARTITION BY code ORDER BY trade_date) AS prev32,
-        LAG(ma60, 33) OVER (PARTITION BY code ORDER BY trade_date) AS prev33,
-        LAG(ma60, 34) OVER (PARTITION BY code ORDER BY trade_date) AS prev34,
-        LAG(ma60, 35) OVER (PARTITION BY code ORDER BY trade_date) AS prev35,
-        LAG(ma60, 36) OVER (PARTITION BY code ORDER BY trade_date) AS prev36,
-        LAG(ma60, 37) OVER (PARTITION BY code ORDER BY trade_date) AS prev37,
-        LAG(ma60, 38) OVER (PARTITION BY code ORDER BY trade_date) AS prev38,
-        LAG(ma60, 39) OVER (PARTITION BY code ORDER BY trade_date) AS prev39,
-        LAG(ma60, 40) OVER (PARTITION BY code ORDER BY trade_date) AS prev40,
-        LAG(ma60, 41) OVER (PARTITION BY code ORDER BY trade_date) AS prev41,
-        LAG(ma60, 42) OVER (PARTITION BY code ORDER BY trade_date) AS prev42,
-        LAG(ma60, 43) OVER (PARTITION BY code ORDER BY trade_date) AS prev43,
-        LAG(ma60, 44) OVER (PARTITION BY code ORDER BY trade_date) AS prev44,
-        LAG(ma60, 45) OVER (PARTITION BY code ORDER BY trade_date) AS prev45,
-        ma5, ma10, ma20, ma60, ma120
-    FROM stock_ma
-)
-SELECT
-    sm.trade_date,
-    sm.name,
-    m.code,
-    sm.close_price,
-    ((close_price - open_price) / close_price * 100)::decimal(7,2) today_up_ratio,
-    (abs(sm.close_price - m.ma5) / sm.close_price
-     + abs(sm.close_price - m.ma10) / sm.close_price
-     + abs(sm.close_price - m.ma20) / sm.close_price
-     + abs(sm.close_price - m.ma60) / sm.close_price
-     + abs(sm.close_price - m.ma120) / sm.close_price
-    )::decimal(7,2) AS total_gap_ratio_per_closeprice,
-    m.ma5, m.ma10, m.ma20
-FROM ma10_check m
-JOIN stockmain sm
-    ON sm.code = m.code AND sm.trade_date = m.trade_date
-WHERE
-    m.trade_date = '2025-09-05'
-    AND prev45 > prev44
-    AND prev44 > prev43
-    AND prev43 > prev42
-    AND prev42 > prev41
-    AND prev41 > prev40
-    AND prev40 > prev39
-    AND prev39 > prev38
-    AND prev38 > prev37
-    AND prev37 > prev36
-    AND prev36 > prev35
-    AND prev35 > prev34
-    AND prev34 > prev33
-    AND prev33 > prev32
-    AND prev32 > prev31
-    AND prev31 > prev30
-    AND prev30 > prev29
-    AND prev29 > prev28
-    AND prev28 > prev27
-    AND prev27 > prev26
-    AND prev26 > prev25
-    AND prev25 > prev24
-    AND prev24 > prev23
-    AND prev23 > prev22
-    AND prev22 > prev21
-    AND prev21 > prev20
-    AND prev20 > prev19
-    AND prev19 > prev18
-    AND prev18 > prev17
-    AND prev17 > prev16
-    AND prev16 > prev15
-    AND prev15 > prev14
-    AND prev14 > prev13
-    AND prev13 > prev12
-    AND prev12 > prev11
-    AND prev11 > prev10
-    AND prev10 > prev9
-    AND prev9 > prev8
-    AND prev8 > prev7
-    AND prev7 > prev6
-    AND prev6 > prev5
-    AND prev5 > prev4
-    AND prev4 > prev3
-    AND prev3 > prev2
-    AND prev2 > prev1
-    AND prev1 < ma60
+and (close_price - ma40)/ma40*100 < 15.0  --ma40과의 간격 %
 
-    AND sm.close_price > m.ma5
-    AND sm.close_price > m.ma10
-    AND sm.close_price > m.ma20
-    AND sm.trade_value > 1000000000
---    AND ((close_price - open_price) / close_price * 100) >= 0.0
---    AND ((close_price - open_price) / close_price * 100) < 7.0
-    AND close_price < 350000
-    AND market_cap > 100000000000 
-    AND (abs(sm.close_price - m.ma5) / sm.close_price
-     + abs(sm.close_price - m.ma10) / sm.close_price
-     + abs(sm.close_price - m.ma20) / sm.close_price
-     + abs(sm.close_price - m.ma60) / sm.close_price
-     + abs(sm.close_price - m.ma120) / sm.close_price
-    ) < 0.23
+and ((close_price - open_price) / close_price * 100) < 15.0  --등락율 %
+and close_price > 1500
+and close_price < 350000
+and market_cap > 50000000000  --5백억
+and trade_value > 1000000000  --10억
 ;
 
---ORDER BY trade_date DESC;
 
