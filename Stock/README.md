@@ -64,7 +64,9 @@ CREATE TABLE stock_ma (
     ma5       NUMERIC(15,2),             -- 5일 이동평균
     ma10      NUMERIC(15,2),             -- 10일 이동평균
     ma20      NUMERIC(15,2),             -- 20일 이동평균
+    ma40      NUMERIC(15,2),             -- 40일 이동평균
     ma60      NUMERIC(15,2),             -- 60일 이동평균
+    ma90      NUMERIC(15,2),             -- 90일 이동평균
     ma120     NUMERIC(15,2),             -- 120일 이동평균
     created_at TIMESTAMP NOT NULL DEFAULT now(),
     PRIMARY KEY (trade_date, code)
