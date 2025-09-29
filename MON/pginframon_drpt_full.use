@@ -39,7 +39,8 @@ export PGDATABASE=postgres
 #export PGDATA=/var/lib/pgsql/16/data
 export PGDB=16390
 export RDAY=95
-cd /var/lib/pgsql/15/IFR/MONITOR
+export IFRDIR=/var/lib/pgsql/15/IFR
+cd ${IFRDIR}/MONITOR
 
 #### pg monitor
 cnt=0; rr=0; while true 
