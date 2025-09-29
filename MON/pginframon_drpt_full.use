@@ -26,7 +26,7 @@ EEOFF
 --------------------------------------------------------------------------------------------
 
 cat > pginframon.sh <<'EEOFF'
-#!/usr/bin/ksh
+#!/usr/bin/sh
 
 #### init
 export TERM=ansi
