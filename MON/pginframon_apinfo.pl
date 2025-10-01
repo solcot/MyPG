@@ -91,7 +91,7 @@ if($before) {
 ## snapappl
 if($apptopcnt > 0) {
 if($scnt > 0)
-{ $bsnapapplts = qx{psql -F ' ' -A -t -c "select current_timestamp"}; } else
+{ $bsnapapplts = qx{psql -F ' ' -A -t -c "select to_charcurrent_timestamp,'YYYY-MM-DD HH24:MI:SS'"}; } else
 { open(IN, $logfile_dir . "/tmpapplts"); $bsnapapplts = <IN>; close(IN); }
 if($before) {
    if($scnt > 0)
@@ -113,7 +113,7 @@ chomp( $adate = `date +%Y%m%d%H%M%S` );
 open(OUT, ">" . $logfile_dir . "/tmpdate"); print OUT "$adate"; close(OUT);
 
 ## snapdb
-$asnapdbts = qx{psql -F ' ' -A -t -c "select current_timestamp"};
+$asnapdbts = qx{psql -F ' ' -A -t -c "select to_charcurrent_timestamp,'YYYY-MM-DD HH24:MI:SS'"};
 open(OUT, ">" . $logfile_dir . "/tmpdbts"); print OUT "$asnapdbts"; close(OUT);
 if($before) {
    if(qx{psql -F ' ' -A -t -c "select 'YES' from pg_class where relname = 'pg_stat_statements';"}) {
@@ -134,7 +134,7 @@ $tmpdb =~ s/^\s+|\s+$//g;
 
 ## snaptab
 if($tabtopcnt > 0) {
-$asnaptabts = qx{psql -F ' ' -A -t -c "select current_timestamp"};
+$asnaptabts = qx{psql -F ' ' -A -t -c "select to_charcurrent_timestamp,'YYYY-MM-DD HH24:MI:SS'"};
 open(OUT, ">" . $logfile_dir . "/tmptabts"); print OUT "$asnaptabts"; close(OUT);
 if($before) {
    $atabcnt1 = qx{psql -F ' ' -A -t -c "select schemaname||'.'||relname relname, coalesce(seq_scan,0)+coalesce(idx_scan,0) ||':'|| coalesce(seq_tup_read,0)+coalesce(idx_tup_fetch,0) ||':'|| coalesce(seq_scan,0) ||':'|| coalesce(seq_tup_read,0) ||':'|| coalesce(idx_scan,0) ||':'|| coalesce(idx_tup_fetch,0) ||':'|| coalesce(n_tup_ins+n_tup_upd+n_tup_del,0) ||':'|| coalesce(n_live_tup,0) ||':'|| coalesce(n_dead_tup,0) rel_others from pg_stat_user_tables"};  # =V9.7
@@ -148,7 +148,7 @@ if($before) {
 
 ## snapappl
 if($apptopcnt > 0) {
-$asnapapplts = qx{psql -F ' ' -A -t -c "select current_timestamp"};
+$asnapapplts = qx{psql -F ' ' -A -t -c "select to_charcurrent_timestamp,'YYYY-MM-DD HH24:MI:SS'"};
 if($scnt == 0) { open(OUT, ">" . $logfile_dir . "/tmpapplts"); print OUT "$asnapapplts"; close(OUT); }
 if($before) {
    $aapplcnt1 = qx{psql -F ' ' -A -t -c "select 'Detailed implementation required...'"; };
