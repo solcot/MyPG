@@ -1,9 +1,9 @@
 #홈페이지에서 API서비스 신청시 받은 Appkey, Appsecret 값 설정
-APP_KEY: "PSY1.....O"
-APP_SECRET: "S9s.........="
+APP_KEY: "PSY1..."
+APP_SECRET: "S9shHf..."
 
 #계좌번호 앞 8자리
-CANO: "6....6"
+CANO: "69..."
 #계좌번호 뒤 2자리
 ACNT_PRDT_CD: "01"
 
@@ -13,5 +13,11 @@ URL_BASE: "https://openapi.koreainvestment.com:9443"
 # URL_BASE: "https://openapivts.koreainvestment.com:29443"
 
 #디스코드 웹훅 URL
-DISCORD_WEBHOOK_URL: "https://d.......pk8"
-DISCORD_WEBHOOK_URL_MAIN: "https://d......f6F"
+DISCORD_WEBHOOK_URL: "https://discord.com/api/webhooks/1392694555098349699/E0Pzv..."
+DISCORD_WEBHOOK_URL_MAIN: "https://discord.com/api/webhooks/1398627811928969256/Vmpq7..."
+
+#디비 접속정보
+HOST: "192.168...."
+DBNAME: "post..."
+USER: "post..."
+PASSWORD: "1dl..."
