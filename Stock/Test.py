@@ -5,6 +5,8 @@ import yaml
 from io import BytesIO
 from datetime import datetime, timedelta
 from holidayskr import is_holiday
+import psycopg2
+from psycopg2.extras import execute_batch
 
 with open('C:\\StockPy\\config.yaml', encoding='UTF-8') as f:
     _cfg = yaml.load(f, Loader=yaml.FullLoader)
@@ -37,285 +39,274 @@ def get_last_trading_day():
         day -= timedelta(days=1)
     return day.strftime('%Y%m%d')
 
-def fetch_krx_data(mktId, trade_date):
+def get_all_symbols(p_trade_date='20250901'):
+    #trade_date = get_last_trading_day()
+    #trade_date = '20250826'
+    trade_date = p_trade_date
+
+    # PostgreSQL 접속 후 쿼리 실행
+    try:
+        with psycopg2.connect(
+            host="192.168.1.33",
+            dbname="postgres",
+            user="postgres",
+            password="1dlsvmfk)(!@"
+        ) as conn:
+            with conn.cursor() as cur:
+                sql = """
+                    with ma_check as (
+                    select
+                    trade_date,
+                    code,
+                    lag(ma40,	1)	over	(partition	by	code	order	by	trade_date)	as	prev1,
+                    lag(ma20,	1)	over	(partition	by	code	order	by	trade_date)	as	prev1_20,
+                    lag(ma40,	2)	over	(partition	by	code	order	by	trade_date)	as	prev2,
+                    lag(ma40,	3)	over	(partition	by	code	order	by	trade_date)	as	prev3,
+                    lag(ma40,	4)	over	(partition	by	code	order	by	trade_date)	as	prev4,
+                    lag(ma40,	5)	over	(partition	by	code	order	by	trade_date)	as	prev5,
+                    lag(ma40,	6)	over	(partition	by	code	order	by	trade_date)	as	prev6,
+                    lag(ma40,	7)	over	(partition	by	code	order	by	trade_date)	as	prev7,
+                    lag(ma40,	8)	over	(partition	by	code	order	by	trade_date)	as	prev8,
+                    lag(ma40,	9)	over	(partition	by	code	order	by	trade_date)	as	prev9,
+                    lag(ma40,	10)	over	(partition	by	code	order	by	trade_date)	as	prev10,
+                    lag(ma40,	11)	over	(partition	by	code	order	by	trade_date)	as	prev11,
+                    lag(ma40,	12)	over	(partition	by	code	order	by	trade_date)	as	prev12,
+                    lag(ma40,	13)	over	(partition	by	code	order	by	trade_date)	as	prev13,
+                    lag(ma40,	14)	over	(partition	by	code	order	by	trade_date)	as	prev14,
+                    lag(ma40,	15)	over	(partition	by	code	order	by	trade_date)	as	prev15,
+                    lag(ma40,	16)	over	(partition	by	code	order	by	trade_date)	as	prev16,
+                    lag(ma40,	17)	over	(partition	by	code	order	by	trade_date)	as	prev17,
+                    lag(ma40,	18)	over	(partition	by	code	order	by	trade_date)	as	prev18,
+                    lag(ma40,	19)	over	(partition	by	code	order	by	trade_date)	as	prev19,
+                    lag(ma40,	20)	over	(partition	by	code	order	by	trade_date)	as	prev20,
+                    lag(ma40,	21)	over	(partition	by	code	order	by	trade_date)	as	prev21,
+                    lag(ma40,	22)	over	(partition	by	code	order	by	trade_date)	as	prev22,
+                    lag(ma40,	23)	over	(partition	by	code	order	by	trade_date)	as	prev23,
+                    lag(ma40,	24)	over	(partition	by	code	order	by	trade_date)	as	prev24,
+                    lag(ma40,	25)	over	(partition	by	code	order	by	trade_date)	as	prev25,
+                    lag(ma40,	26)	over	(partition	by	code	order	by	trade_date)	as	prev26,
+                    lag(ma40,	27)	over	(partition	by	code	order	by	trade_date)	as	prev27,
+                    lag(ma40,	28)	over	(partition	by	code	order	by	trade_date)	as	prev28,
+                    lag(ma40,	29)	over	(partition	by	code	order	by	trade_date)	as	prev29,
+                    lag(ma40,	30)	over	(partition	by	code	order	by	trade_date)	as	prev30,
+                    lag(ma40,	31)	over	(partition	by	code	order	by	trade_date)	as	prev31,
+                    lag(ma40,	32)	over	(partition	by	code	order	by	trade_date)	as	prev32,
+                    lag(ma40,	33)	over	(partition	by	code	order	by	trade_date)	as	prev33,
+                    lag(ma40,	34)	over	(partition	by	code	order	by	trade_date)	as	prev34,
+                    lag(ma40,	35)	over	(partition	by	code	order	by	trade_date)	as	prev35,
+                    lag(ma40,	36)	over	(partition	by	code	order	by	trade_date)	as	prev36,
+                    lag(ma40,	37)	over	(partition	by	code	order	by	trade_date)	as	prev37,
+                    lag(ma40,	38)	over	(partition	by	code	order	by	trade_date)	as	prev38,
+                    lag(ma40,	39)	over	(partition	by	code	order	by	trade_date)	as	prev39,
+                    lag(ma40,	40)	over	(partition	by	code	order	by	trade_date)	as	prev40,
+                    ma5,ma10,ma20,ma40,ma60,ma90,ma120
+                    from stock_ma
+                    ), close_price_check as (
+                    select
+                    trade_date, code,
+                    lag(close_price,	40)	over	(partition	by	code	order	by	trade_date)	as	price_prev40
+                    from stockmain
+                    )
+                    select
+                        --sm.trade_date,
+                        sm.code,
+                        sm.name
+                        --sm.close_price,
+                        --mc.ma5, mc.ma10, mc.ma20, mc.ma40
+                    from stockmain sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
+                        join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+                    where
+                        sm.trade_date = %s
+                    and	prev40	>	prev39
+                    and	prev39	>	prev38
+                    and	prev38	>	prev37
+                    and	prev37	>	prev36
+                    and	prev36	>	prev35
+                    and	prev35	>	prev34
+                    and	prev34	>	prev33
+                    and	prev33	>	prev32
+                    and	prev32	>	prev31
+                    and	prev31	>	prev30
+                    and	prev30	>	prev29
+                    and	prev29	>	prev28
+                    and	prev28	>	prev27
+                    and	prev27	>	prev26
+                    and	prev26	>	prev25
+                    and	prev25	>	prev24
+                    and	prev24	>	prev23
+                    and	prev23	>	prev22
+                    and	prev22	>	prev21
+                    and	prev21	>	prev20
+                    and	prev20	>	prev19
+                    and	prev19	>	prev18
+                    and	prev18	>	prev17
+                    and	prev17	>	prev16
+                    and	prev16	>	prev15
+                    and	prev15	>	prev14
+                    and	prev14	>	prev13
+                    and	prev13	>	prev12
+                    and	prev12	>	prev11
+                    and	prev11	>	prev10
+                    and	prev10	>	prev9
+                    and prev1 < ma40
+
+                    and close_price > ma5
+                    and close_price > ma10
+                    and close_price > ma20
+                    and close_price > ma40
+                    and ma5 > ma10
+                    and ma10 > ma20
+                    and ma20 > ma40
+                    and prev1_20 < prev1
+
+                    and (close_price - ma40)/ma40*100 < 25.0
+                """
+                cur.execute(sql, (trade_date,))
+                rows = cur.fetchall()
+
+                symbols_name_dict = {str(code).zfill(6): name for code, name in rows}
+
+        print(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)} 매수종목 반환")
+        #print(symbols_name_dict)
+        return symbols_name_dict
+
+    except Exception as e:
+        print(f"❌ DB 조회 중 오류 발생: {e}")
+        return {}
+
+def get_all_symbols_sell(p_trade_date='20250901'):
+    #trade_date = get_last_trading_day()
+    #trade_date = '20250826'
+    trade_date = p_trade_date
+
+    # PostgreSQL 접속 후 쿼리 실행
+    try:
+        with psycopg2.connect(
+            host="192.168.1.33",
+            dbname="postgres",
+            user="postgres",
+            password="1dlsvmfk)(!@"
+        ) as conn:
+            with conn.cursor() as cur:
+                sql = """
+                    SELECT sm.code, sm.name
+                    FROM stockmain sm
+                    JOIN stock_ma mc 
+                        ON sm.trade_date = mc.trade_date
+                        AND sm.code = mc.code
+                    WHERE mc.ma40 > mc.ma20
+                        AND sm.trade_date = %s
+                """
+                cur.execute(sql, (trade_date,))
+                rows = cur.fetchall()
+
+                symbols_name_dict = {str(code).zfill(6): name for code, name in rows}
+
+        print(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)} 매도종목 반환")
+        #print(symbols_name_dict)
+        return symbols_name_dict
+
+    except Exception as e:
+        print(f"❌ DB 조회 중 오류 발생: {e}")
+        return {}
+
+def fetch_krx_pbr_data(trade_date, mktId='ALL'):
+    """
+    KRX에서 개별종목의 PER/PBR/배당수익률 데이터를 가져오는 함수
+    
+    Parameters:
+    -----------
+    trade_date : str
+        조회일자 (YYYYMMDD 형식, 예: '20240930')
+    mktId : str
+        시장 구분 ('STK': 코스피, 'KSQ': 코스닥, 'ALL': 전체, 기본값: 'ALL')
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        PBR, PER, 배당수익률 등이 포함된 데이터프레임
+        주요 컬럼: 종목명, 종목코드, 종가, EPS, PER, BPS, PBR, 배당수익률 등
+    """
+    
+    # Step 1: OTP 코드 생성
     otp_url = 'http://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd'
     otp_form_data = {
         'locale': 'ko_KR',
+        'mktId': mktId,           # 'STK', 'KSQ', 'ALL'
+        'trdDd': trade_date,      # 거래일자
+        'money': '1',             # 원 단위
+        'csvxls_isNo': 'false',
         'name': 'fileDown',
-        'url': 'dbms/MDC/STAT/standard/MDCSTAT01501',  # 이 부분이 핵심
-        'mktId': mktId,            # 'STK', 'KSQ'
-        'trdDd': trade_date,
-        'money': '1',              # 원 단위
-        'csvxls_isNo': 'false'
+        'url': 'dbms/MDC/STAT/standard/MDCSTAT03501',  # PBR 데이터 URL
     }
+    
     headers = {
         'Referer': 'http://data.krx.co.kr/contents/MDC/MDI/mdiLoader',
-        'User-Agent': 'Mozilla/5.0'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     }
-
+    
     print(f"OTP 코드 생성 요청 중... 시장: {mktId}, 날짜: {trade_date}")
     otp_response = requests.post(otp_url, data=otp_form_data, headers=headers)
+    
     if otp_response.status_code != 200:
         print(f"OTP 요청 실패: 상태 코드 {otp_response.status_code}")
         print(otp_response.text)
         return None
+    
     otp_code = otp_response.text
-
-    print(f"CSV 파일 다운로드 중... 시장: {mktId}")
+    print(f"OTP 코드 생성 완료")
+    
+    # Step 2: CSV 파일 다운로드
     csv_url = 'http://data.krx.co.kr/comm/fileDn/download_csv/download.cmd'
     csv_response = requests.post(csv_url, data={'code': otp_code}, headers=headers)
+    
     if csv_response.status_code != 200:
         print(f"CSV 다운로드 실패: 상태 코드 {csv_response.status_code}")
         print(csv_response.text)
         return None
-
+    
+    # Step 3: CSV 파싱
     try:
         df = pd.read_csv(BytesIO(csv_response.content), encoding='euc-kr')
+        print(f"데이터 로드 완료: {len(df)}개 종목")
         return df
     except Exception as e:
         print(f"CSV 파싱 오류: {e}")
         return None
 
-def get_all_symbols(p_pool_count=15, p_trade_date='20250901'):
-    #trade_date = get_last_trading_day()
-    #trade_date = '20250826'
-    trade_date = p_trade_date
 
-    #send_message(f"✅ 최종 거래일은 {trade_date} 입니다.")
-    #send_message_main(f"✅ 최종 거래일은 {trade_date} 입니다.")
-    print(f"✅ 최종 거래일은 {trade_date} 입니다.")
-
-    df_kospi = fetch_krx_data('STK', trade_date)
-    df_kosdaq = fetch_krx_data('KSQ', trade_date)
-
-    if df_kospi is None and df_kosdaq is None:
-        print("❌ KOSPI와 KOSDAQ 데이터 모두 가져오기 실패")
-        return []
-    elif df_kospi is None:
-        df = df_kosdaq
-    elif df_kosdaq is None:
-        df = df_kospi
-    else:
-        df = pd.concat([df_kospi, df_kosdaq], ignore_index=True)
-
-    if df is None or df.empty:
-        print("❌ 데이터 로드 실패: 데이터프레임이 비어 있습니다.")
-        return []
-
-    #send_message(f"✅ 전체 종목 수: {len(df)}")
-    #send_message_main(f"✅ 전체 종목 수: {len(df)}")
-    print(f"\n✅ 전체 종목 수: {len(df)}")
-    print("\n✅ 열 이름:")
-    print(df.columns.tolist()) # ['종목코드', '종목명', '종가', '대비', '등락률', '시가', '고가', '저가', '거래량', '거래대금', '시가총액', '상장주식수', '소속부']
-    print("\n✅ 원본 상위 10개 샘플:")
-    print(df.head(10))
-
-    try:
-        df['등락률'] = df['등락률'].astype(str).str.replace('%', '', regex=False).astype(float)
-        df['종가'] = pd.to_numeric(df['종가'], errors='coerce')
-        df['시가'] = pd.to_numeric(df['시가'], errors='coerce')
-        df['고가'] = pd.to_numeric(df['고가'], errors='coerce')
-        df['저가'] = pd.to_numeric(df['저가'], errors='coerce')
-        df['시가총액'] = pd.to_numeric(df['시가총액'], errors='coerce')
-        df['거래량'] = pd.to_numeric(df['거래량'], errors='coerce')
-        df['거래대금'] = pd.to_numeric(df['거래대금'], errors='coerce')
-    except KeyError as e:
-        print(f"❌ 열 이름 오류: {e}")
-        print("사용 가능한 열:", df.columns.tolist())
-        return []
-
-    # 거래대금 단위가 억/천 단위일 수 있으므로 조정 확인 필요
-    print("\n✅ 거래대금 단위 확인 (상위 5개):")
-    print(df['거래대금'].head(5))
-
-    ##📌 [A] 장기 투자용 필터 (우량 + 성장성)
-    ##목적: 장기 보유, 분할 매수, 저평가/성장 기업 탐색
-    #filtered = df[
-    #    (df['종가'] >= 10000) & (df['종가'] <= 100000) &   # 너무 싼 주식 제외, 고평가 제거
-    #    (df['시가총액'] >= 3e11) &                         # 최소 3천억 이상: 대형/중견
-    #    (df['거래대금'] >= 1e9) &                          # 어느 정도 거래 활발
-    #    (df['등락률'].abs() <= 5)                          # 과도한 변동성 제거
-    #].copy()
-
-    #📌 [B] 단기 매매 - 안정성 중심 (보수적)
-    #목적: 큰 리스크 없이 꾸준한 소폭 수익 추구
-    #filtered = df[
-    #    (df['등락률'] >= -0.5) & (df['등락률'] <= 0.5) &
-    #    (df['종가'] >= 5000) & (df['종가'] <= 50000) &
-    #    (df['시가총액'] >= 3e11) & (df['시가총액'] <= 2e12) &
-    #    (df['거래량'] >= 100000) &
-    #    (df['거래대금'] >= 5e9) &
-    #    (df['전일변동폭비율'] >= 0.015) & (df['전일변동폭비율'] <= 0.05)  # 너무 폭발적인 변동성 제거
-    #].copy()
-
-    #📌 [C] 단기 매매 - 수익성 중심 (공격적)
-    #목적: 큰 변동을 활용해 단기 수익 노림 (스캘핑/단타)
-    #filtered = df[
-    #    (df['등락률'] >= -2) & (df['등락률'] <= 2) &
-    #    (df['종가'] >= 1000) & (df['종가'] <= 50000) &
-    #    (df['시가총액'] >= 5e10) &
-    #    (df['거래량'] >= 100000) &
-    #    (df['거래대금'] >= 10e9) &
-    #    (df['전일변동폭비율'] >= 0.04)                         # 높은 변동성
-    #].copy()
-
-    # 필터링 (기본:43개, 수정:97개)
-    #filtered = df[
-    #    #(df['등락률'] >= -1) & (df['등락률'] <= 1) &           # 전일 등락률이 -1% ~ +1% 범위: 과하게 급등/급락하지 않은 종목
-    #    (df['등락률'] >= -1.5) & (df['등락률'] <= 1.5) &           # 전일 등락률이 -1% ~ +1% 범위: 과하게 급등/급락하지 않은 종목
-    #    #(df['종가'] >= 3000) & (df['종가'] <= 30000) &         # 전일 종가가 3,000원 이상 30,000원 이하: 저가/고가 extremes 제외
-    #    (df['종가'] >= 3000) & (df['종가'] <= 70000) &         # 전일 종가가 3,000원 이상 30,000원 이하: 저가/고가 extremes 제외
-    #    #(df['시가총액'] >= 1e11) & (df['시가총액'] <= 1e12) &  # 시가총액이 1,000억 원 ~ 1조 원: 너무 작지도 크지도 않은 종목군
-    #    (df['시가총액'] >= 1e11) & (df['시가총액'] <= 2e12) &  # 시가총액이 1,000억 원 ~ 1조 원: 너무 작지도 크지도 않은 종목군
-    #    (df['거래량'] >= 50000) &                              # 전일 거래량 5만 주 이상: 유동성이 충분한 종목
-    #    #(df['거래대금'] >= 2e9) &                              # 전일 거래대금 20억 원 이상: 자금이 어느 정도 몰린 종목
-    #    (df['거래대금'] >= 5e9) &                              # 전일 거래대금 20억 원 이상: 자금이 어느 정도 몰린 종목
-    #    #(df['전일변동폭비율'] >= 0.03)                         # 전일 고가/저가 차이가 3% 이상: 변동성이 있었던 종목
-    #    (df['전일변동폭비율'] >= 0.05)                         # 전일 고가/저가 차이가 3% 이상: 변동성이 있었던 종목
-    #].copy()  # .copy()는 SettingWithCopyWarning 방지를 위한 명시적 복사
-
-    ## 약 120개 정도 필터됨
-    #filtered = df[
-    #    (df['등락률'] >= -1.5) & (df['등락률'] <= 70.0) &   # 0.5
-    #    (df['종가'] >= 2000) & (df['종가'] <= 333000) &   # 2500
-    #    (df['시가총액'] >= 5e10) & (df['시가총액'] <= 500e12) &   # 5e10
-    #    (df['거래량'] >= 100000) &   # 300000
-    #    (df['거래대금'] >= 3e9) &   # 7e9
-    #    (df['전일변동폭비율'] >= 0.05)   # 0.07
-    #].copy()
-
-    #####df['전일변동폭비율'] = (df['고가'] - df['저가']) / df['시가']
-    ####### 약 60개 정도 필터됨
-    #####filtered = df[
-    #####    (df["등락률"] > 0) &                                        # 당일 양봉 종목만
-    #####    (df["시가총액"] >= 7e9) &                                    # 시가총액 70억 이상
-    #####    (df["거래대금"] >= 7e9) &                                    # 거래대금 70억 이상
-    #####    (df['전일변동폭비율'] >= 0.03) &                              # 전일 변동폭이 시가 대비 3% 이상
-    #####    (df["종가"] > (df["시가"] + (df["고가"] - df["저가"]) * 0.3))  # 목표가 돌파 (k=0.3)
-    #####].copy()
-    #### 거래대금 + 양봉 : 약 40
-    ###filtered = df[
-    ###    (df['등락률'] > 0) & 
-    ###    (df['종가'] >= 1500) & 
-    ###    (df['시가총액'] >= 5e10) &
-    ###    (df['거래량'] >= 1000000) & 
-    ###    (df['거래대금'] >= 1e10) & 
-    ###    (df['전일변동폭비율'] >= 0.07) 
-    ###].copy()
-    #***# 개선된 필터링 조건
-    #***filtered = df[
-    #***    (df['등락률'] >= -5) &  # 소폭 하락 ~ 상승 종목 (과열 방지)
-    #***    (df['등락률'] <= 10) &   # 과도한 상승 종목 제외
-    #***    (df['종가'] >= 2000) &  # 최소 주가 상향 조정
-    #***    (df['시가총액'] >= 5e10) &  # 더 안정적인 대형주 위주
-    #***    (df['거래량'] >= 500000) & 
-    #***    (df['거래대금'] >= 8e9) &   # 거래대금 기준 하향 조정
-    #***    (df['전일변동폭비율'] >= 0.05) &  # 변동폭 기준 완화
-    #***    (df['전일변동폭비율'] <= 0.2)    # 과도한 변동성 제외
-    #***].copy()
-
-    #***# 현재 필터링의 문제점 개선
-    #***filtered = df[
-    #***    (df['등락률'] >= -2) &      # -5에서 -2로 좁힘
-    #***    (df['등락률'] <= 3) &       # 10에서 3으로 좁힘 (과열 방지)
-    #***    (df['종가'] >= 5000) &      # 2000에서 5000으로 상향
-    #***    (df['시가총액'] >= 1e11) &  # 더 대형주 위주
-    #***    (df['거래대금'] >= 2e10) &   # 거래대금 기준 상향
-    #***    (df['전일변동폭비율'] >= 0.03) &  # 적절한 변동성만
-    #***    (df['전일변동폭비율'] <= 0.12)    # 과도한 변동성 제외
-    #***].copy()
-
-    #+++ # [1번계좌] 대형주
-    #+++ filtered = df[
-    #+++     (df['등락률'] >= 0.2) &          # -3~7 등락률 범위를 소폭 확장하여 더 많은 잠재 후보군을 포함
-    #+++     (df['등락률'] <= 12) &
-    #+++     (df['종가'] >= 3000) &          # 동전주를 회피하는 최소 가격
-    #+++     (df['시가총액'] >= 5e11) &      # 시가총액 5천억 이상 (너무 작은 종목 제외)
-    #+++     (df['시가총액'] <= 15e12) &      # 시가총액 15조 이하 (너무 무거운 대형주 제외, 중소형주 집중)
-    #+++     (df['거래대금'] >= 1e10) &       # 거래대금 100억 이상 (최소한의 유동성 확보)
-    #+++     (df['전일변동폭비율'] >= 0.05) &  # 전일 변동폭이 최소 5% 이상인 종목
-    #+++     (df['전일변동폭비율'] <= 0.20)    # 전일 변동폭이 20% 이하 (지나치게 과열된 종목 제외)
-    #+++ ].copy()
-
-    #!!! # [1번계좌] 미니주
-    #!!! filtered = df[
-    #!!!     (df['등락률'] >= 0.5) &          # -3~7 등락률 범위를 소폭 확장하여 더 많은 잠재 후보군을 포함
-    #!!!     (df['등락률'] <= 3.5) &
-    #!!!     #(df['종가'] >= 100) &          # 동전주를 회피하는 최소 가격
-    #!!!     (df['시가총액'] >= 1e9) &      # 시가총액 10억 이상 (너무 작은 종목 제외)
-    #!!!     (df['시가총액'] < 10e10) &       # 시가총액 1천억 이하 (너무 무거운 대형주 제외, 중소형주 집중)
-    #!!!     (df['거래대금'] >= 17e8)         # 거래대금 17억 이상 (최소한의 유동성 확보)
-    #!!!     #(df['전일변동폭비율'] >= 0.03) &   # 전일 변동폭이 최소 5% 이상인 종목
-    #!!!     #(df['전일변동폭비율'] <= 0.20)    # 전일 변동폭이 20% 이하 (지나치게 과열된 종목 제외)
-    #!!! ].copy()
-
-    #*** # [1번계좌] 중형주
-    #*** filtered = df[
-    #***     (df['등락률'] >= 0.5) &          # -3~7 등락률 범위를 소폭 확장하여 더 많은 잠재 후보군을 포함
-    #***     (df['등락률'] <= 1.5) &
-    #***     #(df['종가'] >= 100) &          # 동전주를 회피하는 최소 가격
-    #***     (df['시가총액'] >= 50e10) &      # 시가총액 5천억 이상 (너무 작은 종목 제외)
-    #***     (df['시가총액'] < 200e10) &       # 시가총액 2조 이하 (너무 무거운 대형주 제외, 중소형주 집중)
-    #***     (df['거래대금'] >= 70e8)         # 거래대금 70억 이상 (최소한의 유동성 확보)
-    #***     #(df['전일변동폭비율'] >= 0.03) &   # 전일 변동폭이 최소 5% 이상인 종목
-    #***     #(df['전일변동폭비율'] <= 0.20)    # 전일 변동폭이 20% 이하 (지나치게 과열된 종목 제외)
-    #*** ].copy()
-
-    # 추가 컬럼 계산
-    #df['전일변동폭비율'] = (df['고가'] - df['저가']) / df['저가']
-    df['금일등락률'] = (df['종가'] - df['시가']) / df['종가'] * 100
-
-    # ---------------------- 캔들 꼬리 계산 ----------------------
-    df['바디'] = (df['종가'] - df['시가']).abs()
-    df['윗꼬리'] = df['고가'] - df[['시가', '종가']].max(axis=1)
-    df['아래꼬리'] = df[['시가', '종가']].min(axis=1) - df['저가']
-
-    # 윗꼬리 비율 (바디가 0일 경우 0으로 처리)
-    df['윗꼬리비율'] = df.apply(
-        lambda x: x['윗꼬리'] / x['바디'] if x['바디'] > 0 else 0, axis=1
-    )
-
-    # [1번계좌] 소형주
-    filtered = df[
-        (df['금일등락률'] >= 0.3) &          # -3~7 등락률 범위를 소폭 확장하여 더 많은 잠재 후보군을 포함
-        (df['금일등락률'] <= 3.0) &
-        (df['종가'] <= 300000) &          # 동전주를 회피하는 최소 가격
-        #(df['시가총액'] >= 50e10) &      # 시가총액 5천억 이상 (너무 작은 종목 제외)
-        (df['시가총액'] < 50e10) &        # 시가총액 2조 이하 (너무 무거운 대형주 제외, 중소형주 집중)
-        #(df['거래대금'] >= 67e8)         # 거래대금 67억 이상 (최소한의 유동성 확보)
-        #(df['전일변동폭비율'] >= 0.03) &   # 전일 변동폭이 최소 5% 이상인 종목
-        #(df['전일변동폭비율'] <= 0.20)    # 전일 변동폭이 20% 이하 (지나치게 과열된 종목 제외)
-        #(df['윗꼬리비율'] < 1.5)     # 윗꼬리/바디 비율이 1.5 미만인 종목만
-        (df['아래꼬리'] >= df['윗꼬리'] * 1.1)     # 아래꼬리가 윗꼬리+윗꼬리의30% 보다 큰 종목만 포함
-    ].copy()
-
-    top_filtered = filtered.sort_values(by='거래대금', ascending=False).head(p_pool_count)
-
-    #--- # 안정성 점수 계산
-    #--- top_filtered['안정성점수'] = (
-    #---     top_filtered['시가총액'] * 0.3 +
-    #---     top_filtered['거래대금'] * 0.3 +
-    #---     (1 / (abs(top_filtered['금일등락률']) + 1)) * top_filtered['거래대금'] * 0.4
-    #--- )
-    #--- 
-    #--- return_filtered = top_filtered.sort_values(by='안정성점수', ascending=False)
-    return_filtered = top_filtered
-
-    print(f"\n✅ 최종 선정 종목 수: {len(return_filtered)}")
-    print("\n✅ 상위 점수 종목 샘플:")
-    print(return_filtered)
-
-    # **여기부터 변경 시작:** 종목코드를 키로, 종목명을 값으로 하는 딕셔너리 생성
-    symbols_name_dict = {} # 새로운 딕셔너리 생성
-    for _, row in return_filtered.iterrows():
-        symbol = str(row['종목코드']).zfill(6) # 종목코드를 가져와 6자리 문자열로 만듭니다.
-        name = row['종목명'] # 종목명을 가져옵니다.
-        symbols_name_dict[symbol] = name # 딕셔너리에 '종목코드': '종목명' 형태로 저장합니다.
-
-    return symbols_name_dict # **변경 끝:** 이 딕셔너리를 반환합니다.
+def fetch_krx_all_stocks_pbr(trade_date, mktId='ALL'):
+    """
+    특정 날짜의 전체 종목 PBR 데이터를 가져오는 함수
+    
+    Parameters:
+    -----------
+    trade_date : str
+        조회일자 (YYYYMMDD 형식, 예: '20240930')
+    mktId : str, optional
+        시장 구분 ('STK': 코스피, 'KSQ': 코스닥, 'ALL': 전체, 기본값: 'ALL')
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        전체 종목의 PBR, PER 등 투자지표 데이터
+    """
+    
+    result = fetch_krx_pbr_data(trade_date, mktId)
+    
+    return result
 
 if __name__ == "__main__":
-    pool_count = 300
-    #trade_date = get_last_trading_day()
-    trade_date = '20250901'
-    symbols = get_all_symbols(p_pool_count=pool_count, p_trade_date=trade_date)
+#    pool_count = 300
+#    trade_date = get_last_trading_day()
+#    #trade_date = '20250905'
+#    symbols_buy_pool = get_all_symbols(p_trade_date=trade_date)  # 금일 매수 종목
+#    symbols_sell_pool = get_all_symbols_sell(p_trade_date=trade_date)  # 금일 매도 종목 <- 현재 계좌에 있다면...
+
+    # 사용 예시
+    # 예시 1: 특정 날짜의 전체 종목 PBR 데이터
+    df_all = fetch_krx_all_stocks_pbr('20251002')
+    if df_all is not None:
+        print("\n전체 종목 PBR 데이터:")
+        print(df_all.head())
+        print(f"\n컬럼 목록: {df_all.columns.tolist()}")
