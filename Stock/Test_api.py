@@ -12,7 +12,7 @@ from holidayskr import is_holiday
 import configparser # 추가
 import os # 파일 존재 여부 확인 및 삭제를 위해 os 모듈 추가
 
-with open('C:\\StockPy2\\config.yaml', encoding='UTF-8') as f:
+with open('C:\\StockPy\\config.yaml', encoding='UTF-8') as f:
     _cfg = yaml.load(f, Loader=yaml.FullLoader)
 APP_KEY = _cfg['APP_KEY']
 APP_SECRET = _cfg['APP_SECRET']
@@ -24,7 +24,7 @@ DISCORD_WEBHOOK_URL_MAIN = _cfg['DISCORD_WEBHOOK_URL_MAIN']
 URL_BASE = _cfg['URL_BASE']
 
 # SettingReload.ini 파일을 위한 ConfigParser 객체 전역 선언 (또는 함수 바깥)
-RELOAD_CONFIG_PATH = 'C:\\StockPy2\\SettingReload.ini'
+RELOAD_CONFIG_PATH = 'C:\\StockPy\\SettingReload.ini'
 RELOAD_CONFIG = configparser.ConfigParser()
 
 def send_message(msg):
@@ -836,16 +836,224 @@ def write_reload_setting(value):
     except Exception as e:
         send_message(f"❌ SettingReload.ini 쓰기 오류: {e}")
 
+def get_stock_balance___():
+    """주식 잔고조회"""
+    PATH = "uapi/domestic-stock/v1/trading/inquire-balance"
+    URL = f"{URL_BASE}/{PATH}"
+    headers = {"Content-Type":"application/json", 
+        "authorization":f"Bearer {ACCESS_TOKEN}",
+        "appKey":APP_KEY,
+        "appSecret":APP_SECRET,
+        "tr_id":"TTTC8434R",
+        "custtype":"P",
+    }
+    params = {
+        "CANO": CANO,
+        "ACNT_PRDT_CD": ACNT_PRDT_CD,
+        "AFHR_FLPR_YN": "N",
+        "OFL_YN": "",
+        "INQR_DVSN": "02",
+        "UNPR_DVSN": "01",
+        "FUND_STTL_ICLD_YN": "N",
+        "FNCG_AMT_AUTO_RDPT_YN": "N",
+        "PRCS_DVSN": "01",
+        "CTX_AREA_FK100": "",
+        "CTX_AREA_NK100": ""
+    }
+    res = requests.get(URL, headers=headers, params=params)
+
+    if res.status_code != 200:
+        send_message(f"주식 잔고 조회 실패: {res.json().get('msg1', '알 수 없는 오류')}")
+        return {}
+
+    response_data = res.json()
+    stock_list = response_data.get('output1', []) 
+    evaluation = response_data.get('output2', [])
+
+    stock_dict = {}
+    send_message(f"====주식 보유잔고====")
+    
+    item_count = 0
+    stock_info_list = []  # 주식 정보를 저장할 리스트
+    for idx, stock in enumerate(stock_list, start=1):
+        # API에서 받은 데이터에서 필요한 정보 추출
+        symbol = stock.get('pdno')
+        hldg_qty = int(stock.get('hldg_qty', 0))
+        buy_price = float(stock.get('pchs_avg_pric', 0))
+        product_name = stock.get('prdt_name')
+
+        if hldg_qty > 0: 
+            item_count += 1
+            # ✨ 매수가를 포함한 상세 정보를 딕셔너리로 저장
+            stock_dict[symbol] = {
+                '종목명': product_name,
+                '현재수량': hldg_qty,
+                '매수가': buy_price
+            }
+            #send_message(f"{item_count:02d}.{product_name}({symbol}): {hldg_qty}주, 매수가:{buy_price:,.2f}원")
+            # 리스트 형태로 저장
+            stock_info_list.append(f"{item_count:02d}.{product_name}({symbol})")
+
+    # 수정: 보유 주식 건수를 요약해서 한 번만 메시지 전송
+    if item_count > 0:
+        # 보유 주식 리스트를 콜론으로 구분하여 출력
+        stock_list_str = ":".join(stock_info_list)
+        #send_message(f"📋 현재 보유 주식은 {item_count:02d}건 입니다.\n{stock_list_str}")
+        send_message(f"📋 현재 보유 주식은 {item_count:02d}건 입니다.")
+        send_message_main(f"📋 현재 보유 주식은 {item_count:02d}건 입니다.")
+    else:
+        send_message("📋 현재 보유 주식은 없습니다.")
+
+    if evaluation:
+        scts = evaluation[0].get('scts_evlu_amt')   # 기본값으로 'N/A' 넣지 않기
+        evlu = evaluation[0].get('evlu_pfls_smtl_amt')
+        tot  = evaluation[0].get('tot_evlu_amt')
+
+        send_message(f"💰 주식 평가 금액: {format_krw(scts)}")
+        send_message(f"💰 평가 손익 합계: {format_krw(evlu)}")
+        send_message_main(f"💰 평가 손익 합계: {format_krw(evlu)}")
+        send_message(f"💰 총 평가 금액: {format_krw(tot)}")
+    else:
+        send_message("평가 정보가 없습니다.")
+    send_message("=================")
+
+    return stock_dict
+
+def format_krw(val):
+    """숫자(또는 숫자 문자열)를 천 단위 콤마로 포맷하여 문자열 반환.
+       숫자가 아니면 'N/A' 반환 (단위은 함수에서 붙임)."""
+    if val is None:
+        return "N/A"
+    # 문자열이면 쉼표/공백 제거 후 숫자 변환 시도
+    try:
+        if isinstance(val, str):
+            s = val.strip()
+            if s == "":
+                return "N/A"
+            s = s.replace(",", "")         # "1,000" 같은 경우 제거
+            num = float(s)
+        else:
+            num = float(val)
+    except Exception:
+        return "N/A"
+
+    # 정수이면 정수 형태로 포맷, 아니면 소수 2자리로 포맷 (필요하면 조정)
+    if num.is_integer():
+        return f"{int(num):,}원"
+    else:
+        return f"{num:,.2f}원"
+
+def get_stock_balance():
+    """주식 잔고조회 - 연속 조회 지원"""
+    PATH = "uapi/domestic-stock/v1/trading/inquire-balance"
+    URL = f"{URL_BASE}/{PATH}"
+
+    stock_dict = {}
+    stock_info_list = []
+    item_count = 0
+
+    # 초기 헤더/파라미터
+    headers = {
+        "Content-Type": "application/json",
+        "authorization": f"Bearer {ACCESS_TOKEN}",
+        "appKey": APP_KEY,
+        "appSecret": APP_SECRET,
+        "tr_id": "TTTC8434R",
+        "tr_cont": "",       # 첫 호출 시 공백
+        "custtype": "P",
+    }
+
+    params = {
+        "CANO": CANO,
+        "ACNT_PRDT_CD": ACNT_PRDT_CD,
+        "AFHR_FLPR_YN": "N",
+        "OFL_YN": "",
+        "INQR_DVSN": "02",
+        "UNPR_DVSN": "01",
+        "FUND_STTL_ICLD_YN": "N",
+        "FNCG_AMT_AUTO_RDPT_YN": "N",
+        "PRCS_DVSN": "01",
+        "CTX_AREA_FK100": "",  # 첫 호출 시 공백
+        "CTX_AREA_NK100": ""   # 첫 호출 시 공백
+    }
+
+    page = 1
+    max_pages = 100  # 무한루프 방지용
+
+    while True:
+        res = requests.get(URL, headers=headers, params=params)
+        if res.status_code != 200:
+            send_message(f"[ERROR] 주식 잔고 조회 실패: {res.json().get('msg1','알 수 없는 오류')}")
+            break
+
+        response_data = res.json()
+        stock_list = response_data.get('output1', [])
+        evaluation = response_data.get('output2', [])
+
+        ctx_fk = response_data.get('ctx_area_fk100', '')
+        ctx_nk = response_data.get('ctx_area_nk100', '')
+
+        # 받은 데이터 처리
+        for stock in stock_list:
+            symbol = stock.get('pdno')
+            hldg_qty = int(stock.get('hldg_qty', 0))
+            buy_price = float(stock.get('pchs_avg_pric', 0))
+            product_name = stock.get('prdt_name')
+            if hldg_qty > 0:
+                item_count += 1
+                stock_dict[symbol] = {
+                    '종목명': product_name,
+                    '현재수량': hldg_qty,
+                    '매수가': buy_price
+                }
+                stock_info_list.append(f"{item_count:02d}.{product_name}({symbol})")
+
+        # 다음 페이지 여부 확인
+        tr_cont = res.headers.get('tr_cont', '')
+        if tr_cont in ['F', 'M'] and page < max_pages:
+            headers['tr_cont'] = "N"   # 연속 조회용
+            params['CTX_AREA_FK100'] = ctx_fk
+            params['CTX_AREA_NK100'] = ctx_nk
+            page += 1
+        else:
+            break  # 마지막 페이지 또는 최대 페이지 도달
+
+    # 결과 메시지 출력
+    send_message(f"====주식 보유잔고====")
+    if item_count > 0:
+        send_message(f"📋 전체 보유 주식: {item_count}건")
+        send_message_main(f"📋 전체 보유 주식: {item_count}건")
+        # 원하는 경우 종목 리스트도 출력
+        # send_message(f"{':'.join(stock_info_list)}")
+    else:
+        send_message("📋 현재 보유 주식은 없습니다.")
+
+    if evaluation:
+        scts = evaluation[0].get('scts_evlu_amt')
+        evlu = evaluation[0].get('evlu_pfls_smtl_amt')
+        tot  = evaluation[0].get('tot_evlu_amt')
+        send_message(f"💰 주식 평가 금액: {format_krw(scts)}")
+        send_message(f"💰 평가 손익 합계: {format_krw(evlu)}")
+        send_message(f"💰 총 평가 금액: {format_krw(tot)}")
+    else:
+        send_message("평가 정보가 없습니다.")
+    send_message("=================")
+
+    return stock_dict
+
 #***********************************************************************************************************
 # 자동매매 시작
 try:
     #ACCESS_TOKEN = get_access_token()
-    ACCESS_TOKEN = "ey......WJ3oHQ"
+    ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ0b2tlbiIsImF1ZCI6ImNkOTA1NTk5LWYxYWItNGM5OS1iMzY0LWRmOTE2OTQ5ZGY3NSIsInByZHRfY2QiOiIiLCJpc3MiOiJ1bm9ndyIsImV4cCI6MTc1OTAzOTYyMiwiaWF0IjoxNzU4OTUzMjIyLCJqdGkiOiJQU1kxaUxka1BsTGE5ajhkYTNJZDZENGlHU3g5REVkU3I4Uk8ifQ.PFUczunEusjcFQHAhfyUDU1ebIdN2trDT-lK_iBh4cmsv4v-1HcKBlYN4ROxISofWIfWN7wsa46r-WRDASWbGg"
     #print(f"\n📋 ACCESS_TOKEN: {ACCESS_TOKEN}")
 
-    total_cash = get_balance() # 보유 현금 조회 (10,000원 제외)
+    #total_cash = get_balance() # 보유 현금 조회 (10,000원 제외)
     #total_cash = get_max_order_cash()
-    print(f"\n📋 total_cash: {total_cash:,}")
+    #print(f"\n📋 total_cash: {total_cash:,}")
+    stock_dict = get_stock_balance() # 보유 주식 조회
+    for symbol, info in stock_dict.items():
+        print(f"{symbol} | {info['종목명']} | 수량:{info['현재수량']} | 매수가:{info['매수가']}")
 
 except Exception as e:
     print(f"\n[오류 발생]{e}")
