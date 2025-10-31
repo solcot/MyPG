@@ -1,3 +1,4 @@
+import sys
 import requests
 from requests.exceptions import ConnectTimeout, ReadTimeout, Timeout, ConnectionError
 import json
@@ -11,6 +12,8 @@ from datetime import datetime, timedelta
 from holidayskr import is_holiday
 import configparser # 추가
 import os # 파일 존재 여부 확인 및 삭제를 위해 os 모듈 추가
+import psycopg2
+from psycopg2.extras import execute_batch
 
 with open('C:\\StockPy\\config.yaml', encoding='UTF-8') as f:
     _cfg = yaml.load(f, Loader=yaml.FullLoader)
@@ -22,6 +25,10 @@ ACNT_PRDT_CD = _cfg['ACNT_PRDT_CD']
 DISCORD_WEBHOOK_URL = _cfg['DISCORD_WEBHOOK_URL']
 DISCORD_WEBHOOK_URL_MAIN = _cfg['DISCORD_WEBHOOK_URL_MAIN']
 URL_BASE = _cfg['URL_BASE']
+HOST = _cfg['HOST']
+DBNAME = _cfg['DBNAME']
+USER = _cfg['USER']
+PASSWORD = _cfg['PASSWORD']
 
 # SettingReload.ini 파일을 위한 ConfigParser 객체 전역 선언 (또는 함수 바깥)
 RELOAD_CONFIG_PATH = 'C:\\StockPy\\SettingReload.ini'
@@ -46,6 +53,15 @@ def send_message_main(msg):
     except Exception as e:
         print(f"❌ Discord 전송 실패: {e}", flush=True)
     #print(message, flush=True)
+
+def get_db_connection():
+    """데이터베이스 연결 객체를 반환하는 함수"""
+    return psycopg2.connect(
+        host=HOST,
+        dbname=DBNAME,
+        user=USER,
+        password=PASSWORD
+    )
 
 def get_access_token():
     """토큰 발급"""
@@ -78,161 +94,195 @@ def get_last_trading_day():
         day -= timedelta(days=1)
     return day.strftime('%Y%m%d')
 
-def fetch_krx_data(mktId, trade_date):
-    otp_url = 'http://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd'
-    otp_form_data = {
-        'locale': 'ko_KR',
-        'name': 'fileDown',
-        'url': 'dbms/MDC/STAT/standard/MDCSTAT01501',  # 이 부분이 핵심
-        'mktId': mktId,            # 'STK', 'KSQ'
-        'trdDd': trade_date,
-        'money': '1',              # 원 단위
-        'csvxls_isNo': 'false'
-    }
-    headers = {
-        'Referer': 'http://data.krx.co.kr/contents/MDC/MDI/mdiLoader',
-        'User-Agent': 'Mozilla/5.0'
-    }
+def get_all_symbols20(p_trade_date='20250901', p_max_price=500000):
+    trade_date = p_trade_date
 
-    #send_message(f"OTP 코드 생성 요청 중... 시장: {mktId}, 날짜: {trade_date}")
-    otp_response = requests.post(otp_url, data=otp_form_data, headers=headers)
-    if otp_response.status_code != 200:
-        send_message(f"OTP 요청 실패: 상태 코드 {otp_response.status_code}")
-        send_message(otp_response.text)
-        return None
-    otp_code = otp_response.text
-
-    #send_message(f"CSV 파일 다운로드 중... 시장: {mktId}")
-    csv_url = 'http://data.krx.co.kr/comm/fileDn/download_csv/download.cmd'
-    csv_response = requests.post(csv_url, data={'code': otp_code}, headers=headers)
-    if csv_response.status_code != 200:
-        send_message(f"CSV 다운로드 실패: 상태 코드 {csv_response.status_code}")
-        send_message(csv_response.text)
-        return None
-
+    # PostgreSQL 접속 후 쿼리 실행
     try:
-        df = pd.read_csv(BytesIO(csv_response.content), encoding='euc-kr')
-        return df
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                sql = """
+                    select * from get_stock_ma20(%s, %s);
+                """
+                cur.execute(sql, (trade_date,p_max_price))
+                rows = cur.fetchall()
+
+                symbols_name_dict = {str(code).zfill(6): name for code, name in rows}
+
+        send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 20일 이평 매수종목 반환")
+        #send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 40일 이평 매수종목 반환")
+        send_message(symbols_name_dict)
+        #send_message_main(symbols_name_dict)
+        return symbols_name_dict
+
     except Exception as e:
-        send_message(f"CSV 파싱 오류: {e}")
-        return None
+        send_message(f"❌ DB 조회 중 오류 발생: {e}")
+        return {}
 
-def get_all_symbols(p_pool_count=15):
-    trade_date = get_last_trading_day()
-    send_message(f"✅ 매수Pool(symbol) 수신 거래일은 {trade_date} 입니다.")
-    send_message_main(f"✅ 매수Pool(symbol) 수신 거래일은 {trade_date} 입니다.")
+def get_all_symbols40(p_trade_date='20250901', p_max_price=500000):
+    trade_date = p_trade_date
 
-    df_kospi = fetch_krx_data('STK', trade_date)
-    df_kosdaq = fetch_krx_data('KSQ', trade_date)
-
-    if df_kospi is None and df_kosdaq is None:
-        send_message("❌ KOSPI와 KOSDAQ 데이터 모두 가져오기 실패")
-        return []
-    elif df_kospi is None:
-        df = df_kosdaq
-    elif df_kosdaq is None:
-        df = df_kospi
-    else:
-        df = pd.concat([df_kospi, df_kosdaq], ignore_index=True)
-
-    if df is None or df.empty:
-        send_message("❌ 데이터 로드 실패: 데이터프레임이 비어 있습니다.")
-        return []
-
-    send_message(f"✅ 전체 종목 수: {len(df)}")
-    send_message_main(f"✅ 전체 종목 수: {len(df)}")
-
+    # PostgreSQL 접속 후 쿼리 실행
     try:
-        df['등락률'] = df['등락률'].astype(str).str.replace('%', '', regex=False).astype(float)
-        df['종가'] = pd.to_numeric(df['종가'], errors='coerce')
-        df['시가'] = pd.to_numeric(df['시가'], errors='coerce')
-        df['고가'] = pd.to_numeric(df['고가'], errors='coerce')
-        df['저가'] = pd.to_numeric(df['저가'], errors='coerce')
-        df['시가총액'] = pd.to_numeric(df['시가총액'], errors='coerce')
-        df['거래량'] = pd.to_numeric(df['거래량'], errors='coerce')
-        df['거래대금'] = pd.to_numeric(df['거래대금'], errors='coerce')
-    except KeyError as e:
-        send_message(f"❌ 열 이름 오류: {e}")
-        send_message("사용 가능한 열:", df.columns.tolist())
-        return []
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                sql = """
+                    select * from get_stock_ma40(%s, %s);
+                """
+                cur.execute(sql, (trade_date,p_max_price))
+                rows = cur.fetchall()
 
-    # 금일 등락률
-    df['금일등락률'] = (df['종가'] - df['시가']) / df['종가'] * 100
+                symbols_name_dict = {str(code).zfill(6): name for code, name in rows}
 
-    # ---------------------- 캔들 꼬리 계산 ----------------------
-    df['바디'] = (df['종가'] - df['시가']).abs()
-    df['윗꼬리'] = df['고가'] - df[['시가', '종가']].max(axis=1)
-    df['아래꼬리'] = df[['시가', '종가']].min(axis=1) - df['저가']
+        send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 40일 이평 매수종목 반환")
+        #send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 40일 이평 매수종목 반환")
+        send_message(symbols_name_dict)
+        #send_message_main(symbols_name_dict)
+        return symbols_name_dict
 
-    # 윗꼬리 비율 (바디가 0일 경우 0으로 처리)
-    df['윗꼬리비율'] = df.apply(
-        lambda x: x['윗꼬리'] / x['바디'] if x['바디'] > 0 else 0, axis=1
-    )
+    except Exception as e:
+        send_message(f"❌ DB 조회 중 오류 발생: {e}")
+        return {}
 
-    #*************************************************************************************************************
-    # [1번계좌] 소형주
-    filtered = df[
-        (df['금일등락률'] >= 0.3) &          # -3~7 등락률 범위를 소폭 확장하여 더 많은 잠재 후보군을 포함
-        (df['금일등락률'] <= 3.0) &
-        (df['종가'] <= 300000) &          # 동전주를 회피하는 최소 가격
-        #(df['시가총액'] >= 50e10) &      # 시가총액 5천억 이상 (너무 작은 종목 제외)
-        (df['시가총액'] < 50e10) &        # 시가총액 2조 이하 (너무 무거운 대형주 제외, 중소형주 집중)
-        #(df['거래대금'] >= 67e8)         # 거래대금 67억 이상 (최소한의 유동성 확보)
-        #(df['전일변동폭비율'] >= 0.03) &   # 전일 변동폭이 최소 5% 이상인 종목
-        #(df['전일변동폭비율'] <= 0.20)    # 전일 변동폭이 20% 이하 (지나치게 과열된 종목 제외)
-        #(df['윗꼬리비율'] < 1.5)     # 윗꼬리/바디 비율이 1.5 미만인 종목만
-        (df['아래꼬리'] >= df['윗꼬리'] * 1.1)     # 아래꼬리가 윗꼬리+윗꼬리의30% 보다 큰 종목만 포함
-    ].copy()
-    #*************************************************************************************************************
+def get_all_symbols60(p_trade_date='20250901', p_max_price=500000):
+    trade_date = p_trade_date
 
-    top_filtered = filtered.sort_values(by='거래대금', ascending=False).head(p_pool_count)
+    # PostgreSQL 접속 후 쿼리 실행
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                sql = """
+                    select * from get_stock_ma60(%s, %s);
+                """
+                cur.execute(sql, (trade_date,p_max_price))
+                rows = cur.fetchall()
 
-    #--- # 안정성 점수 계산
-    #--- top_filtered['안정성점수'] = (
-    #---     top_filtered['시가총액'] * 0.3 +
-    #---     top_filtered['거래대금'] * 0.3 +
-    #---     (1 / (abs(top_filtered['금일등락률']) + 1)) * top_filtered['거래대금'] * 0.4
-    #--- )
-    #--- 
-    #--- return_filtered = top_filtered.sort_values(by='안정성점수', ascending=False)
-    return_filtered = top_filtered
+                symbols_name_dict = {str(code).zfill(6): name for code, name in rows}
 
-    send_message(f"✅ 최종 선정 종목 수: {len(return_filtered)}")
-    send_message_main(f"✅ 최종 선정 종목 수: {len(return_filtered)}")
+        send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 60일 이평 매수종목 반환")
+        #send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 60일 이평 매수종목 반환")
+        send_message(symbols_name_dict)
+        #send_message_main(symbols_name_dict)
+        return symbols_name_dict
 
-    # 종목코드:종목명 딕셔너리 반환
-    symbols_name_dict = {}
-    for _, row in return_filtered.iterrows():
-        symbol = str(row['종목코드']).zfill(6)
-        name = row['종목명']
-        symbols_name_dict[symbol] = name
+    except Exception as e:
+        send_message(f"❌ DB 조회 중 오류 발생: {e}")
+        return {}
 
-    return symbols_name_dict
+def get_all_symbols90(p_trade_date='20250901', p_max_price=500000):
+    trade_date = p_trade_date
+
+    # PostgreSQL 접속 후 쿼리 실행
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                sql = """
+                    select * from get_stock_ma90(%s, %s);
+                """
+                cur.execute(sql, (trade_date,p_max_price))
+                rows = cur.fetchall()
+
+                symbols_name_dict = {str(code).zfill(6): name for code, name in rows}
+
+        send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 90일 이평 매수종목 반환")
+        #send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 90일 이평 매수종목 반환")
+        send_message(symbols_name_dict)
+        #send_message_main(symbols_name_dict)
+        return symbols_name_dict
+
+    except Exception as e:
+        send_message(f"❌ DB 조회 중 오류 발생: {e}")
+        return {}
+
+def get_all_symbols120(p_trade_date='20250901', p_max_price=500000):
+    trade_date = p_trade_date
+
+    # PostgreSQL 접속 후 쿼리 실행
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                sql = """
+                    select * from get_stock_ma120(%s, %s);
+                """
+                cur.execute(sql, (trade_date,p_max_price))
+                rows = cur.fetchall()
+
+                symbols_name_dict = {str(code).zfill(6): name for code, name in rows}
+
+        send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 120일 이평 매수종목 반환")
+        #send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 120일 이평 매수종목 반환")
+        send_message(symbols_name_dict)
+        #send_message_main(symbols_name_dict)
+        return symbols_name_dict
+
+    except Exception as e:
+        send_message(f"❌ DB 조회 중 오류 발생: {e}")
+        return {}
+
+def get_all_symbols_sell(p_trade_date='20250901'):
+    trade_date = p_trade_date
+
+    # PostgreSQL 접속 후 쿼리 실행
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                sql = """
+                    select * from get_stock_sell(%s);
+                """
+                cur.execute(sql, (trade_date,))
+                rows = cur.fetchall()
+
+                symbols_name_dict = {str(code).zfill(6): name for code, name in rows}
+
+        send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 매도종목 반환")
+        send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 매도종목 반환")
+        #print(symbols_name_dict)
+        return symbols_name_dict
+
+    except Exception as e:
+        send_message(f"❌ DB 조회 중 오류 발생: {e}")
+        return {}
 
 # --- ✨ 손절 (Trailing Stop) 로직 함수 ✨ ---
-def check_trailing_stop_loss(stock_dict, trailing_losses, stop_loss_threshold=-3.0, trailing_rebound=1.0, stop_abs_loss_threshold=-5.0):
+def check_trailing_stop_loss(
+    stock_dict, 
+    trailing_losses, 
+    blocked_symbols,   # 🚨 추가: 물타기 제한에 걸린 종목 관리용 set
+    stop_loss_threshold=-7.0, 
+    trailing_rebound=1.0, 
+    stop_abs_loss_threshold=-15.0, 
+    add_lose_pct=-5.0, 
+    max_mooling=5
+):
     """
-    손절 감시:
-    1. 지속적인 하락 중 -5% 초과 시 무조건 손절
-    2. 손실이 줄었다가 다시 악화되면 트레일링 손절
+    손절 감시 (물타기 적용):
+    1. 지속적인 하락 중 -5% 초과 시 무조건 손절 (현재 비활성화됨)
+    2. 손실이 줄었다가 다시 악화되면 트레일링 손절 대신 물타기 신호
+    3. 물타기 횟수 제한 (max_mooling, 기본 5회)
+       → 제한 도달 시 🚫 메시지는 딱 1번만 출력
     """
     stopped = []
 
     for sym, info in stock_dict.items():
         current_price = get_current_price(sym)
-        bought_price = info.get('매수가')
+        bought_price = info.get("매수가")
         if current_price is None or bought_price is None:
             continue
 
         profit_pct = round(((current_price / bought_price) - 1) * 100, 2)
 
-        # 1️⃣ -5% 이상 손실 시 무조건 손절
-        if profit_pct <= stop_abs_loss_threshold:
-            send_message(f"😭😭 [손절2]{info.get('종목명')}({sym}) 손실 {stop_abs_loss_threshold:.2f}% 초과! 강제손절 (손절률 {profit_pct:.2f}%)")
-            send_message_main(f"😭😭 [손절2]{info.get('종목명')}({sym}) 손실 {stop_abs_loss_threshold:.2f}% 초과! 강제손절 (손절률 {profit_pct:.2f}%)")
-            stopped.append(sym)
-            continue  # 더 이상 체크할 필요 없음
+        # ✅ 동적 손절 임계치 계산
+        buy_count = count_buy_record(sym)
+        mool_count = buy_count - 1
+        adjusted_threshold = stop_loss_threshold + (mool_count * add_lose_pct)
 
+        #--- # 1️⃣ -5% 이상 손실 시 무조건 손절
+        #--- if profit_pct <= stop_abs_loss_threshold:
+        #---     send_message(f"😭 [손절]{info.get('종목명')}({sym}) 손실 {stop_abs_loss_threshold:.2f}% 초과! 강제손절 (손절률 {profit_pct:.2f}%)")
+        #---     send_message_main(f"😭 [손절]{info.get('종목명')}({sym}) 손실 {stop_abs_loss_threshold:.2f}% 초과! 강제손절 (손절률 {profit_pct:.2f}%)")
+        #---     stopped.append(sym)
+        #---     continue  # 더 이상 체크할 필요 없음
+                                                             
         # 2️⃣ 트레일링 손절 조건 확인
         if profit_pct < 0:
             # 최저 손실 갱신
@@ -240,12 +290,22 @@ def check_trailing_stop_loss(stock_dict, trailing_losses, stop_loss_threshold=-3
                 trailing_losses[sym] = profit_pct
 
             # 손실 반등 후 재하락 감지
-            if trailing_losses[sym] - profit_pct >= trailing_rebound and profit_pct <= stop_loss_threshold:
-                #send_message(f"😭 [손절1]{info.get('종목명')}({sym}) 트레일링 손절 (손절률 {profit_pct:.2f}%)")
-                send_message(f"😭 [손절1]{info.get('종목명')}({sym}) 트레일링 손절 (반등률 {trailing_losses[sym]:.2f}%)-(손절률 {profit_pct:.2f}%)")
-                #send_message_main(f"😭 [손절1]{info.get('종목명')}({sym}) 트레일링 손절 (손절률 {profit_pct:.2f}%)")
-                send_message_main(f"😭 [손절1]{info.get('종목명')}({sym}) 트레일링 손절 (반등률 {trailing_losses[sym]:.2f}%)-(손절률 {profit_pct:.2f}%)")
-                stopped.append(sym)
+            if trailing_losses[sym] - profit_pct >= trailing_rebound and profit_pct <= adjusted_threshold:
+
+                # 물타기 횟수 제한 확인
+                if mool_count >= max_mooling:
+                    if sym not in blocked_symbols:   # 🚫 이미 로그 찍은 종목은 생략
+                        send_message(f"🚫 [물타기중단]{info.get('종목명')}({sym}) "
+                                     f"물타기 {max_mooling}회 도달 → 추가 물타기 불가")
+                        send_message_main(f"🚫 [물타기중단]{info.get('종목명')}({sym}) "
+                                          f"물타기 {max_mooling}회 도달 → 추가 물타기 불가")
+                        blocked_symbols.add(sym)  # ✅ 상태 기록
+                else:
+                    send_message(f"🟢 [물타기신호 {mool_count+1}회차]{info.get('종목명')}({sym}) "
+                                 f"손실률 {profit_pct:.2f}% (임계치 {adjusted_threshold:.2f}%) → 물타기 대상")
+                    send_message_main(f"🟢 [물타기신호 {mool_count+1}회차]{info.get('종목명')}({sym}) "
+                                      f"손실률 {profit_pct:.2f}% (임계치 {adjusted_threshold:.2f}%) → 물타기 대상")
+                    stopped.append(sym)
         else:
             # 손실이 아닌 경우 기록 제거
             if sym in trailing_losses:
@@ -452,7 +512,6 @@ def get_price_info(code="005930", k_base=0.5, gap_threshold=0.03):
             msg = f"[{code}] {stock_name} 갭하락 {gap_rate*100:.2f}% 발생 -> 매수풀에서 제거"
             send_message(msg)
             send_message_main(msg)
-            selected_symbols_map.pop(code, None)
             return None, None
 
         # 갭 상승
@@ -460,7 +519,6 @@ def get_price_info(code="005930", k_base=0.5, gap_threshold=0.03):
             msg = f"[{code}] {stock_name} 갭상승 {gap_rate*100:.2f}% 발생 -> 매수풀에서 제거"
             send_message(msg)
             send_message_main(msg)
-            selected_symbols_map.pop(code, None)
             return None, None
 
         return target_price, open_price
@@ -502,16 +560,26 @@ def format_krw(val):
         return f"{num:,.2f}원"
 
 def get_stock_balance():
-    """주식 잔고조회"""
+    """주식 잔고조회 - 연속 조회 지원"""
     PATH = "uapi/domestic-stock/v1/trading/inquire-balance"
     URL = f"{URL_BASE}/{PATH}"
-    headers = {"Content-Type":"application/json", 
-        "authorization":f"Bearer {ACCESS_TOKEN}",
-        "appKey":APP_KEY,
-        "appSecret":APP_SECRET,
-        "tr_id":"TTTC8434R",
-        "custtype":"P",
+
+    stock_dict = {}
+    stock_info_list = []
+    item_count = 0
+    evaluation = []  # <- 추가
+
+    # 초기 헤더/파라미터
+    headers = {
+        "Content-Type": "application/json",
+        "authorization": f"Bearer {ACCESS_TOKEN}",
+        "appKey": APP_KEY,
+        "appSecret": APP_SECRET,
+        "tr_id": "TTTC8434R",
+        "tr_cont": "",       # 첫 호출 시 공백
+        "custtype": "P",
     }
+
     params = {
         "CANO": CANO,
         "ACNT_PRDT_CD": ACNT_PRDT_CD,
@@ -522,57 +590,72 @@ def get_stock_balance():
         "FUND_STTL_ICLD_YN": "N",
         "FNCG_AMT_AUTO_RDPT_YN": "N",
         "PRCS_DVSN": "01",
-        "CTX_AREA_FK100": "",
-        "CTX_AREA_NK100": ""
+        "CTX_AREA_FK100": "",  # 첫 호출 시 공백
+        "CTX_AREA_NK100": ""   # 첫 호출 시 공백
     }
-    res = requests.get(URL, headers=headers, params=params)
 
-    if res.status_code != 200:
-        send_message(f"주식 잔고 조회 실패: {res.json().get('msg1', '알 수 없는 오류')}")
-        return {}
+    page = 1
+    max_pages = 100  # 무한루프 방지용
 
-    response_data = res.json()
-    stock_list = response_data.get('output1', []) 
-    evaluation = response_data.get('output2', [])
+    while True:
+        #time.sleep(0.3)  # <-- API 호출 제한 회피용 딜레이
+        res = requests.get(URL, headers=headers, params=params)
+        if res.status_code != 200:
+            msg1 = res.json().get('msg1', '')
+            if '초당 거래건수' in msg1:
+                send_message("[WARN] 초당 거래건수 초과 — 1초 대기 후 재시도")
+                time.sleep(1)
+                continue  # 재시도
+            else:
+                send_message(f"[ERROR] 주식 잔고 조회 실패: {msg1}")
+                sys.exit(1)  # ← 프로그램 강제 종료, #return stock_dict  #break
 
-    stock_dict = {}
+        response_data = res.json()
+        stock_list = response_data.get('output1', [])
+        evaluation = response_data.get('output2', [])
+
+        ctx_fk = response_data.get('ctx_area_fk100', '')
+        ctx_nk = response_data.get('ctx_area_nk100', '')
+
+        # 받은 데이터 처리
+        for stock in stock_list:
+            symbol = stock.get('pdno')
+            hldg_qty = int(stock.get('hldg_qty', 0))
+            buy_price = float(stock.get('pchs_avg_pric', 0))
+            product_name = stock.get('prdt_name')
+            if hldg_qty > 0:
+                item_count += 1
+                stock_dict[symbol] = {
+                    '종목명': product_name,
+                    '현재수량': hldg_qty,
+                    '매수가': buy_price
+                }
+                stock_info_list.append(f"{item_count:02d}.{product_name}({symbol})")
+
+        # 다음 페이지 여부 확인
+        tr_cont = res.headers.get('tr_cont', '')
+        if tr_cont in ['F', 'M'] and page < max_pages:
+            headers['tr_cont'] = "N"   # 연속 조회용
+            params['CTX_AREA_FK100'] = ctx_fk
+            params['CTX_AREA_NK100'] = ctx_nk
+            page += 1
+        else:
+            break  # 마지막 페이지 또는 최대 페이지 도달
+
+    # 결과 메시지 출력
     send_message(f"====주식 보유잔고====")
-    
-    item_count = 0
-    stock_info_list = []  # 주식 정보를 저장할 리스트
-    for idx, stock in enumerate(stock_list, start=1):
-        # API에서 받은 데이터에서 필요한 정보 추출
-        symbol = stock.get('pdno')
-        hldg_qty = int(stock.get('hldg_qty', 0))
-        buy_price = float(stock.get('pchs_avg_pric', 0))
-        product_name = stock.get('prdt_name')
-
-        if hldg_qty > 0: 
-            item_count += 1
-            # ✨ 매수가를 포함한 상세 정보를 딕셔너리로 저장
-            stock_dict[symbol] = {
-                '종목명': product_name,
-                '현재수량': hldg_qty,
-                '매수가': buy_price
-            }
-            #send_message(f"{item_count:02d}.{product_name}({symbol}): {hldg_qty}주, 매수가:{buy_price:,.2f}원")
-            # 리스트 형태로 저장
-            stock_info_list.append(f"{item_count:02d}.{product_name}({symbol})")
-
-    # 수정: 보유 주식 건수를 요약해서 한 번만 메시지 전송
     if item_count > 0:
-        # 보유 주식 리스트를 콜론으로 구분하여 출력
-        stock_list_str = ":".join(stock_info_list)
-        send_message(f"📋 현재 보유 주식은 {item_count:02d}건 입니다.\n{stock_list_str}")
-        send_message_main(f"📋 현재 보유 주식은 {item_count:02d}건 입니다.")
+        send_message(f"📋 전체 보유 주식: {item_count}건")
+        send_message_main(f"📋 전체 보유 주식: {item_count}건")
+        # 원하는 경우 종목 리스트도 출력
+        # send_message(f"{':'.join(stock_info_list)}")
     else:
         send_message("📋 현재 보유 주식은 없습니다.")
 
     if evaluation:
-        scts = evaluation[0].get('scts_evlu_amt')   # 기본값으로 'N/A' 넣지 않기
+        scts = evaluation[0].get('scts_evlu_amt')
         evlu = evaluation[0].get('evlu_pfls_smtl_amt')
         tot  = evaluation[0].get('tot_evlu_amt')
-
         send_message(f"💰 주식 평가 금액: {format_krw(scts)}")
         send_message(f"💰 평가 손익 합계: {format_krw(evlu)}")
         send_message_main(f"💰 평가 손익 합계: {format_krw(evlu)}")
@@ -655,7 +738,7 @@ def buy(code="005930", qty="1"):
         send_message(f"[매수 실패]{str(res.json())}")
         return False
 
-def safe_buy(sym, buy_amount, current_price):
+def safe_buy(sym, buy_amount, current_price, stock_name):
     """
     주문 가능 금액을 확인하고 안전하게 매수
     - 최초 주문은 버퍼 0% (1.00) 적용
@@ -663,15 +746,18 @@ def safe_buy(sym, buy_amount, current_price):
     """
     if current_price is None or current_price <= 0:
         send_message(f"⚠️ {sym} 매수 불가: 현재가 오류 ({current_price}), 매수풀에서 제거")
-        selected_symbols_map.pop(sym, None)
         return False
 
-    # 최초 주문가능금액 조회
-    #max_cash = get_balance(pdno=sym, ord_unpr=current_price)
-    max_cash = buy_amount
-    if max_cash <= 0:
+    # 실제 사용 가능한 현금 조회
+    account_cash = get_balance()
+    if account_cash is None or account_cash <= 0:
         send_message(f"⚠️ {sym} 매수 불가: 주문가능금액이 0원으로 조회됨, 매수풀에서 제거")
-        selected_symbols_map.pop(sym, None)
+        return False
+
+    # 매수하려는 금액이 계좌 잔고를 초과하면 cap
+    max_cash = int(min(buy_amount, account_cash))
+    if max_cash <= 0:
+        send_message(f"⚠️ {sym} 매수 불가: 매수금액 0원, 매수풀에서 제거")
         return False
 
     attempts = 0
@@ -682,22 +768,16 @@ def safe_buy(sym, buy_amount, current_price):
 
         safe_cash = int(min(buy_amount, max_cash) * ratio)
         qty_to_buy = int(safe_cash // current_price)
+        total_buy_amt = qty_to_buy * current_price
 
         if qty_to_buy <= 0:
             send_message(f"⚠️ {sym} 매수 불가: (safe_cash {safe_cash}원, 현재가 {current_price}원), 매수풀에서 제거")
-            selected_symbols_map.pop(sym, None)
             return False
 
         send_message(f"🟢 {sym} 주문시도({attempts+1}회차): 수량={qty_to_buy}, 단가={current_price}, 총액={qty_to_buy*current_price:,}원, 잔고={buy_amount:,}원")
         ok = buy(sym, qty_to_buy)
         if ok:
-            # ✅ 종목명 확보 & 중복 기록 방지
-            stock_name = (
-                selected_symbols_map.get(sym)
-                or (get_stock_balance().get(sym, {}).get('종목명') if callable(get_stock_balance) else None)
-                or "Unknown"
-            )
-            add_buy_record(sym, stock_name)
+            add_buy_record(sym, qty_to_buy, current_price, total_buy_amt, stock_name)
             return True
 
         # 실패 → 다음 루프에서 더 보수적으로 줄여서 재시도
@@ -705,7 +785,6 @@ def safe_buy(sym, buy_amount, current_price):
         time.sleep(0.2)  # API 호출 간격 확보
 
     send_message(f"⚠️ {sym} 매수 실패(6회 재시도 후). 매수풀에서 제거")
-    selected_symbols_map.pop(sym, None)
     return False
 
 def sell(code="005930", qty="1", stock_dict_cache=None, div="모름"):
@@ -778,6 +857,9 @@ def load_settings():
             'T_START_TIME': {'hour': 9, 'minute': 3, 'second': 0},
             'T_SELL_TIME': {'hour': 14, 'minute': 3, 'second': 0},
             'T_EXIT_TIME': {'hour': 14, 'minute': 8, 'second': 0},
+            'AMOUNT_TO_BUY': 350000,
+            'STOP_ADD_LOSE_PCT': -5.0,
+            'MAX_MOOLING': 5,
             'SLIPPAGE_LIMIT': 1.015,
             'STOP_LOSE_PCT': -3.0,
             'STOP_TRAILING_REBOUND': 1.0,
@@ -826,6 +908,9 @@ def load_settings():
         settings['TARGET_K2_TIME'] = parse_time_setting(config, 'TARGET_K2')
         settings['TARGET_K3_TIME'] = parse_time_setting(config, 'TARGET_K3')
 
+        settings['AMOUNT_TO_BUY'] = config.getfloat('StrategyParameters', 'AMOUNT_TO_BUY')
+        settings['STOP_ADD_LOSE_PCT'] = config.getfloat('StrategyParameters', 'STOP_ADD_LOSE_PCT')
+        settings['MAX_MOOLING'] = config.getint('StrategyParameters', 'MAX_MOOLING')
         settings['SLIPPAGE_LIMIT'] = config.getfloat('StrategyParameters', 'SLIPPAGE_LIMIT')
         settings['STOP_LOSE_PCT'] = config.getfloat('StrategyParameters', 'STOP_LOSE_PCT')
         settings['STOP_TRAILING_REBOUND'] = config.getfloat('StrategyParameters', 'STOP_TRAILING_REBOUND')
@@ -857,6 +942,9 @@ def load_settings():
             'T_START_TIME': {'hour': 9, 'minute': 3, 'second': 0},
             'T_SELL_TIME': {'hour': 14, 'minute': 3, 'second': 0},
             'T_EXIT_TIME': {'hour': 14, 'minute': 8, 'second': 0},
+            'AMOUNT_TO_BUY': 350000,
+            'STOP_ADD_LOSE_PCT': -5.0,
+            'MAX_MOOLING': 5,
             'SLIPPAGE_LIMIT': 1.015,
             'STOP_LOSE_PCT': -3.0,
             'STOP_TRAILING_REBOUND': 1.0,
@@ -909,7 +997,24 @@ def write_reload_setting(value):
 
 
 BUYDATE_FILE = "C:\\StockPy\\BuyDate.ini"
+BUYDATE_HISTORY_FILE = "C:\\StockPy\\BuyDate_History.ini"
 SELLHISTORY_FILE = "C:\\StockPy\\SellHistory.ini"
+
+def count_buy_record(sym):
+    """BUYDATE_FILE에서 특정 symbol이 몇 개 있는지 count"""
+    if not os.path.exists(BUYDATE_FILE):
+        return 1
+
+    count = 0
+    with open(BUYDATE_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            parts = line.strip().split(maxsplit=2)  # 날짜 / 심볼 / 종목명
+            if len(parts) >= 2 and parts[1] == sym:
+                count += 1
+    # count가 0이면 1을 return
+    return count if count > 0 else 1
 
 def get_position_snapshot(code, stock_dict_cache=None):
     """
@@ -923,16 +1028,11 @@ def get_position_snapshot(code, stock_dict_cache=None):
     # 키 명 보호적으로 처리 (환경 따라 '평균단가' 등일 수 있어 백업 키도 확인)
     buy_price = (
         info.get('매수가')
-        or info.get('평균단가')
-        or info.get('매입단가')
-        or 0
     )
     stock_name = (
         info.get('종목명')
-        or (selected_symbols_map.get(code) if 'selected_symbols_map' in globals() else None)
-        or "Unknown"
     )
-    hold_qty = info.get('현재수량') or info.get('보유수량') or 0
+    hold_qty = info.get('현재수량')
 
     # 정수/문자 혼합 안전 처리
     try:
@@ -1003,40 +1103,54 @@ def write_sell_history(code, qty, sell_price, buy_price, stock_name, div):
             f"{buy_date_str} {today_str} {hold_days} {code} {qty:,} {buy_price:,} {buy_total:,} "
             f"{sell_price:,} {sell_total:,} {profit_amt:,} {profit_rate:.2f}% {div} {stock_name}\n"
         )
-        
-def add_buy_record(sym, stock_name):
-    """매수 기록 추가 (이미 있으면 추가 안 함: 최초 매수일 유지)"""
+
+def add_buy_record(sym, qty_to_buy, current_price, total_buy_amt, stock_name):
+    """매수 기록 추가 (무조건 마지막에 추가)"""
     today_str = datetime.now().strftime("%Y%m%d")
-    existed = False
+    
+    # 파일 존재 여부와 관계없이 무조건 마지막에 기록
+    with open(BUYDATE_FILE, "a", encoding="utf-8") as f:
+        f.write(f"{today_str} {sym} {qty_to_buy:,} {current_price:,} {total_buy_amt:,} {stock_name}\n")
 
-    if os.path.exists(BUYDATE_FILE):
-        with open(BUYDATE_FILE, "r", encoding="utf-8") as f:
-            for line in f:
-                if not line.strip():
-                    continue
-                parts = line.strip().split(maxsplit=2)  # ✅ 공백 포함 종목명 안전
-                if len(parts) >= 2 and parts[1] == sym:
-                    existed = True
-                    break
-
-    if not existed:
-        with open(BUYDATE_FILE, "a", encoding="utf-8") as f:
-            f.write(f"{today_str} {sym} {stock_name}\n")
-
+# --- ★★★ 요청사항이 반영된 수정된 함수 ★★★ ---
 def remove_sell_record(sym):
-    """매도 시 해당 종목 기록 삭제"""
+    """매도 시 BuyDate.ini에서 해당 종목을 삭제하고, 삭제된 내역은 BuyDate_History.ini에 기록합니다."""
     if not os.path.exists(BUYDATE_FILE):
+        print(f"경고: 원본 파일({BUYDATE_FILE})이 존재하지 않습니다.")
         return
-    with open(BUYDATE_FILE, "r", encoding="utf-8") as f:
-        lines = f.readlines()
-    with open(BUYDATE_FILE, "w", encoding="utf-8") as f:
-        for line in lines:
-            if not line.strip():
-                continue
-            parts = line.strip().split(maxsplit=2)  # ✅
-            if len(parts) >= 2 and parts[1] == sym:
-                continue
-            f.write(line)
+
+    try:
+        # 1. 원본 파일(BuyDate.ini)의 모든 내용을 읽어옵니다.
+        with open(BUYDATE_FILE, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        
+        # 2. 원본 파일은 '덮어쓰기(w)' 모드로, 백업 파일은 '추가(a)' 모드로 엽니다.
+        #    이렇게 하면 파일을 한 번만 순회하면서 두 가지 작업을 동시에 처리할 수 있습니다.
+        with open(BUYDATE_FILE, "w", encoding="utf-8") as f_buy_new, \
+             open(BUYDATE_HISTORY_FILE, "a", encoding="utf-8") as f_history:
+            
+            # 3. 읽어온 모든 라인을 하나씩 확인합니다.
+            for line in lines:
+                if not line.strip():  # 빈 줄은 건너뜁니다.
+                    continue
+                
+                parts = line.strip().split(maxsplit=2)
+                
+                # 4. 라인에서 분리한 두 번째 요소(종목 코드)가 매도한 종목(sym)과 일치하는지 확인합니다.
+                if len(parts) >= 2 and parts[1] == sym:
+                    # 5. 일치하면, 해당 라인을 BuyDate_History.ini에 씁니다. (백업)
+                    f_history.write(line)
+                    # continue를 통해 아래 f_buy_new.write(line)가 실행되지 않도록 하여
+                    # BuyDate.ini에서는 해당 라인이 삭제되는 효과를 줍니다.
+                    continue
+                
+                # 6. 매도한 종목이 아니면, 해당 라인을 BuyDate.ini에 다시 씁니다. (유지)
+                f_buy_new.write(line)
+
+        #print(f"'{sym}' 종목을 {BUYDATE_FILE}에서 삭제하고 {BUYDATE_HISTORY_FILE}에 백업했습니다.")
+
+    except IOError as e:
+        print(f"파일 처리 중 오류가 발생했습니다: {e}")
 
 def get_old_symbols(days=5):
     """
@@ -1060,6 +1174,124 @@ def get_old_symbols(days=5):
                 old_symbols.append((symbol, stock_name))
 
     return old_symbols
+
+def can_additional_buy():
+    """계좌 잔고 확인 후 추가매수 가능 여부 반환"""
+    balance = get_balance()
+    if balance is None:
+        return False
+    return balance >= AMOUNT_TO_BUY
+
+def print_today_sell_history():
+    """SellHistory.ini 에서 매도일이 오늘인 내역과 총 수익금 출력"""
+    today_str = datetime.now().strftime("%Y%m%d")
+    if not os.path.exists(SELLHISTORY_FILE):
+        send_message("📂 SellHistory.ini 파일이 존재하지 않습니다.")
+        return
+
+    total_cnt = 0
+    total_profit = 0
+    found = False
+    with open(SELLHISTORY_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            parts = line.strip().split(maxsplit=12)  # 종목명 포함
+            if len(parts) < 11:
+                continue
+            sell_date = parts[1]  # 두 번째 컬럼이 매도일
+            if sell_date == today_str:
+                send_message("📑 오늘 매도 내역: " + line.strip())
+                try:
+                    profit_amt = int(parts[9].replace(",", ""))  # 10번째 컬럼 (수익금)
+                    total_cnt += 1
+                    total_profit += profit_amt
+                except Exception:
+                    pass
+                found = True
+
+    if found:
+        send_message(f"📊 오늘 총 수익금: {total_cnt:,}건 {total_profit:,}원")
+        send_message("=================")
+        send_message_main(f"📊 오늘 총 수익금: {total_cnt:,}건 {total_profit:,}원")
+    else:
+        send_message("📑 오늘 매도 내역 없음")
+        send_message("=================")
+        send_message_main("📑 오늘 매도 내역 없음")
+
+def print_month_sell_history():
+    """SellHistory.ini 에서 이번달 매도 내역과 총 수익금 출력"""
+    today_str = datetime.now().strftime("%Y%m%d")
+    this_month = today_str[:6]  # YYYYMM 형식
+    if not os.path.exists(SELLHISTORY_FILE):
+        send_message("📂 SellHistory.ini 파일이 존재하지 않습니다.")
+        return
+
+    total_cnt = 0
+    total_profit = 0
+    found = False
+    with open(SELLHISTORY_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            parts = line.strip().split(maxsplit=12)  # 종목명 포함
+            if len(parts) < 11:
+                continue
+            sell_date = parts[1]  # 두 번째 컬럼이 매도일
+            if sell_date.startswith(this_month):
+                try:
+                    profit_amt = int(parts[9].replace(",", ""))  # 10번째 컬럼 (수익금)
+                    total_cnt += 1
+                    total_profit += profit_amt
+                except Exception:
+                    pass
+                found = True
+
+    if found:
+        send_message(f"📊 {this_month}월 총 수익금: {total_cnt:,}건 {total_profit:,}원")
+        send_message("=================")
+        send_message_main(f"📊 {this_month}월 총 수익금: {total_cnt:,}건 {total_profit:,}원")
+    else:
+        send_message(f"📑 {this_month}월 매도 내역 없음")
+        send_message("=================")
+        send_message_main(f"📑 {this_month}월 매도 내역 없음")
+
+def print_year_sell_history():
+    """SellHistory.ini 에서 올해 매도 내역과 총 수익금 출력"""
+    today_str = datetime.now().strftime("%Y%m%d")
+    this_year = today_str[:4]  # YYYY 형식
+    if not os.path.exists(SELLHISTORY_FILE):
+        send_message("📂 SellHistory.ini 파일이 존재하지 않습니다.")
+        return
+
+    total_cnt = 0
+    total_profit = 0
+    found = False
+    with open(SELLHISTORY_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            parts = line.strip().split(maxsplit=12)  # 종목명 포함
+            if len(parts) < 11:
+                continue
+            sell_date = parts[1]  # 두 번째 컬럼이 매도일
+            if sell_date.startswith(this_year):
+                try:
+                    profit_amt = int(parts[9].replace(",", ""))  # 10번째 컬럼 (수익금)
+                    total_cnt += 1
+                    total_profit += profit_amt
+                except Exception:
+                    pass
+                found = True
+
+    if found:
+        send_message(f"📊 {this_year}년 총 수익금: {total_cnt:,}건 {total_profit:,}원")
+        send_message("=================")
+        send_message_main(f"📊 {this_year}년 총 수익금: {total_cnt:,}건 {total_profit:,}원")
+    else:
+        send_message(f"📑 {this_year}년 매도 내역 없음")
+        send_message("=================")
+        send_message_main(f"📑 {this_year}년 매도 내역 없음")
 #***********************************************************************************************************
 # 자동매매 시작
 try:
@@ -1079,8 +1311,30 @@ try:
         settings = load_settings()
 
         POOL_COUNT = settings['POOL_COUNT']
-        selected_symbols_map = get_all_symbols(p_pool_count=POOL_COUNT)  # ✅ 변경: 종목코드:종목명 딕셔너리 형태로 받아옵니다.
-        #selected_symbols_map = {
+        AMOUNT_TO_BUY = settings['AMOUNT_TO_BUY']
+        trade_date = get_last_trading_day()
+        #trade_date = '20250909'
+        MAX_BUY_PRICE = AMOUNT_TO_BUY
+        symbols_buy_pool20 = get_all_symbols20(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 20
+        symbols_buy_pool40 = get_all_symbols40(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 40
+        symbols_buy_pool60 = get_all_symbols60(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 60
+        symbols_buy_pool90 = get_all_symbols90(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 90
+        symbols_buy_pool120 = get_all_symbols120(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 120
+        symbols_buy_pool = {
+            **symbols_buy_pool20,
+            **symbols_buy_pool40,
+            **symbols_buy_pool60,
+            **symbols_buy_pool90,
+            **symbols_buy_pool120
+        }
+        send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_buy_pool)}건 이평 매수종목 반환")
+        send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_buy_pool)}건 이평 매수종목 반환")
+        send_message(symbols_buy_pool)
+        send_message_main(symbols_buy_pool)
+
+        symbols_sell_pool = get_all_symbols_sell(p_trade_date=trade_date)  # 금일 매도 종목 <- 현재 계좌에 있다면...
+
+        #symbols_buy_pool = {
         #    "005930": "삼성전자",
         #    "035720": "카카오",
         #    "000660": "SK하이닉스",
@@ -1090,31 +1344,18 @@ try:
         #    # "종목코드": "종목명" 형식으로 추가하세요.
         #}
 
-        ## --- ✨ 테스트 출력 시작 ✨ ---
-        #send_message("--- [setting.ini] 로드된 설정 값 ---")
-        #for key, value in settings.items():
-        #    if isinstance(value, dict): # 시간 설정 (딕셔너리)은 보기 좋게 출력
-        #        time_str = f"{{'hour': {value['hour']}, 'minute': {value['minute']}, 'second': {value['second']}}}"
-        #        send_message(f"- {key}: {time_str}")
-        #    elif isinstance(value, list): # 리스트는 join으로 출력
-        #        send_message(f"- {key}: {', '.join(value)}")
-        #    else:
-        #        send_message(f"- {key}: {value}")
-        #send_message("--- [setting.ini] 로드된 설정 값 끝 ---")
-        ## --- ✨ 테스트 출력 끝 ✨ ---
-
         ACCOUNT_AMT = settings['ACCOUNT_AMT']    #**************** ACCOUNT_AMT/TARGET_BUY_COUNT/df['종가'] 는 항상 같이 고려되야 함....
-        # --- ✨ 09시 이전 EXCLUDE_LIST 초기화 로직 ✨ ---
-        t_now_check = datetime.now()
-        t_9_oclock = t_now_check.replace(hour=9, minute=0, second=0, microsecond=0)
-
-        # 09:00:00 이전이면 EXCLUDE_LIST를 강제로 빈 리스트로 설정
-        if t_now_check < t_9_oclock:
-            send_message("✅ 09시 이전이므로 EXCLUDE_LIST를 초기화합니다.")
-            EXCLUDE_LIST = []
-        else:
-            EXCLUDE_LIST = settings['EXCLUDE_LIST']
-        #EXCLUDE_LIST = settings['EXCLUDE_LIST']
+        #--- # --- ✨ 09시 이전 EXCLUDE_LIST 초기화 로직 ✨ ---
+        #--- t_now_check = datetime.now()
+        #--- t_9_oclock = t_now_check.replace(hour=9, minute=0, second=0, microsecond=0)
+#--- 
+        #--- # 09:00:00 이전이면 EXCLUDE_LIST를 강제로 빈 리스트로 설정
+        #--- if t_now_check < t_9_oclock:
+        #---     send_message("✅ 09시 이전이므로 EXCLUDE_LIST를 초기화합니다.")
+        #---     EXCLUDE_LIST = []
+        #--- else:
+        #---     EXCLUDE_LIST = settings['EXCLUDE_LIST']
+        EXCLUDE_LIST = settings['EXCLUDE_LIST']
         TARGET_BUY_COUNT = settings['TARGET_BUY_COUNT']
 
         T_9_TIME = settings['T_9_TIME']
@@ -1122,8 +1363,11 @@ try:
         T_SELL_TIME = settings['T_SELL_TIME']
         T_EXIT_TIME = settings['T_EXIT_TIME']
 
-        SLIPPAGE_LIMIT = settings['SLIPPAGE_LIMIT']
+        #AMOUNT_TO_BUY = settings['AMOUNT_TO_BUY']   #윗부분에서 처리
+        STOP_ADD_LOSE_PCT = settings['STOP_ADD_LOSE_PCT']
+        MAX_MOOLING = settings['MAX_MOOLING']
 
+        SLIPPAGE_LIMIT = settings['SLIPPAGE_LIMIT']
         STOP_LOSE_PCT = settings['STOP_LOSE_PCT']
         STOP_TRAILING_REBOUND = settings['STOP_TRAILING_REBOUND']
         STOP_ABS_LOSE_PCT = settings['STOP_ABS_LOSE_PCT']
@@ -1154,9 +1398,9 @@ try:
 
         if EXCLUDE_LIST and len(EXCLUDE_LIST) > 0:
             # ✅ 변경: 딕셔너리에서 제외할 종목들을 필터링하여 새로운 딕셔너리 생성
-            selected_symbols_map = {
+            symbols_buy_pool = {
                 sym: name
-                for sym, name in selected_symbols_map.items()
+                for sym, name in symbols_buy_pool.items()
                 if sym not in EXCLUDE_LIST
             }
 
@@ -1213,6 +1457,9 @@ try:
         last_balance_check_time = datetime.now() - timedelta(minutes=15)  # 초기화: 과거로 설정해서 15분후에 출력되도록 이후는 30분마다
         last_heartbeat = datetime.now() - timedelta(minutes=10)
         last_reload_check_time = datetime.now() - timedelta(seconds=10)
+        last_can_buy1_flag_time = datetime.now() - timedelta(minutes=11)
+        last_can_buy2_flag_time = datetime.now() - timedelta(minutes=12)
+        last_can_buy3_flag_time = datetime.now() - timedelta(minutes=13)
         # 슬리피지 초과 감시용 변수들 (초기화 부분)
         slippage_count = {}
         slippage_last_logged = {}
@@ -1222,9 +1469,14 @@ try:
         trailing_peaks = {} 
         # ✨ 추가: 손절 변동(Trailing Stop)을 위한 딕셔너리
         trailing_losses = {}  # 예: {'005930': -1.2}
+        blocked_symbols = set()   # 🚨 반드시 초기화 필요
 
         while True:
             t_now = datetime.now()
+
+            can_buy_flag = can_additional_buy()
+            #if not can_buy_flag:
+            #    time.sleep(300)            
 
             # 10분마다 heartbeat 출력
             if (t_now - last_heartbeat).total_seconds() >= 600:
@@ -1250,20 +1502,54 @@ try:
             # --- ✨ 재로드 로직 끝 ✨ ---
 
             if t_9 < t_now < t_start and soldout == False: # # AM 09:00 ~ AM 09:03 : 잔여 수량 매도
-                #~~~ for sym, details in stock_dict.items():
-                #~~~     qty = details.get('현재수량', '0') # '현재수량'을 추출하여 qty에 할당
-                #~~~     if int(qty) > 0: # 수량이 0보다 큰 경우에만 매도 실행
-                #~~~         sell(sym, qty, stock_dict_cache=stock_dict, div="장시작")  # ← 캐시 전달
-                soldout = True
-                #~~~ bought_list = []
-                #~~~ time.sleep(0.1)
-                #~~~ stock_dict = get_stock_balance()
+                ##### 장시작시 매수종목중 이평선 역배열에 만난 종목 매도
+                for sym, details in stock_dict.items():
+                    qty = details.get('현재수량', '0')
+                    sell_name = details.get('종목명')
+                    if int(qty) > 0:
+                        if sym in symbols_sell_pool.keys():
+                            send_message(f"✨ [장시작매도]{sell_name}({sym}) 이평선 역배열 매도 수행")
+                            send_message_main(f"✨ [장시작매도]{sell_name}({sym}) 이평선 역배열 매도 수행")
+                            result = sell(sym, qty, stock_dict_cache=stock_dict, div="장시작이평선역배열")
+                            if result:
+                                time.sleep(1.5)              
+                bought_list = []
+                stock_dict = get_stock_balance()
+                for sym in stock_dict.keys():
+                    bought_list.append(sym)
 
-            if t_start < t_now < t_sell:  # AM 09:03 ~ PM 02:58 : 매수     
+                ##### 장시작시 이평선 정배열인 종목 신규 매수
+                if not can_buy_flag:
+                    send_message(f"🚫 장시작 신규매수 중단: 계좌 잔고 부족(<{AMOUNT_TO_BUY:,}원)")
+                    send_message_main(f"🚫 장시작 신규매수 중단: 계좌 잔고 부족(<{AMOUNT_TO_BUY:,}원)")     
+                else:
+                    for sym, stock_name in symbols_buy_pool.items():
+                        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
+                        if remaining_buy_count > 1:
+                            if sym in bought_list:
+                                continue
+                            current_price = get_current_price(sym)
+                            if current_price is None:
+                                send_message(f"[{stock_name}({sym})] 가격수신실패. 다음 종목으로 넘어갑니다.")
+                                continue 
+                            send_message(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
+                            send_message_main(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
+                            result = safe_buy(sym, AMOUNT_TO_BUY, current_price, stock_name)
+                            if result:
+                                time.sleep(1.5)
+                        
+                bought_list = []
+                stock_dict = get_stock_balance()
+                for sym in stock_dict.keys():
+                    bought_list.append(sym)
+
+                soldout = True
+
+            if t_start < t_now < t_sell:  # AM 09:03 ~ PM 02:58 : 물타기/익절 감시     
             
                 #send_message("루프 시작..................") #루프 시간 측정용
 
-                # 손절 감시 로직 -------------------------------------------------------  
+                # 물타기 감시 로직 -------------------------------------------------------  
                 if t_notstoploss < t_now < t_sell:  # PM 03:10 ~ PM 03:23 : BREAK_EVEN_PCT 조정
                     STOP_LOSE_PCT = -3000.0
                     STOP_TRAILING_REBOUND = 1.0
@@ -1273,61 +1559,76 @@ try:
                         stopped = check_trailing_stop_loss(
                             stock_dict=stock_dict,
                             trailing_losses=trailing_losses,
+                            blocked_symbols=blocked_symbols,   # ✅ set으로 미리 선언 필요
                             stop_loss_threshold=STOP_LOSE_PCT,
-                            trailing_rebound=STOP_TRAILING_REBOUND,  # 반등 후 다시 이 수치 이상 하락시 손절
-                            stop_abs_loss_threshold=STOP_ABS_LOSE_PCT
+                            trailing_rebound=STOP_TRAILING_REBOUND,
+                            stop_abs_loss_threshold=STOP_ABS_LOSE_PCT,
+                            add_lose_pct=STOP_ADD_LOSE_PCT,
+                            max_mooling=MAX_MOOLING
                         )
                         if stopped:
-                            for sym in stopped:
-                                qty = stock_dict.get(sym, {}).get('현재수량', 0)
-                                if qty > 0:
-                                    result = sell(sym, qty, stock_dict_cache=stock_dict, div="손절")  # ← 캐시 전달
-                                    if result:
-                                        if sym in bought_list:
-                                            bought_list.remove(sym)
-                                        # ✅ 변경: selected_symbols_map에서 해당 종목 제거
-                                        if sym in selected_symbols_map:
-                                            selected_symbols_map.pop(sym, None)
-                                        if sym in trailing_losses:
-                                            trailing_losses.pop(sym, None)
-                                        if sym in trailing_peaks:
-                                            trailing_peaks.pop(sym, None)
-                            time.sleep(0.1)
-                            bought_list = []
-                            stock_dict = get_stock_balance() # 보유 주식 조회
-                            for sym in stock_dict.keys():
-                                bought_list.append(sym)
+                            if not can_buy_flag:
+                                if (t_now - last_can_buy1_flag_time).total_seconds() >= 900:
+                                    send_message(f"🚫 물타기 중단: 계좌 잔고 부족(<{AMOUNT_TO_BUY:,}원)")
+                                    send_message_main(f"🚫 물타기 중단: 계좌 잔고 부족(<{AMOUNT_TO_BUY:,}원)")
+                                    last_can_buy1_flag_time = t_now
+                            else:
+                                for sym in stopped:
+                                    remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
+                                    if remaining_buy_count > 0:
+                                        current_price = get_current_price(sym)
+                                        info = stock_dict.get(sym, {})
+                                        if current_price is None or not info:
+                                            continue
 
-                            #---# ✨ 손절 후 buy_amount 재계산 로직
-                            #---time.sleep(5) # 급격한 재매수 방지용
-                            #---remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
-                            #---if remaining_buy_count > 0:
-                            #---    buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
-                            #---    total_cash = get_balance() - 10000
-                            #---    if total_cash < 0:
-                            #---        total_cash = 0
-                            #---    # 종목별 주문 금액 완화 로직 추가
-                            #---    if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-                            #---        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
-                            #---    elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-                            #---        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
-                            #---    else:
-                            #---        buy_amount = int(total_cash * buy_percent)
-                            #---else:
-                            #---    buy_amount = 0
+                                        bought_name = info.get('종목명')
+                                        bought_qty = info.get('현재수량', 0)
+                                        bought_price = info.get('매수가')
+
+                                        total_cash = get_balance()
+                                        buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
+
+                                        # 종목별 주문 금액 완화 로직 추가
+                                        if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
+                                            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
+                                        elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
+                                            buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
+                                        else:
+                                            buy_amount = int(total_cash * buy_percent)
+                                        
+                                        if AMOUNT_TO_BUY > 0:
+                                            buy_amount = AMOUNT_TO_BUY
+                                        #buy_qty = int(buy_amount // current_price)
+                                        if buy_amount > 0:
+                                            send_message(f"💧 {bought_name}({sym}) 손절 대신 추가 물타기 진행 ({buy_amount:,}원)")
+                                            send_message_main(f"💧 {bought_name}({sym}) 손절 대신 추가 물타기 진행 ({buy_amount:,}원)")
+                                            result = safe_buy(sym, buy_amount, current_price, stock_name=bought_name)
+                                            if result:
+                                                soldout = False
+
+                                                if sym in trailing_losses:
+                                                    trailing_losses.pop(sym, None)
+                                                if sym in trailing_peaks:
+                                                    trailing_peaks.pop(sym, None)
+                                                                            
+                                                time.sleep(0.1)
+                                                bought_list = []
+                                                stock_dict = get_stock_balance() # 보유 주식 조회
+                                                for sym in stock_dict.keys():
+                                                    bought_list.append(sym)
 
                     last_stop_loss_check_time = t_now # 마지막 체크 시간 업데이트
-                # 손절 감시 로직 끝 ------------------------------------------------------------------
+                # 물타기 감시 로직 끝 ------------------------------------------------------------------
                 # 익절 감시 로직 -----------------------------------------------------------                
-                if t_notbuy < t_now < t_sell:  # PM 02:30 ~ PM 03:23 : BREAK_EVEN_PCT 조정
-                    BREAK_EVEN_PCT1 = 3.0
-                    BREAK_EVEN_LOSE_PCT1 = 0.3
-                    BREAK_EVEN_PCT2 = 5.0
-                    BREAK_EVEN_LOSE_PCT2 = 0.3
-                    BREAK_EVEN_PCT3 = 7.0
-                    BREAK_EVEN_LOSE_PCT3 = 0.3
-                    TAKE_PROFIT_PCT = 9.0
-                    TAKE_PROFIT_LOSE_PCT = 0.3
+                #---if t_notbuy < t_now < t_sell:  # PM 02:30 ~ PM 03:23 : BREAK_EVEN_PCT 조정
+                #---    BREAK_EVEN_PCT1 = 3.0
+                #---    BREAK_EVEN_LOSE_PCT1 = 0.3
+                #---    BREAK_EVEN_PCT2 = 5.0
+                #---    BREAK_EVEN_LOSE_PCT2 = 0.3
+                #---    BREAK_EVEN_PCT3 = 7.0
+                #---    BREAK_EVEN_LOSE_PCT3 = 0.3
+                #---    TAKE_PROFIT_PCT = 9.0
+                #---    TAKE_PROFIT_LOSE_PCT = 0.3
                 if (t_now - last_profit_taking_check_time).total_seconds() >= 15: # 15초마다 체크
                     profited_flag = 0
                     burn_in_list_flag = 0
@@ -1351,63 +1652,46 @@ try:
                                 if qty > 0:
                                     result = sell(sym, qty, stock_dict_cache=stock_dict, div="익절")  # ← 캐시 전달
                                     if result:
-                                        if sym in bought_list:
-                                            bought_list.remove(sym)
-                                        # ✅ 변경: selected_symbols_map에서 해당 종목 제거
-                                        if sym in selected_symbols_map:
-                                            selected_symbols_map.pop(sym, None)
                                         if sym in trailing_peaks:
                                             trailing_peaks.pop(sym, None)
                                         if sym in trailing_losses:
                                             trailing_losses.pop(sym, None)
                         if BURN_IN_RATIO > 0:
                             if burn_in_list:
-                                burn_in_list_flag = 1
-                                for sym in burn_in_list:
-                                    ratio = BURN_IN_RATIO
-                                    current_price = get_current_price(sym)
-                                    info = stock_dict.get(sym, {})
-                                    if current_price is None or not info:
-                                        continue
+                                if not can_buy_flag:
+                                    if (t_now - last_can_buy2_flag_time).total_seconds() >= 900:
+                                        send_message(f"🚫 불타기 중단: 계좌 잔고 부족(<{AMOUNT_TO_BUY:,}원)")
+                                        send_message_main(f"🚫 불타기 중단: 계좌 잔고 부족(<{AMOUNT_TO_BUY:,}원)")
+                                        last_can_buy2_flag_time = t_now
+                                else:
+                                    burn_in_list_flag = 1
+                                    for sym in burn_in_list:
+                                        ratio = BURN_IN_RATIO
+                                        current_price = get_current_price(sym)
+                                        info = stock_dict.get(sym, {})
+                                        if current_price is None or not info:
+                                            continue
 
-                                    bought_name = info.get('종목명')
-                                    bought_qty = info.get('현재수량', 0)
-                                    bought_price = info.get('매수가')
+                                        bought_name = info.get('종목명')
+                                        bought_qty = info.get('현재수량', 0)
+                                        bought_price = info.get('매수가')
 
-                                    if bought_price and bought_qty:
-                                        invested = bought_price * bought_qty
-                                        amount_to_buy = int(invested * ratio)
-                                        #qty_to_buy = int(amount_to_buy // current_price)
-                                        if amount_to_buy > 0:
-                                            send_message(f"🔥 {bought_name}({sym}) 불타기 매수 진행 ({ratio*100:.1f}%, {amount_to_buy:,}원)")
-                                            send_message_main(f"🔥 {bought_name}({sym}) 불타기 매수 진행 ({ratio*100:.1f}%, {amount_to_buy:,}원)")
-                                            result = safe_buy(sym, amount_to_buy, current_price)
-                                            if result:
-                                                soldout = False
+                                        if bought_price and bought_qty:
+                                            invested = bought_price * bought_qty
+                                            amount_to_buy = int(invested * ratio)
+                                            #qty_to_buy = int(amount_to_buy // current_price)
+                                            if amount_to_buy > 0:
+                                                send_message(f"🔥 {bought_name}({sym}) 불타기 매수 진행 ({ratio*100:.1f}%, {amount_to_buy:,}원)")
+                                                send_message_main(f"🔥 {bought_name}({sym}) 불타기 매수 진행 ({ratio*100:.1f}%, {amount_to_buy:,}원)")
+                                                result = safe_buy(sym, amount_to_buy, current_price, stock_name=bought_name)
+                                                if result:
+                                                    soldout = False
                         if profited_flag > 0 or burn_in_list_flag > 0:
                             time.sleep(0.1)
                             bought_list = []
                             stock_dict = get_stock_balance() # 보유 주식 조회
                             for sym in stock_dict.keys():
                                 bought_list.append(sym)
-
-                            #---# ✨ 익절 후 buy_amount 재계산 로직
-                            #---time.sleep(5) # 급격한 재매수 방지용
-                            #---remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
-                            #---if remaining_buy_count > 0:
-                            #---    buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
-                            #---    total_cash = get_balance() - 10000
-                            #---    if total_cash < 0:
-                            #---        total_cash = 0
-                            #---    # 종목별 주문 금액 완화 로직 추가
-                            #---    if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-                            #---        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
-                            #---    elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-                            #---        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
-                            #---    else:
-                            #---        buy_amount = int(total_cash * buy_percent)
-                            #---else:
-                            #---    buy_amount = 0
                     
                     last_profit_taking_check_time = t_now # 마지막 체크 시간 업데이트
                 # 익절 감시 로직 끝 -------------------------------------------------------------
@@ -1416,90 +1700,7 @@ try:
 
 
 
-                if t_start < t_now < t_notbuy:  # AM 09:03 ~ PM 02:30 : 매수, 이시간 이후에는 매수금지 
-
-
-
-
-
-                    # ✅ 변경: 딕셔너리의 (키, 값)을 순회하며 종목코드(sym)와 종목명(stock_name)을 가져옵니다.
-                    for sym, stock_name in list(selected_symbols_map.items()):
-                        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
-                        if remaining_buy_count > 1:
-                            if sym in bought_list:
-                                selected_symbols_map.pop(sym, None)
-                                continue
-
-                            # 🔁 k값 점진적 완화 로직 추가
-                            if remaining_buy_count > 1:
-                                if t_now >= t_now.replace(**TARGET_K3_TIME):
-                                    k = TARGET_K3
-                                elif t_now >= t_now.replace(**TARGET_K2_TIME):
-                                    k = TARGET_K2
-                                else:
-                                    k = TARGET_K1
-                            else:
-                                k = TARGET_K1
-
-                            target_price, open_price = get_price_info(sym, k, 0.03)
-                            #time.sleep(0.1)
-                            current_price = get_current_price(sym)
-                            if open_price is None or target_price is None or current_price is None: # 가격을 가져오지 못했으면 다음 종목으로 넘어감
-                                send_message(f"[{sym}] 갭상승/갭하락/가격수신실패. 다음 종목으로 넘어갑니다.")
-                                #time.sleep(1) # API 호출 빈도 조절
-                                continue 
-
-                            # 갭상승 제외하고, 진짜 장중 돌파만 매수
-                            if open_price < target_price < current_price:
-                            # 갭상승(or NXT) 포함해서 target_price 돌파 매수
-                            #if target_price < current_price:
-                                # ✅ 변경: stock_name은 이미 for 루프에서 가져왔으므로 이 줄은 필요 없습니다.
-                                # stock_name = symbol_name_map.get(sym, "Unknown") 
-
-                                # 돌파 조건은 만족했지만 슬리피지 체크
-                                if current_price > target_price * SLIPPAGE_LIMIT:
-                                    # 슬리피지 횟수 기록
-                                    if sym not in slippage_count:
-                                        slippage_count[sym] = 1
-                                    else:
-                                        slippage_count[sym] += 1
-                                    # 3회 이하까지는 무조건 출력
-                                    if slippage_count[sym] <= 3:
-                                        send_message(f"🔄 {stock_name}({sym}) 슬리피지 초과 {slippage_count[sym]}회 (현재가:{current_price:.2f} > 허용가:{target_price * SLIPPAGE_LIMIT:.2f})")
-                                    else:
-                                        # 마지막으로 출력한 시간이 10분 지났으면 다시 출력
-                                        last_log_time = slippage_last_logged.get(sym)
-                                        if last_log_time is None or (t_now - last_log_time).total_seconds() >= 600:
-                                            send_message(f"🔄 {stock_name}({sym}) 슬리피지 반복 초과 중... (현재가:{current_price:.2f} > 허용가:{target_price * SLIPPAGE_LIMIT:.2f})")
-                                            slippage_last_logged[sym] = t_now
-                                    continue  # 슬리피지 초과 종목은 매수하지 않음
-                                else:
-                                    #buy_qty = 0  # 매수할 수량 초기화  
-                                    total_cash = get_balance()
-                                    buy_percent = math.floor((100 / remaining_buy_count) * 0.01 * 1000) / 1000
-
-                                    # 종목별 주문 금액 완화 로직 추가
-                                    if t_now >= t_now.replace(**AMOUNT_LIMIT2_TIME):
-                                        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT2)  # 매수 비중 줄임
-                                    elif t_now >= t_now.replace(**AMOUNT_LIMIT1_TIME):
-                                        buy_amount = int(total_cash * buy_percent * AMOUNT_LIMIT1)  # 매수 비중 줄임
-                                    else:
-                                        buy_amount = int(total_cash * buy_percent)
-
-                                    #buy_qty = int(buy_amount // current_price)
-                                    if buy_amount > 0:
-                                        send_message(f"📈 {stock_name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
-                                        send_message_main(f"📈 {stock_name}({sym}) 목표가 달성({target_price} < {current_price}) 매수를 시도합니다.")
-                                        result = safe_buy(sym, buy_amount, current_price)
-                                        if result:
-                                            soldout = False
-                                            time.sleep(0.1)
-                                            bought_list = []
-                                            stock_dict = get_stock_balance() # 보유 주식 조회
-                                            for sym in stock_dict.keys():
-                                                bought_list.append(sym)
-                            time.sleep(0.025)
-                    time.sleep(0.025)
+                time.sleep(7)
 
 
 
@@ -1545,18 +1746,18 @@ try:
 
             # 루프 내부, t_sell < t_now < t_exit 직전에 추가
             if not old_sell_done and t_oldstocksell < t_now < t_sell:
-                old_syms = get_old_symbols(days=31)
+                old_syms = get_old_symbols(days=1095)
                 if old_syms:
-                    send_message(f"⏰ 31일 이상 보유 종목 매도 실행: {len(old_syms)}개")
-                    send_message_main(f"⏰ 31일 이상 보유 종목 매도 실행: {len(old_syms)}개")
+                    send_message(f"⏰ 1095일 이상 보유 종목 매도 실행: {len(old_syms)}개")
+                    send_message_main(f"⏰ 1095일 이상 보유 종목 매도 실행: {len(old_syms)}개")
                     for sym, stock_name in old_syms:
                         qty = stock_dict.get(sym, {}).get('현재수량', 0)
                         if qty and int(qty) > 0:
                             result = sell(sym, qty, stock_dict_cache=stock_dict, div="보유기간초과")  # ← 캐시 전달
                             time.sleep(1)
                             if result:
-                                send_message(f"📉 {stock_name}({sym}) 보유 31일 경과 → 전량 매도 완료")
-                                send_message_main(f"📉 {stock_name}({sym}) 보유 31일 경과 → 전량 매도 완료")
+                                send_message(f"📉 {stock_name}({sym}) 보유 1095일 경과 → 전량 매도 완료")
+                                send_message_main(f"📉 {stock_name}({sym}) 보유 1095일 경과 → 전량 매도 완료")
                 # ✅ 매도 직후 보유 최신화
                 bought_list = []
                 stock_dict = get_stock_balance() # 보유 주식 조회
@@ -1565,19 +1766,14 @@ try:
                 old_sell_done = True
 
             if t_sell < t_now < t_exit:  # PM 02:58 ~ PM 03:03 : 일괄 매도
-                if soldout == False:
-                    #~~~ stock_dict = get_stock_balance()
-                    #~~~ for sym, details in stock_dict.items():
-                    #~~~     qty = details.get('현재수량', '0') # '현재수량'을 추출하여 qty에 할당
-                    #~~~     if int(qty) > 0: # 수량이 0보다 큰 경우에만 매도 실행
-                    #~~~         sell(sym, qty, stock_dict_cache=stock_dict, div="장종료")  # ← 캐시 전달
-                    #~~~         time.sleep(1)
-                    soldout = True
-                    #~~~ bought_list = []
-                    time.sleep(1)
+                time.sleep(3)
+
             if t_exit < t_now:  # PM 03:03 ~ :프로그램 종료
                 send_message("종료시점 보유주식 조회내역은 아래와 같습니다.")
                 get_stock_balance()
+                print_today_sell_history()  # ✨ 오늘 매도 내역 출력
+                print_month_sell_history()   # ✨ 이번달 매도 내역 출력
+                print_year_sell_history()   # ✨ 이번해 매도 내역 출력
                 send_message("🛑 운영시간이 아니므로 프로그램을 종료합니다.")
                 send_message_main("🛑 운영시간이 아니므로 프로그램을 종료합니다.")
                 break
