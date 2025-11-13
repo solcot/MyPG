@@ -1,5 +1,5 @@
 [General]
-ACCOUNT_AMT = 5000000
+ACCOUNT_AMT = 7000000
 ; 이 값은 실제 운용 자금으로 유지합니다.
 EXCLUDE_LIST = 
 ; 매매를 원치 않는 종목 코드를 쉼표로 구분하여 입력합니다. [ 공백 (or) 005930, 000660, 035420 ]
@@ -13,14 +13,26 @@ T_9_SECOND = 15
 T_START_HOUR = 9
 T_START_MINUTE = 3
 T_START_SECOND = 0
+;T_9_HOUR = 10
+;T_9_MINUTE = 0
+;T_9_SECOND = 15
+;T_START_HOUR = 10
+;T_START_MINUTE = 3
+;T_START_SECOND = 0
 ; 장 초반 변동성을 피하는 시작 시간은 그대로 유지하되, 5분으로 살짝 앞당겨 기회를 더 포착합니다.
 T_SELL_HOUR = 15
 T_SELL_MINUTE = 23
 T_SELL_SECOND = 0
+;T_SELL_HOUR = 16
+;T_SELL_MINUTE = 23
+;T_SELL_SECOND = 0
 ; 종가 매매 시간(15:20) 직전까지 추세를 최대한 활용하기 위해 매도 시간을 늦춥니다.
 T_EXIT_HOUR = 15
 T_EXIT_MINUTE = 25
 T_EXIT_SECOND = 0
+;T_EXIT_HOUR = 16
+;T_EXIT_MINUTE = 25
+;T_EXIT_SECOND = 0
 
 AMOUNT_LIMIT1_HOUR = 13
 AMOUNT_LIMIT1_MINUTE = 0
