@@ -266,7 +266,9 @@ def check_trailing_stop_loss(
     for sym, info in stock_dict.items():
         current_price = get_current_price(sym)
         bought_price = info.get("매수가")
-        if current_price is None or bought_price is None:
+        # ✅ 방어 코드 추가
+        if current_price is None or bought_price is None or bought_price == 0:
+            send_message(f"⚠️ [check_trailing_stop_loss] {info.get('종목명')}({sym}) 매수가 비정상 (bought_price={bought_price}) → 계산 건너뜀")
             continue
 
         profit_pct = round(((current_price / bought_price) - 1) * 100, 2)
@@ -1428,6 +1430,9 @@ try:
         t_notbuy = t_now.replace(hour=14, minute=30, second=0,microsecond=0)
         t_oldstocksell = t_now.replace(hour=15, minute=0, second=0, microsecond=0)
         t_notstoploss = t_now.replace(hour=15, minute=10, second=0,microsecond=0)
+        #t_notbuy = t_now.replace(hour=15, minute=30, second=0,microsecond=0)
+        #t_oldstocksell = t_now.replace(hour=16, minute=0, second=0, microsecond=0)
+        #t_notstoploss = t_now.replace(hour=16, minute=10, second=0,microsecond=0)
 
         t_sell = t_now.replace(**T_SELL_TIME)
         t_exit = t_now.replace(**T_EXIT_TIME)
@@ -1791,3 +1796,10 @@ try:
 except Exception as e:
     send_message(f"[오류 발생]{e}")
     time.sleep(1)
+
+#-- 디버그 필요시 -- except Exception as e:
+#-- 디버그 필요시 --     import traceback
+#-- 디버그 필요시 --     error_msg = f"[오류 발생] {e}\n{traceback.format_exc()}"
+#-- 디버그 필요시 --     send_message(error_msg)
+#-- 디버그 필요시 --     print(error_msg)
+#-- 디버그 필요시 --     time.sleep(1)
