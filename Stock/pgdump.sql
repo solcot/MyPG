@@ -4246,26 +4246,5 @@ ALTER TABLE ONLY public.stockmain
 
 
 --
--- Name: stock_ma_idx01; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX stock_ma_idx01 ON public.stock_ma USING btree (code);
-
-
---
--- Name: stockfdt_idx01; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX stockfdt_idx01 ON public.stockfdt USING btree (code);
-
-
---
--- Name: stockmain_idx01; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX stockmain_idx01 ON public.stockmain USING btree (code);
-
-
---
 -- PostgreSQL database dump complete
 --
