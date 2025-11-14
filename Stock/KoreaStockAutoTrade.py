@@ -1318,16 +1318,16 @@ try:
         #trade_date = '20250909'
         MAX_BUY_PRICE = AMOUNT_TO_BUY
         symbols_buy_pool20 = get_all_symbols20(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 20
-        symbols_buy_pool40 = get_all_symbols40(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 40
-        symbols_buy_pool60 = get_all_symbols60(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 60
-        symbols_buy_pool90 = get_all_symbols90(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 90
-        symbols_buy_pool120 = get_all_symbols120(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 120
+        #symbols_buy_pool40 = get_all_symbols40(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 40
+        #symbols_buy_pool60 = get_all_symbols60(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 60
+        #symbols_buy_pool90 = get_all_symbols90(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 90
+        #symbols_buy_pool120 = get_all_symbols120(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 120
         symbols_buy_pool = {
-            **symbols_buy_pool20,
-            **symbols_buy_pool40,
-            **symbols_buy_pool60,
-            **symbols_buy_pool90,
-            **symbols_buy_pool120
+            **symbols_buy_pool20   #,
+        #    **symbols_buy_pool40,
+        #    **symbols_buy_pool60,
+        #    **symbols_buy_pool90,
+        #    **symbols_buy_pool120
         }
         send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_buy_pool)}건 이평 매수종목 반환")
         send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_buy_pool)}건 이평 매수종목 반환")
