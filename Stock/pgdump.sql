@@ -147,8 +147,9 @@ BEGIN
     WHERE a.trade_date = p_trade_date
 --      AND a.close_price < 300000
       AND a.market_cap > 1000000000000   --1조
-and c.pbr < 1.0
-and (c.pbr/c.per*100)::decimal(10,2) > 5.0
+--and c.pbr < 1.0
+--and (c.pbr/c.per*100)::decimal(10,2) > 5.0
+
 --      AND c.pbr < 1.00
 --      AND c.per < 5.00
 --      AND a.trade_value > 1000000000
@@ -489,6 +490,7 @@ lag(ma120,      119)    over    (partition      by      code    order   by      
 lag(ma120,      120)    over    (partition      by      code    order   by      trade_date)     as      prev120,
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stock_ma
+where trade_date >= (date(p_trade_date) - 240) and trade_date <= p_trade_date
 ), close_price_check as (
 select
 trade_date, code,
@@ -930,6 +932,7 @@ lag(ma20,       19)     over    (partition      by      code    order   by      
 lag(ma20,       20)     over    (partition      by      code    order   by      trade_date)     as      prev20,
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stock_ma
+where trade_date >= (date(p_trade_date) - 40) and trade_date <= p_trade_date
 ), close_price_check as (
 select
 trade_date, code,
@@ -1115,6 +1118,7 @@ lag(ma40,       39)     over    (partition      by      code    order   by      
 lag(ma40,       40)     over    (partition      by      code    order   by      trade_date)     as      prev40,
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stock_ma
+where trade_date >= (date(p_trade_date) - 80) and trade_date <= p_trade_date
 ), close_price_check as (
 select
 trade_date, code,
@@ -1376,6 +1380,7 @@ lag(ma60,       59)     over    (partition      by      code    order   by      
 lag(ma60,       60)     over    (partition      by      code    order   by      trade_date)     as      prev60,
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stock_ma
+where trade_date >= (date(p_trade_date) - 120) and trade_date <= p_trade_date
 ), close_price_check as (
 select
 trade_date, code,
@@ -1723,6 +1728,7 @@ lag(ma90,       89)     over    (partition      by      code    order   by      
 lag(ma90,       90)     over    (partition      by      code    order   by      trade_date)     as      prev90,
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stock_ma
+where trade_date >= (date(p_trade_date) - 180) and trade_date <= p_trade_date
 ), close_price_check as (
 select
 trade_date, code,
@@ -2065,13 +2071,7 @@ where ma10 > ma5
 and sm.trade_date = p_trade_date
 and sm.code not in (
 '122870'  --와이지엔터테인먼트
-,'124560' --태웅로직스
---,'250060' --모비스
-,'376930' --노을
---,'105630' --한세실업
-
---,'101000' --KS인더스트리
---,'101680' --한국정밀기계
+--,'376930' --노을
 )
 $$;
 
@@ -2212,6 +2212,7 @@ lag(ma120,      119)    over    (partition      by      code    order   by      
 lag(ma120,      120)    over    (partition      by      code    order   by      trade_date)     as      prev120,
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stocketf_ma
+where trade_date >= (date(p_trade_date) - 240) and trade_date <= p_trade_date
 ), close_price_check as (
 select
 trade_date, code,
@@ -2646,6 +2647,7 @@ lag(ma20,       19)     over    (partition      by      code    order   by      
 lag(ma20,       20)     over    (partition      by      code    order   by      trade_date)     as      prev20,
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stocketf_ma
+where trade_date >= (date(p_trade_date) - 40) and trade_date <= p_trade_date
 ), close_price_check as (
 select
 trade_date, code,
@@ -2824,6 +2826,7 @@ lag(ma40,       39)     over    (partition      by      code    order   by      
 lag(ma40,       40)     over    (partition      by      code    order   by      trade_date)     as      prev40,
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stocketf_ma
+where trade_date >= (date(p_trade_date) - 80) and trade_date <= p_trade_date
 ), close_price_check as (
 select
 trade_date, code,
@@ -3078,6 +3081,7 @@ lag(ma60,       59)     over    (partition      by      code    order   by      
 lag(ma60,       60)     over    (partition      by      code    order   by      trade_date)     as      prev60,
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stocketf_ma
+where trade_date >= (date(p_trade_date) - 120) and trade_date <= p_trade_date
 ), close_price_check as (
 select
 trade_date, code,
@@ -3418,6 +3422,7 @@ lag(ma90,       89)     over    (partition      by      code    order   by      
 lag(ma90,       90)     over    (partition      by      code    order   by      trade_date)     as      prev90,
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stocketf_ma
+where trade_date >= (date(p_trade_date) - 180) and trade_date <= p_trade_date
 ), close_price_check as (
 select
 trade_date, code,
@@ -4238,6 +4243,27 @@ ALTER TABLE ONLY public.stockfdt
 
 ALTER TABLE ONLY public.stockmain
     ADD CONSTRAINT stockmain_pkey PRIMARY KEY (trade_date, code);
+
+
+--
+-- Name: stock_ma_idx01; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX stock_ma_idx01 ON public.stock_ma USING btree (code);
+
+
+--
+-- Name: stockfdt_idx01; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX stockfdt_idx01 ON public.stockfdt USING btree (code);
+
+
+--
+-- Name: stockmain_idx01; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX stockmain_idx01 ON public.stockmain USING btree (code);
 
 
 --
