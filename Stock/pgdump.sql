@@ -491,17 +491,17 @@ lag(ma120,      120)    over    (partition      by      code    order   by      
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stock_ma
 where trade_date >= (date(p_trade_date) - 240) and trade_date <= p_trade_date
-), close_price_check as (
-select
-trade_date, code,
-lag(close_price,        120)    over    (partition      by      code    order   by      trade_date)     as      price_prev120
-from stockmain
-)
+)--, close_price_check as (
+--select
+--trade_date, code,
+--lag(close_price,      120)    over    (partition      by      code    order   by      trade_date)     as      price_prev120
+--from stockmain
+--)
 select
     sm.code,
     sm.name
 from stockmain sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
-    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+--    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
     join stockfdt_pbr_v sfv on sm.trade_date = sfv.trade_date and sm.code = sfv.code
 where
     sm.trade_date = p_trade_date
@@ -933,17 +933,17 @@ lag(ma20,       20)     over    (partition      by      code    order   by      
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stock_ma
 where trade_date >= (date(p_trade_date) - 40) and trade_date <= p_trade_date
-), close_price_check as (
-select
-trade_date, code,
-lag(close_price,        20)     over    (partition      by      code    order   by      trade_date)     as      price_prev20
-from stockmain
-)
+)--, close_price_check as (
+--select
+--trade_date, code,
+--lag(close_price,        20)     over    (partition      by      code    order   by      trade_date)     as      price_prev20
+--from stockmain
+--)
 select
     sm.code,
     sm.name
 from stockmain sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
-    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+--    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
     join stockfdt_pbr_v sfv on sm.trade_date = sfv.trade_date and sm.code = sfv.code
 where
     sm.trade_date = p_trade_date
@@ -1119,17 +1119,17 @@ lag(ma40,       40)     over    (partition      by      code    order   by      
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stock_ma
 where trade_date >= (date(p_trade_date) - 80) and trade_date <= p_trade_date
-), close_price_check as (
-select
-trade_date, code,
-lag(close_price,        40)     over    (partition      by      code    order   by      trade_date)     as      price_prev40
-from stockmain
-)
+)--, close_price_check as (
+--select
+--trade_date, code,
+--lag(close_price,      40)     over    (partition      by      code    order   by      trade_date)     as      price_prev40
+--from stockmain
+--)
 select
     sm.code,
     sm.name
 from stockmain sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
-    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+--    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
     join stockfdt_pbr_v sfv on sm.trade_date = sfv.trade_date and sm.code = sfv.code
 where
     sm.trade_date = p_trade_date
@@ -1381,17 +1381,17 @@ lag(ma60,       60)     over    (partition      by      code    order   by      
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stock_ma
 where trade_date >= (date(p_trade_date) - 120) and trade_date <= p_trade_date
-), close_price_check as (
-select
-trade_date, code,
-lag(close_price,        60)     over    (partition      by      code    order   by      trade_date)     as      price_prev60
-from stockmain
-)
+)--, close_price_check as (
+--select
+--trade_date, code,
+--lag(close_price,      60)     over    (partition      by      code    order   by      trade_date)     as      price_prev60
+--from stockmain
+--)
 select
     sm.code,
     sm.name
 from stockmain sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
-    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+--    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
     join stockfdt_pbr_v sfv on sm.trade_date = sfv.trade_date and sm.code = sfv.code
 where
     sm.trade_date = p_trade_date
@@ -1729,17 +1729,17 @@ lag(ma90,       90)     over    (partition      by      code    order   by      
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stock_ma
 where trade_date >= (date(p_trade_date) - 180) and trade_date <= p_trade_date
-), close_price_check as (
-select
-trade_date, code,
-lag(close_price,        90)     over    (partition      by      code    order   by      trade_date)     as      price_prev90
-from stockmain
-)
+)--, close_price_check as (
+--select
+--trade_date, code,
+--lag(close_price,      90)     over    (partition      by      code    order   by      trade_date)     as      price_prev90
+--from stockmain
+--)
 select
     sm.code,
     sm.name
 from stockmain sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
-    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+--    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
     join stockfdt_pbr_v sfv on sm.trade_date = sfv.trade_date and sm.code = sfv.code
 where
     sm.trade_date = p_trade_date
@@ -2213,17 +2213,17 @@ lag(ma120,      120)    over    (partition      by      code    order   by      
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stocketf_ma
 where trade_date >= (date(p_trade_date) - 240) and trade_date <= p_trade_date
-), close_price_check as (
-select
-trade_date, code,
-lag(close_price,        120)    over    (partition      by      code    order   by      trade_date)     as      price_prev120
-from stocketf
-)
+)--, close_price_check as (
+--select
+--trade_date, code,
+--lag(close_price,      120)    over    (partition      by      code    order   by      trade_date)     as      price_prev120
+--from stocketf
+--)
 select
     sm.code,
     sm.name
 from stocketf sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
-    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+--    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
 where
     sm.trade_date = p_trade_date
 and     prev120 >       prev119
@@ -2648,17 +2648,17 @@ lag(ma20,       20)     over    (partition      by      code    order   by      
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stocketf_ma
 where trade_date >= (date(p_trade_date) - 40) and trade_date <= p_trade_date
-), close_price_check as (
-select
-trade_date, code,
-lag(close_price,        20)     over    (partition      by      code    order   by      trade_date)     as      price_prev20
-from stocketf
-)
+)--, close_price_check as (
+--select
+--trade_date, code,
+--lag(close_price,      20)     over    (partition      by      code    order   by      trade_date)     as      price_prev20
+--from stocketf
+--)
 select
     sm.code,
     sm.name
 from stocketf sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
-    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+--    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
 where
     sm.trade_date = p_trade_date
 and     prev20  >       prev19
@@ -2827,17 +2827,17 @@ lag(ma40,       40)     over    (partition      by      code    order   by      
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stocketf_ma
 where trade_date >= (date(p_trade_date) - 80) and trade_date <= p_trade_date
-), close_price_check as (
-select
-trade_date, code,
-lag(close_price,        40)     over    (partition      by      code    order   by      trade_date)     as      price_prev40
-from stocketf
-)
+)--, close_price_check as (
+--select
+--trade_date, code,
+--lag(close_price,        40)     over    (partition      by      code    order   by      trade_date)     as      price_prev40
+--from stocketf
+--)
 select
     sm.code,
     sm.name
 from stocketf sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
-    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+--    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
 where
     sm.trade_date = p_trade_date
 and     prev40  >       prev39
@@ -3082,17 +3082,17 @@ lag(ma60,       60)     over    (partition      by      code    order   by      
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stocketf_ma
 where trade_date >= (date(p_trade_date) - 120) and trade_date <= p_trade_date
-), close_price_check as (
-select
-trade_date, code,
-lag(close_price,        60)     over    (partition      by      code    order   by      trade_date)     as      price_prev60
-from stocketf
-)
+)--, close_price_check as (
+--select
+--trade_date, code,
+--lag(close_price,      60)     over    (partition      by      code    order   by      trade_date)     as      price_prev60
+--from stocketf
+--)
 select
     sm.code,
     sm.name
 from stocketf sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
-    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+--    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
 where
     sm.trade_date = p_trade_date
 and     prev60  >       prev59
@@ -3423,17 +3423,17 @@ lag(ma90,       90)     over    (partition      by      code    order   by      
 ma5,ma10,ma20,ma40,ma60,ma90,ma120
 from stocketf_ma
 where trade_date >= (date(p_trade_date) - 180) and trade_date <= p_trade_date
-), close_price_check as (
-select
-trade_date, code,
-lag(close_price,        90)     over    (partition      by      code    order   by      trade_date)     as      price_prev90
-from stocketf
-)
+)--, close_price_check as (
+--select
+--trade_date, code,
+--lag(close_price,      90)     over    (partition      by      code    order   by      trade_date)     as      price_prev90
+--from stocketf
+--)
 select
     sm.code,
     sm.name
 from stocketf sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
-    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+--    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
 where
     sm.trade_date = p_trade_date
 and     prev90  >       prev89
