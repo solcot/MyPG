@@ -3,7 +3,7 @@ ACCOUNT_AMT = 7000000
 ; 이 값은 실제 운용 자금으로 유지합니다.
 EXCLUDE_LIST = 
 ; 매매를 원치 않는 종목 코드를 쉼표로 구분하여 입력합니다. [ 공백 (or) 005930, 000660, 035420 ]
-TARGET_BUY_COUNT = 16
+TARGET_BUY_COUNT = 2
 ; *** TARGET_BUY_COUNT-1 종목 매수
 
 [TimeSettings]
