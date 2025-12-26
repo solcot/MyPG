@@ -1579,7 +1579,7 @@ try:
                                     last_can_buy1_flag_time = t_now
                             else:
                                 for sym in stopped:
-                                    remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
+                                    remaining_buy_count = 100   # TARGET_BUY_COUNT - len(bought_list)
                                     if remaining_buy_count > 0:
                                         current_price = get_current_price(sym)
                                         info = stock_dict.get(sym, {})
