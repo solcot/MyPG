@@ -206,6 +206,8 @@ def check_trailing_stop_loss(
             if sym not in trailing_losses or profit_pct > trailing_losses[sym]:
                 trailing_losses[sym] = profit_pct
 
+            #debug: send_message(f"{info.get('종목명')}({sym}) [trailing_losses[sym]] {trailing_losses[sym]} [profit_pct] {profit_pct} [trailing_rebound] {trailing_rebound} [adjusted_threshold] {adjusted_threshold}")
+
             # 손실 반등 후 재하락 감지
             if trailing_losses[sym] - profit_pct >= trailing_rebound and profit_pct <= adjusted_threshold:
 
