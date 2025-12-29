@@ -957,11 +957,11 @@ and     prev14  >       prev13
 and     prev13  >       prev12
 and     prev12  >       prev11
 and     prev11  >       prev10
-and     prev10  >       prev9
-and     prev9   >       prev8
-and     prev8   >       prev7
-and     prev9   >       prev6
-and     prev6   >       prev5
+--and     prev10  >       prev9
+--and     prev9   >       prev8
+--and     prev8   >       prev7
+--and     prev9   >       prev6
+--and     prev6   >       prev5
 and prev1 < ma20
 
 and close_price > ma5
