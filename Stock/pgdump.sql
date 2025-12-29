@@ -565,41 +565,41 @@ and     prev64  >       prev63
 and     prev63  >       prev62
 and     prev62  >       prev61
 and     prev61  >       prev60
-and     prev60  >       prev59
-and     prev59  >       prev58
-and     prev58  >       prev57
-and     prev57  >       prev56
-and     prev56  >       prev55
-and     prev55  >       prev54
-and     prev54  >       prev53
-and     prev53  >       prev52
-and     prev52  >       prev51
-and     prev51  >       prev50
-and     prev50  >       prev49
-and     prev49  >       prev48
-and     prev48  >       prev47
-and     prev47  >       prev46
-and     prev46  >       prev45
-and     prev45  >       prev44
-and     prev44  >       prev43
-and     prev43  >       prev42
-and     prev42  >       prev41
-and     prev41  >       prev40
-and     prev40  >       prev39
-and     prev39  >       prev38
-and     prev38  >       prev37
-and     prev37  >       prev36
-and     prev36  >       prev35
-and     prev35  >       prev34
-and     prev34  >       prev33
-and     prev33  >       prev32
-and     prev32  >       prev31
-and     prev31  >       prev30
-and     prev30  >       prev29
-and     prev29  >       prev28
-and     prev28  >       prev27
-and     prev27  >       prev26
-and     prev26  >       prev25
+--and   prev60  >       prev59
+--and   prev59  >       prev58
+--and   prev58  >       prev57
+--and   prev57  >       prev56
+--and   prev56  >       prev55
+--and   prev55  >       prev54
+--and   prev54  >       prev53
+--and   prev53  >       prev52
+--and   prev52  >       prev51
+--and     prev51  >       prev50
+--and     prev50  >       prev49
+--and     prev49  >       prev48
+--and     prev48  >       prev47
+--and     prev47  >       prev46
+--and     prev46  >       prev45
+--and     prev45  >       prev44
+--and     prev44  >       prev43
+--and     prev43  >       prev42
+--and     prev42  >       prev41
+--and     prev41  >       prev40
+--and     prev40  >       prev39
+--and     prev39  >       prev38
+--and     prev38  >       prev37
+--and     prev37  >       prev36
+--and     prev36  >       prev35
+--and     prev35  >       prev34
+--and     prev34  >       prev33
+--and     prev33  >       prev32
+--and     prev32  >       prev31
+--and     prev31  >       prev30
+--and     prev30  >       prev29
+--and     prev29  >       prev28
+--and     prev28  >       prev27
+--and     prev27  >       prev26
+--and     prev26  >       prev25
 and prev1 < ma120
 
 and close_price > ma5
@@ -617,10 +617,14 @@ and ma60 > ma90
 and ma90 > ma120
 and prev1_90 < prev1
 
-and close_price < p_max_price
+and close_price < (p_max_price - 800000)
 and sm.market_cap > 300000000000
 
-and sfv.pbr < 3.0
+and ((sfv.pbr < 1.0) or (
+sfv.pbr > 0.1 and sfv.pbr < 3.0
+and sfv.per > 1.0 and sfv.per < 30.0
+and sfv.roe > 3.0
+))
 $$;
 
 
@@ -974,7 +978,11 @@ and prev1_10 < prev1
 and close_price < p_max_price
 and sm.market_cap > 300000000000
 
-and sfv.pbr < 3.0
+and ((sfv.pbr < 1.0) or (
+sfv.pbr > 0.1 and sfv.pbr < 3.0
+and sfv.per > 1.0 and sfv.per < 30.0
+and sfv.roe > 3.0
+))
 $$;
 
 
@@ -1153,17 +1161,17 @@ and     prev24  >       prev23
 and     prev23  >       prev22
 and     prev22  >       prev21
 and     prev21  >       prev20
-and     prev20  >       prev19
-and     prev19  >       prev18
-and     prev18  >       prev17
-and     prev17  >       prev16
-and     prev16  >       prev15
-and     prev15  >       prev14
-and     prev14  >       prev13
-and     prev13  >       prev12
-and     prev12  >       prev11
-and     prev11  >       prev10
-and     prev10  >       prev9
+--and   prev20  >       prev19
+--and   prev19  >       prev18
+--and   prev18  >       prev17
+--and   prev17  >       prev16
+--and   prev16  >       prev15
+--and   prev15  >       prev14
+--and   prev14  >       prev13
+--and   prev13  >       prev12
+--and   prev12  >       prev11
+--and   prev11  >       prev10
+--and   prev10  >       prev9
 and prev1 < ma40
 
 and close_price > ma5
@@ -1175,10 +1183,14 @@ and ma10 > ma20
 and ma20 > ma40
 and prev1_20 < prev1
 
-and close_price < p_max_price
+and close_price < (p_max_price - 200000)
 and sm.market_cap > 300000000000
 
-and sfv.pbr < 3.0
+and ((sfv.pbr < 1.0) or (
+sfv.pbr > 0.1 and sfv.pbr < 3.0
+and sfv.per > 1.0 and sfv.per < 30.0
+and sfv.roe > 3.0
+))
 $$;
 
 
@@ -1425,23 +1437,23 @@ and     prev34  >       prev33
 and     prev33  >       prev32
 and     prev32  >       prev31
 and     prev31  >       prev30
-and     prev30  >       prev29
-and     prev29  >       prev28
-and     prev28  >       prev27
-and     prev27  >       prev26
-and     prev26  >       prev25
-and     prev25  >       prev24
-and     prev24  >       prev23
-and     prev23  >       prev22
-and     prev22  >       prev21
-and     prev21  >       prev20
-and     prev20  >       prev19
-and     prev19  >       prev18
-and     prev18  >       prev17
-and     prev17  >       prev16
-and     prev16  >       prev15
-and     prev15  >       prev14
-and     prev14  >       prev13
+--and   prev30  >       prev29
+--and   prev29  >       prev28
+--and   prev28  >       prev27
+--and   prev27  >       prev26
+--and   prev26  >       prev25
+--and   prev25  >       prev24
+--and   prev24  >       prev23
+--and   prev23  >       prev22
+--and   prev22  >       prev21
+--and   prev21  >       prev20
+--and   prev20  >       prev19
+--and   prev19  >       prev18
+--and   prev18  >       prev17
+--and   prev17  >       prev16
+--and   prev16  >       prev15
+--and   prev15  >       prev14
+--and   prev14  >       prev13
 and prev1 < ma60
 
 and close_price > ma5
@@ -1455,10 +1467,14 @@ and ma20 > ma40
 and ma40 > ma60
 and prev1_40 < prev1
 
-and close_price < p_max_price
+and close_price < (p_max_price - 400000)
 and sm.market_cap > 300000000000
 
-and sfv.pbr < 3.0
+and ((sfv.pbr < 1.0) or (
+sfv.pbr > 0.1 and sfv.pbr < 3.0
+and sfv.per > 1.0 and sfv.per < 30.0
+and sfv.roe > 3.0
+))
 $$;
 
 
@@ -1788,32 +1804,32 @@ and     prev49  >       prev48
 and     prev48  >       prev47
 and     prev47  >       prev46
 and     prev46  >       prev45
-and     prev45  >       prev44
-and     prev44  >       prev43
-and     prev43  >       prev42
-and     prev42  >       prev41
-and     prev41  >       prev40
-and     prev40  >       prev39
-and     prev39  >       prev38
-and     prev38  >       prev37
-and     prev37  >       prev36
-and     prev36  >       prev35
-and     prev35  >       prev34
-and     prev34  >       prev33
-and     prev33  >       prev32
-and     prev32  >       prev31
-and     prev31  >       prev30
-and     prev30  >       prev29
-and     prev29  >       prev28
-and     prev28  >       prev27
-and     prev27  >       prev26
-and     prev26  >       prev25
-and     prev25  >       prev24
-and     prev24  >       prev23
-and     prev23  >       prev22
-and     prev22  >       prev21
-and     prev21  >       prev20
-and     prev20  >       prev19
+--and     prev45  >       prev44
+--and     prev44  >       prev43
+--and     prev43  >       prev42
+--and     prev42  >       prev41
+--and     prev41  >       prev40
+--and     prev40  >       prev39
+--and     prev39  >       prev38
+--and     prev38  >       prev37
+--and     prev37  >       prev36
+--and     prev36  >       prev35
+--and     prev35  >       prev34
+--and     prev34  >       prev33
+--and     prev33  >       prev32
+--and     prev32  >       prev31
+--and     prev31  >       prev30
+--and     prev30  >       prev29
+--and     prev29  >       prev28
+--and     prev28  >       prev27
+--and     prev27  >       prev26
+--and     prev26  >       prev25
+--and     prev25  >       prev24
+--and     prev24  >       prev23
+--and     prev23  >       prev22
+--and     prev22  >       prev21
+--and     prev21  >       prev20
+--and     prev20  >       prev19
 and prev1 < ma90
 
 and close_price > ma5
@@ -1829,10 +1845,14 @@ and ma40 > ma60
 and ma60 > ma90
 and prev1_60 < prev1
 
-and close_price < p_max_price
+and close_price < (p_max_price - 600000)
 and sm.market_cap > 300000000000
 
-and sfv.pbr < 3.0
+and ((sfv.pbr < 1.0) or (
+sfv.pbr > 0.1 and sfv.pbr < 3.0
+and sfv.per > 1.0 and sfv.per < 30.0
+and sfv.roe > 3.0
+))
 $$;
 
 
@@ -2070,8 +2090,8 @@ on sm.trade_date = mc.trade_date and sm.code = mc.code
 where ma10 > ma5
 and sm.trade_date = p_trade_date
 and sm.code not in (
-'122870'  --와이지엔터테인먼트
---,'376930' --노을
+'376930' --노을
+,'018880' --한온시스템
 )
 $$;
 
@@ -4062,7 +4082,8 @@ CREATE VIEW public.stockfdt_pbr_v AS
  SELECT stockfdt.trade_date,
     stockfdt.code,
     stockfdt.pbr,
-    stockfdt.per
+    stockfdt.per,
+    (((stockfdt.pbr / stockfdt.per) * (100)::numeric))::numeric(10,2) AS roe
    FROM public.stockfdt;
 
 
