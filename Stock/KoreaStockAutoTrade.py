@@ -1318,16 +1318,16 @@ try:
         #trade_date = '20250909'
         MAX_BUY_PRICE = AMOUNT_TO_BUY
         symbols_buy_pool20 = get_all_symbols20(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 20
-        #symbols_buy_pool40 = get_all_symbols40(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 40
-        #symbols_buy_pool60 = get_all_symbols60(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 60
-        #symbols_buy_pool90 = get_all_symbols90(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 90
-        #symbols_buy_pool120 = get_all_symbols120(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 120
+        symbols_buy_pool40 = get_all_symbols40(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 40
+        symbols_buy_pool60 = get_all_symbols60(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 60
+        symbols_buy_pool90 = get_all_symbols90(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 90
+        symbols_buy_pool120 = get_all_symbols120(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 120
         symbols_buy_pool = {
-            **symbols_buy_pool20   #,
-        #    **symbols_buy_pool40,
-        #    **symbols_buy_pool60,
-        #    **symbols_buy_pool90,
-        #    **symbols_buy_pool120
+            **symbols_buy_pool20,
+            **symbols_buy_pool40,
+            **symbols_buy_pool60,
+            **symbols_buy_pool90,
+            **symbols_buy_pool120
         }
         send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_buy_pool)}건 이평 매수종목 반환")
         send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_buy_pool)}건 이평 매수종목 반환")
@@ -1400,9 +1400,37 @@ try:
 
         if EXCLUDE_LIST and len(EXCLUDE_LIST) > 0:
             # ✅ 변경: 딕셔너리에서 제외할 종목들을 필터링하여 새로운 딕셔너리 생성
-            symbols_buy_pool = {
+            symbols_buy_pool20 = {
                 sym: name
-                for sym, name in symbols_buy_pool.items()
+                for sym, name in symbols_buy_pool20.items()
+                if sym not in EXCLUDE_LIST
+            }
+        if EXCLUDE_LIST and len(EXCLUDE_LIST) > 0:
+            # ✅ 변경: 딕셔너리에서 제외할 종목들을 필터링하여 새로운 딕셔너리 생성
+            symbols_buy_pool40 = {
+                sym: name
+                for sym, name in symbols_buy_pool40.items()
+                if sym not in EXCLUDE_LIST
+            }
+        if EXCLUDE_LIST and len(EXCLUDE_LIST) > 0:
+            # ✅ 변경: 딕셔너리에서 제외할 종목들을 필터링하여 새로운 딕셔너리 생성
+            symbols_buy_pool60 = {
+                sym: name
+                for sym, name in symbols_buy_pool60.items()
+                if sym not in EXCLUDE_LIST
+            }
+        if EXCLUDE_LIST and len(EXCLUDE_LIST) > 0:
+            # ✅ 변경: 딕셔너리에서 제외할 종목들을 필터링하여 새로운 딕셔너리 생성
+            symbols_buy_pool90 = {
+                sym: name
+                for sym, name in symbols_buy_pool90.items()
+                if sym not in EXCLUDE_LIST
+            }
+        if EXCLUDE_LIST and len(EXCLUDE_LIST) > 0:
+            # ✅ 변경: 딕셔너리에서 제외할 종목들을 필터링하여 새로운 딕셔너리 생성
+            symbols_buy_pool120 = {
+                sym: name
+                for sym, name in symbols_buy_pool120.items()
                 if sym not in EXCLUDE_LIST
             }
 
@@ -1523,12 +1551,12 @@ try:
                 for sym in stock_dict.keys():
                     bought_list.append(sym)
 
-                ##### 장시작시 이평선 정배열인 종목 신규 매수
+                ##### 장시작시 이평선 정배열인 종목 신규(or 추가) 매수
                 if not can_buy_flag:
                     send_message(f"🚫 장시작 신규매수 중단: 계좌 잔고 부족(<{AMOUNT_TO_BUY:,}원)")
                     send_message_main(f"🚫 장시작 신규매수 중단: 계좌 잔고 부족(<{AMOUNT_TO_BUY:,}원)")     
                 else:
-                    for sym, stock_name in symbols_buy_pool.items():
+                    for sym, stock_name in symbols_buy_pool20.items():
                         remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
                         if remaining_buy_count > 1:
                             if sym in bought_list:
@@ -1542,7 +1570,63 @@ try:
                             result = safe_buy(sym, AMOUNT_TO_BUY, current_price, stock_name)
                             if result:
                                 time.sleep(1.5)
-                        
+                    for sym, stock_name in symbols_buy_pool40.items():
+                        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
+                        if remaining_buy_count > 1:
+                            #if sym in bought_list:
+                            #    continue
+                            current_price = get_current_price(sym)
+                            if current_price is None:
+                                send_message(f"[{stock_name}({sym})] 가격수신실패. 다음 종목으로 넘어갑니다.")
+                                continue 
+                            send_message(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
+                            send_message_main(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
+                            result = safe_buy(sym, AMOUNT_TO_BUY-200000, current_price, stock_name)
+                            if result:
+                                time.sleep(1.5)
+                    for sym, stock_name in symbols_buy_pool60.items():
+                        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
+                        if remaining_buy_count > 1:
+                            #if sym in bought_list:
+                            #    continue
+                            current_price = get_current_price(sym)
+                            if current_price is None:
+                                send_message(f"[{stock_name}({sym})] 가격수신실패. 다음 종목으로 넘어갑니다.")
+                                continue 
+                            send_message(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
+                            send_message_main(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
+                            result = safe_buy(sym, AMOUNT_TO_BUY-400000, current_price, stock_name)
+                            if result:
+                                time.sleep(1.5)
+                    for sym, stock_name in symbols_buy_pool90.items():
+                        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
+                        if remaining_buy_count > 1:
+                            #if sym in bought_list:
+                            #    continue
+                            current_price = get_current_price(sym)
+                            if current_price is None:
+                                send_message(f"[{stock_name}({sym})] 가격수신실패. 다음 종목으로 넘어갑니다.")
+                                continue 
+                            send_message(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
+                            send_message_main(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
+                            result = safe_buy(sym, AMOUNT_TO_BUY-600000, current_price, stock_name)
+                            if result:
+                                time.sleep(1.5)
+                    for sym, stock_name in symbols_buy_pool120.items():
+                        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
+                        if remaining_buy_count > 1:
+                            #if sym in bought_list:
+                            #    continue
+                            current_price = get_current_price(sym)
+                            if current_price is None:
+                                send_message(f"[{stock_name}({sym})] 가격수신실패. 다음 종목으로 넘어갑니다.")
+                                continue 
+                            send_message(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
+                            send_message_main(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
+                            result = safe_buy(sym, AMOUNT_TO_BUY-800000, current_price, stock_name)
+                            if result:
+                                time.sleep(1.5)
+
                 bought_list = []
                 stock_dict = get_stock_balance()
                 for sym in stock_dict.keys():
