@@ -20,18 +20,19 @@ SET row_security = off;
 -- Name: get_stock_dp01(date, numeric, numeric); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
-CREATE FUNCTION public.get_stock_dp01(p_trade_date date DEFAULT '2025-07-01'::date, p_max_price numeric DEFAULT 500000, p_pool_count numeric DEFAULT 25) RETURNS TABLE(code character varying, name character varying)
-    LANGUAGE sql
-    AS $$
+CREATE OR REPLACE FUNCTION public.get_stock_dp01(p_trade_date date DEFAULT '2025-07-01'::date, p_max_price numeric DEFAULT 500000, p_pool_count numeric DEFAULT 25)
+ RETURNS TABLE(code character varying, name character varying)
+ LANGUAGE sql
+AS $function$
 select a.code, a.name --, (close_price-open_price)/close_price*100 ratio, trade_value
 from stockmain a join stock_ma b on a.trade_date = b.trade_date and a.code = b.code
-join stockfdt c on a.trade_date = c.trade_date and a.code = c.code
+join stockfdt_pbr_v c on a.trade_date = c.trade_date and a.code = c.code
 where a.trade_date = p_trade_date
 
 and a.close_price < p_max_price
 
-and (a.close_price-a.open_price)/a.close_price*100 >= 0.1
-and (a.close_price-a.open_price)/a.close_price*100 <= 5.1
+and (a.close_price-a.open_price)/a.close_price*100 > 0.1
+and (a.close_price-a.open_price)/a.close_price*100 < 3.1
 
 --and market_cap < 2000000000000   --2조
 and market_cap < 5000000000000   --5조
@@ -43,13 +44,15 @@ and market_cap > 500000000000   --5천억
 and a.close_price > ma5
 and ma5 > ma10
 and ma10 > ma20
-and ma20 > ma40
+--and ma20 > ma40
 --and ma40 > ma60
 --and ma60 > ma90
 --and ma90 > ma120
 
 and c.pbr < 1.50
 --and c.pbr < 1.10
+and c.per < 15.0
+and c.roe > 5.0
 
 --and trade_value > 1000000000   --십억
 and trade_value > 1500000000   --십5억
