@@ -60,7 +60,7 @@ and trade_value > 1500000000   --십5억
 
 order by trade_value desc
 limit p_pool_count
-$$;
+$function$;
 
 
 ALTER FUNCTION public.get_stock_dp01(p_trade_date date, p_max_price numeric, p_pool_count numeric) OWNER TO postgres;
