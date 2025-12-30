@@ -1559,8 +1559,8 @@ try:
                     for sym, stock_name in symbols_buy_pool20.items():
                         remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
                         if remaining_buy_count > 1:
-                            if sym in bought_list:
-                                continue
+                            #if sym in bought_list:
+                            #    continue
                             current_price = get_current_price(sym)
                             if current_price is None:
                                 send_message(f"[{stock_name}({sym})] 가격수신실패. 다음 종목으로 넘어갑니다.")
