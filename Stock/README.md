@@ -7,6 +7,7 @@ pip install html5lib
 pip install beautifulsoup4
 pip install holidayskr
 pip install psycopg2-binary   # pg 연동시 필요
+pip install pandas_market_calendars
 
 🚀 : “출발!”, “시작!” 느낌
 
