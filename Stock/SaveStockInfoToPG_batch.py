@@ -13,6 +13,9 @@ import configparser # 추가
 import os # 파일 존재 여부 확인 및 삭제를 위해 os 모듈 추가
 import psycopg2
 from psycopg2.extras import execute_batch
+import pandas_market_calendars as mcal
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning)
 
 with open('C:\\StockPy\\config.yaml', encoding='UTF-8') as f:
     _cfg = yaml.load(f, Loader=yaml.FullLoader)
@@ -339,18 +342,36 @@ def get_last_trading_day():
         day -= timedelta(days=1)
     return day.strftime('%Y%m%d')
 
-def is_trading_day(trade_date: str) -> bool:
+#--def is_trading_day(trade_date: str) -> bool:
+#--    """
+#--    YYYYMMDD 문자열 기준으로 거래일 여부 반환
+#--    """
+#--    dt = datetime.strptime(trade_date, "%Y%m%d")
+#--    # 주말 체크 (토요일=5, 일요일=6)
+#--    if dt.weekday() >= 5:
+#--        return False
+#--    # 공휴일 체크
+#--    if is_holiday(dt.strftime("%Y-%m-%d")):
+#--        return False
+#--    return True
+
+# KRX 달력을 한 번만 생성 (함수 호출 시마다 생성하면 느려질 수 있음)
+krx_cal = mcal.get_calendar('XKRX')
+
+def is_trading_day(p_date):
     """
-    YYYYMMDD 문자열 기준으로 거래일 여부 반환
+    특정 날짜가 장 개장일인지 확인하는 함수
+    :param p_date: datetime 객체
+    :return: True (개장일), False (휴장일)
     """
-    dt = datetime.strptime(trade_date, "%Y%m%d")
-    # 주말 체크 (토요일=5, 일요일=6)
-    if dt.weekday() >= 5:
-        return False
-    # 공휴일 체크
-    if is_holiday(dt.strftime("%Y-%m-%d")):
-        return False
-    return True
+    # 날짜를 문자열로 변환 (YYYY-MM-DD)
+    target_date = p_date.strftime('%Y-%m-%d')
+    
+    # 해당 날짜의 스케줄 조회
+    schedule = krx_cal.schedule(start_date=target_date, end_date=target_date)
+    
+    # schedule 데이터프레임이 비어있지 않으면 개장일임
+    return not schedule.empty
 
 def fetch_krx_data(mktId, trade_date):
     otp_url = 'http://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd'
@@ -1129,7 +1150,7 @@ if __name__ == "__main__":
 #***    while current_date <= end_date:
 #***        trade_date = current_date.strftime("%Y%m%d")
 #***
-#***        # 토요일(5), 일요일(6), 공휴일은 스킵
+#***        # 토요일(5), 일요일(6), 공휴일은 스킵  ---> 수행전 if is_trading_day(trade_date): 이 방식으로 변경 필요
 #***        if current_date.weekday() >= 5 or is_holiday(trade_date[:4] + "-" + trade_date[4:6] + "-" + trade_date[6:]):
 #***            print(f"⏩ 휴장일 스킵: {trade_date}")
 #***        else:
@@ -1150,7 +1171,7 @@ if __name__ == "__main__":
 #***    while current_date <= end_date:
 #***        trade_date = current_date.strftime("%Y%m%d")
 #***
-#***        # 토요일(5), 일요일(6), 공휴일은 스킵
+#***        # 토요일(5), 일요일(6), 공휴일은 스킵  ---> 수행전 if is_trading_day(trade_date): 이 방식으로 변경 필요
 #***        if current_date.weekday() >= 5 or is_holiday(trade_date[:4] + "-" + trade_date[4:6] + "-" + trade_date[6:]):
 #***            print(f"⏩ 휴장일 스킵: {trade_date}")
 #***        else:
@@ -1171,15 +1192,14 @@ if __name__ == "__main__":
     while current_date <= end_date:
         trade_date = current_date.strftime("%Y%m%d")
 
-        # 토요일(5), 일요일(6), 공휴일은 스킵
-        if current_date.weekday() >= 5 or is_holiday(trade_date[:4] + "-" + trade_date[4:6] + "-" + trade_date[6:]):
-            print(f"⏩ 휴장일 스킵: {trade_date}")
-        else:
+        if is_trading_day(trade_date):
             try:
                 print(f"📌 처리 중: {trade_date}")
                 insert_all_symbols_fdt(p_trade_date=trade_date)
             except Exception as e:
                 print(f"❌ {trade_date} 처리 중 오류 발생: {e}")
+        else:
+            print(f"⏩ 휴장일 스킵: {trade_date}")
 
         # 다음날로 이동
         current_date += timedelta(days=1)
