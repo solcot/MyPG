@@ -14,6 +14,9 @@ import configparser # 추가
 import os # 파일 존재 여부 확인 및 삭제를 위해 os 모듈 추가
 import psycopg2
 from psycopg2.extras import execute_batch
+import pandas_market_calendars as mcal
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning)
 
 with open('C:\\StockPy_dp\\config.yaml', encoding='UTF-8') as f:
     _cfg = yaml.load(f, Loader=yaml.FullLoader)
@@ -1220,6 +1223,35 @@ def print_year_sell_history():
         send_message(f"📑 {this_year}년 매도 내역 없음")
         send_message("=================")
         send_message_main(f"📑 {this_year}년 매도 내역 없음")
+
+def check_market_status_pre_market():
+    # 1. 한국 거래소(XKRX) 달력 가져오기
+    krx = mcal.get_calendar('XKRX')
+    
+    # 2. 오늘 날짜 확인 (시간 제외하고 날짜만)
+    now = datetime.now()
+    today_str = now.strftime('%Y-%m-%d')
+    
+    # 3. 넉넉하게 전후 20일간의 개장 여부 스케줄 조회
+    # (이 함수는 실제 데이터가 아니라 '규칙'에 의해 계산되므로 8시에도 정확합니다)
+    schedule = krx.schedule(start_date=(now - timedelta(days=20)).strftime('%Y-%m-%d'), 
+                            end_date=(now + timedelta(days=1)).strftime('%Y-%m-%d'))
+    
+    # 4. 오늘이 개장일 리스트(schedule.index)에 있는지 확인
+    is_market_open = today_str in schedule.index.strftime('%Y-%m-%d')
+    
+    # 5. 마지막 거래일 찾기
+    # 오늘이 개장일이면 리스트에서 오늘 이전 날짜 중 마지막, 
+    # 오늘이 휴장일이면 그냥 리스트의 마지막 날짜
+    if is_market_open:
+        # 오늘을 포함한 스케줄이므로, 오늘보다 이전인 날짜들 중 마지막을 선택
+        past_trades = schedule[schedule.index < today_str]
+        last_trading_day = past_trades.index[-1].strftime('%Y%m%d')
+    else:
+        # 오늘이 휴장일이면 스케줄 상의 마지막 날짜가 곧 마지막 거래일
+        last_trading_day = schedule.index[-1].strftime('%Y%m%d')
+
+    return is_market_open, last_trading_day
 #***********************************************************************************************************
 # 자동매매 시작
 try:
@@ -1240,8 +1272,10 @@ try:
 
         POOL_COUNT = settings['POOL_COUNT']
         AMOUNT_TO_BUY = settings['AMOUNT_TO_BUY']
-        trade_date = get_last_trading_day()
+        #trade_date = get_last_trading_day()
         #trade_date = '20250909'
+        is_open, trade_date = check_market_status_pre_market()
+        #-debug- send_message(f"✅ [{is_open},{trade_date}] ---")
         MAX_BUY_PRICE = AMOUNT_TO_BUY
         selected_symbols_map = get_all_symbols(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE, p_pool_count=POOL_COUNT)  # 금일 매수 종목 40
         send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(selected_symbols_map)}건 변동성돌파 매수풀 반환")
@@ -1401,7 +1435,8 @@ try:
 
             #today = datetime.today().weekday()
             today = datetime.today()
-            if today.weekday() >= 5 or is_holiday(today.strftime("%Y-%m-%d")):  # 토요일/일요일/휴일 이면 자동 종료
+            #if today.weekday() >= 5 or is_holiday(today.strftime("%Y-%m-%d")):  # 토요일/일요일/휴일 이면 자동 종료
+            if not is_open:
                 send_message("🛑 휴일이므로 프로그램을 종료합니다.")
                 send_message_main("🛑 휴일이므로 프로그램을 종료합니다.")
                 program_exit = True # ✨ 플래그 설정 ✨
