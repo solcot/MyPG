@@ -1078,70 +1078,6 @@ def get_all_symbols120_etf(p_trade_date='20250901', p_max_price=500000):
         return {}
 
 if __name__ == "__main__":
-#    trade_date = datetime.now().strftime('%Y%m%d')
-#    #trade_date = '20251017'
-#
-#    settings = load_settings()
-#    AMOUNT_TO_BUY = settings['AMOUNT_TO_BUY']
-#    MAX_BUY_PRICE = AMOUNT_TO_BUY
-#
-#    # daily stockmain,stock_ma insert ****************************************************************
-#    if is_trading_day(trade_date):
-#        insert_all_symbols(p_trade_date=trade_date)
-#
-#        symbols_buy_pool20 = get_all_symbols20(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 20
-#        symbols_buy_pool40 = get_all_symbols40(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 40
-#        symbols_buy_pool60 = get_all_symbols60(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 60
-#        symbols_buy_pool90 = get_all_symbols90(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 90
-#        symbols_buy_pool120 = get_all_symbols120(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 120
-#        symbols_buy_pool = {
-#            **symbols_buy_pool20,
-#            **symbols_buy_pool40,
-#            **symbols_buy_pool60,
-#            **symbols_buy_pool90,
-#            **symbols_buy_pool120
-#        }
-#        send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_buy_pool)}건 이평 매수종목 반환")
-#        send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_buy_pool)}건 이평 매수종목 반환")
-#        send_message(symbols_buy_pool)
-#        send_message_main(symbols_buy_pool)
-#    else:
-#        send_message(f"⏩ {trade_date}는 거래일이 아니므로 stockmain/stock_ma insert 처리 스킵")
-#        send_message_main(f"⏩ {trade_date}는 거래일이 아니므로 stockmain/stock_ma insert 처리 스킵")
-#
-#    # daily stocketf,stocketf_ma insert ****************************************************************
-#    if is_trading_day(trade_date):
-#        insert_all_symbols_etf(p_trade_date=trade_date)
-#
-#        symbols_buy_pool20_etf = get_all_symbols20_etf(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 20
-#        symbols_buy_pool40_etf = get_all_symbols40_etf(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 40
-#        symbols_buy_pool60_etf = get_all_symbols60_etf(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 60
-#        symbols_buy_pool90_etf = get_all_symbols90_etf(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 90
-#        symbols_buy_pool120_etf = get_all_symbols120_etf(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 120
-#        symbols_buy_pool_etf = {
-#            **symbols_buy_pool20_etf,            
-#            **symbols_buy_pool40_etf,
-#            **symbols_buy_pool60_etf,
-#            **symbols_buy_pool90_etf,
-#            **symbols_buy_pool120_etf
-#        }
-#        send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_buy_pool_etf)}건 이평 매수종목 반환")
-#        send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_buy_pool_etf)}건 이평 매수종목 반환")
-#        send_message(symbols_buy_pool_etf)
-#        send_message_main(symbols_buy_pool_etf)
-#    else:
-#        send_message(f"⏩ {trade_date}는 거래일이 아니므로 stocketf/stocketf_ma insert 처리 스킵")
-#        send_message_main(f"⏩ {trade_date}는 거래일이 아니므로 stocketf/stocketf_ma insert 처리 스킵")
-#
-#    # daily stockfdt insert ****************************************************************
-#    if is_trading_day(trade_date):
-#        insert_all_symbols_fdt(p_trade_date=trade_date)
-#    else:
-#        send_message(f"⏩ {trade_date}는 거래일이 아니므로 stockfdt insert 처리 스킵")
-#        send_message_main(f"⏩ {trade_date}는 거래일이 아니므로 stockfdt insert 처리 스킵")
-
-# =============================================================================================================================
-
     # 기간별 stockmain,stock_ma insert ****************************************************************
     start_date = datetime.strptime("20210101", "%Y%m%d")
     end_date = datetime.strptime("20231231", "%Y%m%d")
@@ -1150,7 +1086,7 @@ if __name__ == "__main__":
     while current_date <= end_date:
         trade_date = current_date.strftime("%Y%m%d")
 
-        if is_trading_day(trade_date):
+        if is_trading_day(current_date):
             try:
                 print(f"📌 처리 중: {trade_date}")
                 insert_all_symbols(p_trade_date=trade_date)
@@ -1170,7 +1106,7 @@ if __name__ == "__main__":
 #***    while current_date <= end_date:
 #***        trade_date = current_date.strftime("%Y%m%d")
 #***
-#***        # 토요일(5), 일요일(6), 공휴일은 스킵  ---> 수행전 if is_trading_day(trade_date): 이 방식으로 변경 필요
+#***        # 토요일(5), 일요일(6), 공휴일은 스킵  ---> 수행전 if is_trading_day(current_date): 이 방식으로 변경 필요
 #***        if current_date.weekday() >= 5 or is_holiday(trade_date[:4] + "-" + trade_date[4:6] + "-" + trade_date[6:]):
 #***            print(f"⏩ 휴장일 스킵: {trade_date}")
 #***        else:
@@ -1191,7 +1127,7 @@ if __name__ == "__main__":
 #***    while current_date <= end_date:
 #***        trade_date = current_date.strftime("%Y%m%d")
 #***
-#***        # 토요일(5), 일요일(6), 공휴일은 스킵  ---> 수행전 if is_trading_day(trade_date): 이 방식으로 변경 필요
+#***        # 토요일(5), 일요일(6), 공휴일은 스킵  ---> 수행전 if is_trading_day(current_date): 이 방식으로 변경 필요
 #***        if current_date.weekday() >= 5 or is_holiday(trade_date[:4] + "-" + trade_date[4:6] + "-" + trade_date[6:]):
 #***            print(f"⏩ 휴장일 스킵: {trade_date}")
 #***        else:
