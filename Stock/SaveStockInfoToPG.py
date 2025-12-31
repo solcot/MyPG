@@ -1078,6 +1078,7 @@ def get_all_symbols120_etf(p_trade_date='20250901', p_max_price=500000):
         return {}
 
 if __name__ == "__main__":
+    trade_date_p = datetime.now()
     trade_date = datetime.now().strftime('%Y%m%d')
     #trade_date = '20251017'
 
@@ -1086,14 +1087,14 @@ if __name__ == "__main__":
     MAX_BUY_PRICE = AMOUNT_TO_BUY
 
     # daily stockfdt insert ****************************************************************
-    if is_trading_day(trade_date):
+    if is_trading_day(trade_date_p):
         insert_all_symbols_fdt(p_trade_date=trade_date)
     else:
         send_message(f"⏩ {trade_date}는 거래일이 아니므로 stockfdt insert 처리 스킵")
         send_message_main(f"⏩ {trade_date}는 거래일이 아니므로 stockfdt insert 처리 스킵")
 
     # daily stockmain,stock_ma insert ****************************************************************
-    if is_trading_day(trade_date):
+    if is_trading_day(trade_date_p):
         insert_all_symbols(p_trade_date=trade_date)
 
         symbols_buy_pool20 = get_all_symbols20(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 20
@@ -1117,7 +1118,7 @@ if __name__ == "__main__":
         send_message_main(f"⏩ {trade_date}는 거래일이 아니므로 stockmain/stock_ma insert 처리 스킵")
 
     # daily stocketf,stocketf_ma insert ****************************************************************
-    if is_trading_day(trade_date):
+    if is_trading_day(trade_date_p):
         insert_all_symbols_etf(p_trade_date=trade_date)
 
         symbols_buy_pool20_etf = get_all_symbols20_etf(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 20
