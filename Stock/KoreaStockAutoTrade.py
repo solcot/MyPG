@@ -1302,28 +1302,27 @@ def check_market_status_pre_market():
     # 1. 한국 거래소(XKRX) 달력 가져오기
     krx = mcal.get_calendar('XKRX')
     
-    # 2. 오늘 날짜 확인 (시간 제외하고 날짜만)
+    # 2. 오늘 날짜 확인
     now = datetime.now()
     today_str = now.strftime('%Y-%m-%d')
     
-    # 3. 넉넉하게 전후 20일간의 개장 여부 스케줄 조회
-    # (이 함수는 실제 데이터가 아니라 '규칙'에 의해 계산되므로 8시에도 정확합니다)
+    # 3. 넉넉하게 전후 20일간의 스케줄 조회
+    # 종료일을 오늘(now)까지로 제한하거나, 필터링 로직을 강화해야 합니다.
     schedule = krx.schedule(start_date=(now - timedelta(days=20)).strftime('%Y-%m-%d'), 
-                            end_date=(now + timedelta(days=1)).strftime('%Y-%m-%d'))
+                            end_date=today_str)
     
-    # 4. 오늘이 개장일 리스트(schedule.index)에 있는지 확인
+    # 4. 오늘이 개장일인지 확인
     is_market_open = today_str in schedule.index.strftime('%Y-%m-%d')
     
-    # 5. 마지막 거래일 찾기
-    # 오늘이 개장일이면 리스트에서 오늘 이전 날짜 중 마지막, 
-    # 오늘이 휴장일이면 그냥 리스트의 마지막 날짜
-    if is_market_open:
-        # 오늘을 포함한 스케줄이므로, 오늘보다 이전인 날짜들 중 마지막을 선택
-        past_trades = schedule[schedule.index < today_str]
+    # 5. 마지막 거래일(Last Trading Day) 계산
+    # '오늘보다 이전인' 거래일들만 필터링합니다.
+    past_trades = schedule[schedule.index < today_str]
+    
+    if not past_trades.empty:
         last_trading_day = past_trades.index[-1].strftime('%Y%m%d')
     else:
-        # 오늘이 휴장일이면 스케줄 상의 마지막 날짜가 곧 마지막 거래일
-        last_trading_day = schedule.index[-1].strftime('%Y%m%d')
+        # 혹시 모를 에러 방지 (데이터가 없을 경우)
+        last_trading_day = None
 
     return is_market_open, last_trading_day
 #***********************************************************************************************************
@@ -1334,6 +1333,8 @@ try:
     send_message_main(msg)
 
     ACCESS_TOKEN = get_access_token()
+    #send_message(f"✅-----[{ACCESS_TOKEN}]-----")
+    #ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ0b2tlbiIsImF1ZCI6IjkxN2ZlNjRhLTk3ODMtNGI0Yy04ZWZiLTQwY2Y2Y2QxYThhYiIsInByZHRfY2QiOiIiLCJpc3MiOiJ1bm9ndyIsImV4cCI6MTc2NzMwOTMzMywiaWF0IjoxNzY3MjIyOTMzLCJqdGkiOiJQU1kxaUxka1BsTGE5ajhkYTNJZDZENGlHU3g5REVkU3I4Uk8ifQ.e7gsdKo8tiDKUZIWzaz7cycXp0G7eBeSV2PVbopAwH7PiyWl8-QHf_G6xrtrJuTtG58HACBW4rYeXwdzUOCf8A"
 
     # --- ✨ 메인 자동매매 루프 시작 ✨ ---
     # 외부 루프: 설정 재로드를 위해 전체 로직을 감쌈
@@ -1349,7 +1350,7 @@ try:
         #trade_date = get_last_trading_day()
         #trade_date = '20250909'
         is_open, trade_date = check_market_status_pre_market()
-        #-debug- send_message(f"✅ [{is_open},{trade_date}] ---")
+        #send_message(f"✅ [{is_open},{trade_date}] ---")
         MAX_BUY_PRICE = AMOUNT_TO_BUY
         symbols_buy_pool20 = get_all_symbols20(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 20
         symbols_buy_pool40 = get_all_symbols40(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 40
