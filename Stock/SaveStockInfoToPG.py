@@ -275,57 +275,56 @@ def save_to_postgres_fdt(df, trade_date, conn):
     send_message(f"✅ {trade_date} stockfdt 덮어쓰기 완료 ({len(values)} 종목)")
 
 # =================================================================================
-# [핵심] 로그인 세션 생성 함수 (자동 복구 기능 포함)
+# [수정] 로그인 세션 생성 함수 (SessionManager와 동기화 완료)
 # =================================================================================
 def get_authenticated_session():
     """
-    1. 'krx_session.pkl' 로드 시도 및 유효성 검사.
-    2. 유효하면 즉시 세션 반환.
-    3. 파일이 없거나, 로드 중 에러가 나거나, 유효성 검사 실패 시(세션 만료)
-       -> 자동으로 Selenium 브라우저를 띄워 재로그인 프로세스로 진입.
+    1. 'C:\\StockPy\\krx_session.pkl' 경로를 고정하여 SessionManager와 파일을 공유합니다.
+    2. SessionManager와 동일한 타임아웃(15초)과 검증 로직(길이 체크)을 사용합니다.
+    3. 세션이 유효하면 즉시 반환하고, 정말 문제가 있을 때만 비상용으로 Selenium을 켭니다.
     """
-    cookie_filename = 'krx_session.pkl'
+    # [수정] 경로를 절대 경로로 고정하여 프로그램 실행 위치에 상관없이 동일한 파일을 보게 합니다.
+    cookie_filename = r'C:\StockPy\krx_session.pkl' 
     user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     
     sess = requests.Session()
     sess.headers.update({'User-Agent': user_agent})
     
-    # -------------------------------------------------------
-    # 1. 저장된 쿠키 로드 및 유효성 테스트
-    # -------------------------------------------------------
-    need_login = True  # 기본적으로 로그인이 필요하다고 가정
+    need_login = True
 
+    # -------------------------------------------------------
+    # 1. 저장된 쿠키 로드 및 유효성 테스트 (SessionManager와 동기화)
+    # -------------------------------------------------------
     if os.path.exists(cookie_filename):
-        print(f"📂 저장된 세션 파일('{cookie_filename}') 발견. 유효성 검사 중...")
+        print(f"📂 저장된 세션 파일('{cookie_filename}') 로드 및 검증 중...")
         try:
             with open(cookie_filename, 'rb') as f:
                 cookies = pickle.load(f)
                 sess.cookies.update(cookies)
             
-            # 테스트 요청 (가벼운 마이페이지 혹은 메뉴 호출)
+            # [수정] 타임아웃을 15초로 늘려 서버 지연으로 인한 오작동을 방지합니다.
             test_url = 'http://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020506'
-            res = sess.get(test_url, timeout=5)
+            res = sess.get(test_url, timeout=15)
             
-            # KRX는 세션 만료 시 보통 200 OK를 주더라도 내용물에 '로그인' 버튼이 생기거나
-            # 리다이렉트 스크립트가 포함됨. 
-            # 여기서는 간단히 길이가 너무 짧거나(에러 페이지), 특정 키워드가 없으면 만료로 판단.
-            if res.status_code == 200 and "MDC" in res.text and len(res.text) > 2000:
-                print("✅ 저장된 세션이 유효합니다! 자동 로그인 성공.")
-                need_login = False  # 로그인 불필요
+            # [수정] SessionManager와 동일하게 '응답 코드'와 '내용 길이'만으로 깔끔하게 판단합니다.
+            if res.status_code == 200 and len(res.text) > 2000:
+                print("✅ 세션이 유효합니다! (SessionManager 동기화 성공)")
+                need_login = False 
                 return sess
             else:
-                print("⚠️ 저장된 세션이 만료되었습니다. (재로그인 필요)")
+                print(f"⚠️ 세션 검증 실패: 코드 {res.status_code}, 길이 {len(res.text)}")
         except Exception as e:
-            print(f"⚠️ 세션 로드 중 오류 발생({e}). 재로그인을 진행합니다.")
+            print(f"⚠️ 세션 파일 읽기 오류: {e}")
     else:
-        print("ℹ️ 저장된 세션 파일이 없습니다. 새 로그인을 진행합니다.")
+        print(f"ℹ️ 세션 파일이 존재하지 않습니다: {cookie_filename}")
 
     # -------------------------------------------------------
-    # 2. Selenium으로 수동 로그인 진행 (need_login이 True일 때만 실행)
+    # 2. Selenium으로 비상 로그인 (SessionManager가 꺼져있을 때만 실행됨)
     # -------------------------------------------------------
     if need_login:
         print("\n" + "="*70)
-        print("🚀 [로그인 갱신 필요] 브라우저가 열리면 로그인을 진행해주세요.")
+        print("🚨 [비상] 유효한 세션이 없습니다. 수동 로그인을 진행합니다.")
+        print("   (SessionManager.py가 켜져 있는지 확인해 주세요!)")
         print("="*70)
 
         chrome_options = Options()
@@ -334,7 +333,6 @@ def get_authenticated_session():
         chrome_options.add_argument("--window-size=1280,800")
         chrome_options.add_argument(f'user-agent={user_agent}')
 
-        # 크롬 바이너리 위치
         path_candidates = [
             r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
@@ -349,37 +347,31 @@ def get_authenticated_session():
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=chrome_options)
 
-            # 로그인 화면 접속
             target_url = 'http://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020506'
             driver.get(target_url)
             time.sleep(3) 
 
-            # 팝업 닫기
             try:
                 driver.switch_to.alert.accept()
             except:
                 pass
 
-            print("\n" + "="*60)
-            print("🛑 [사용자 개입 필요]")
-            print("   1. 열린 크롬 창에서 '로그인' 버튼을 눌러 로그인을 완료하세요.")
-            print("   2. 로그인이 완료되면, 👉 여기 터미널에서 [Enter] 키를 누르세요.")
-            print("="*60 + "\n")
-            input("⌨️ 로그인을 완료했다면 엔터를 누르세요...")
+            print("\n🛑 [사용자 개입 필요] 로그인을 완료하고 엔터를 누르세요.")
+            input("⌨️ 엔터 키 대기 중...")
 
-            # 로그인 후 쿠키 가져오기
-            sess = requests.Session() # 새 세션 시작
+            # 로그인 정보 추출 및 저장
+            sess = requests.Session()
             selenium_cookies = driver.get_cookies()
             for cookie in selenium_cookies:
                 sess.cookies.set(cookie['name'], cookie['value'])
             
             sess.headers.update({'User-Agent': user_agent})
             
-            # 새 쿠키 저장
+            # [수정] 저장 시에도 절대 경로를 사용합니다.
             with open(cookie_filename, 'wb') as f:
                 pickle.dump(sess.cookies, f)
             
-            print(f"💾 새로운 로그인 정보를 '{cookie_filename}'에 갱신했습니다.")
+            print(f"💾 새로운 세션이 저장되었습니다: {cookie_filename}")
             return sess
 
         except Exception as e:
@@ -388,7 +380,7 @@ def get_authenticated_session():
         finally:
             if driver:
                 driver.quit()
-
+                
 # =================================================================================
 # 데이터 수집 함수 (Session 인자 사용)
 # =================================================================================
