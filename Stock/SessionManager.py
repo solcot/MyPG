@@ -12,7 +12,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 # 설정
 # =========================================================
 COOKIE_FILENAME = r'C:\StockPy\krx_session.pkl'
-CHECK_INTERVAL = 300  # 5분 (너무 자주 하면 차단될 수 있으므로 5분 권장)
+CHECK_INTERVAL = 900  # 15분 (너무 자주 하면 차단될 수 있으므로 15분 권장)
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
 def get_timestamp():
