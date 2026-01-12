@@ -2096,10 +2096,10 @@ on sm.trade_date = mc.trade_date and sm.code = mc.code
 --where ma20 > ma10
 where ma10 > ma5
 and sm.trade_date = p_trade_date
-and sm.code not in (
-'376930' --노을
-,'018880' --한온시스템
-)
+--and sm.code not in (
+--'376930' --노을
+--,'018880' --한온시스템
+--)
 $$;
 
 
