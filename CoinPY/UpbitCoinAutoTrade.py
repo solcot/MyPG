@@ -20,7 +20,7 @@ class UpbitAutoTrade:
         
         self.LOOP_TIME = int(self.config.get('LOOP_TIME', 30))
         self.AMOUNT_TO_BUY = int(self.config.get('AMOUNT_TO_BUY', 100000))
-        self.TRADE_VALUE = int(self.config.get('TRADE_VALUE', 10000000000)) # 100억 권장
+        self.TRADE_VALUE = int(self.config.get('TRADE_VALUE', 5000000000)) # 50억 권장
         
         start_msg = f"🤖 자동매매 봇 초기화 완료 (주기: {self.LOOP_TIME}분 / 매수금: {self.AMOUNT_TO_BUY}원 / 불타기 허용)"
         print(start_msg)
@@ -60,7 +60,7 @@ class UpbitAutoTrade:
                 data = response.json()
                 if isinstance(data, list):
                     result_list.extend(data)
-                time.sleep(0.1)
+                time.sleep(0.5) # [수정] 스냅샷 조회 시에도 안전하게 0.5초 대기
             except Exception as e:
                 print(f"❌ API 조회 중 에러: {e}")
         return result_list
@@ -71,16 +71,19 @@ class UpbitAutoTrade:
     def get_ma_status(self, ticker):
         """이평선 분석 (에러 발생 시 None 반환하여 건너뜀)"""
         try:
+            # 1. 일봉 데이터 조회
             df = pyupbit.get_ohlcv(ticker, interval="day", count=30)
             if df is None or len(df) < 25: return None
             
             curr_ma5 = df['close'].rolling(5).mean().iloc[-1]
             curr_ma10 = df['close'].rolling(10).mean().iloc[-1]
             curr_ma20 = df['close'].rolling(20).mean().iloc[-1]
-            curr_price = pyupbit.get_current_price(ticker)
             
+            # 2. 현재가 조회
+            curr_price = pyupbit.get_current_price(ticker)
             if curr_price is None: return None
 
+            # 3. 분봉 데이터 조회 (타임머신)
             past_time = datetime.now() - timedelta(minutes=self.LOOP_TIME)
             df_past_min = pyupbit.get_ohlcv(ticker, interval="minute1", to=past_time, count=1)
             
@@ -101,10 +104,11 @@ class UpbitAutoTrade:
                 'name': ticker
             }
         except Exception:
+            # API 제한 등으로 None이 반환될 수 있음
             return None
 
     def report_account_status(self):
-        """계좌 리포트 (자투리 & 에러 필터링 적용)"""
+        """계좌 리포트"""
         try:
             balances = self.upbit.get_balances()
             krw_balance = 0
@@ -119,7 +123,6 @@ class UpbitAutoTrade:
                 vol = float(b['balance'])
                 valuation_raw = avg_price * vol 
                 
-                # [필터링] 매수 금액 기준 10,000원 미만이면 무시
                 if valuation_raw < 10000:
                     continue
 
@@ -147,7 +150,7 @@ class UpbitAutoTrade:
             if coin_reports:
                 report_msg += "📦 **보유 코인(1만원 이상):**\n" + "\n".join(coin_reports)
             else:
-                report_msg += "📦 **보유 코인:** 없음 (또는 1만원 미만 소액)"
+                report_msg += "📦 **보유 코인:** 없음"
             
             print(report_msg.replace("**", ""))
             self.send_discord_message(report_msg)
@@ -168,7 +171,6 @@ class UpbitAutoTrade:
                 currency = b['currency']
                 if currency == 'KRW': continue
                 
-                # [필터링] 10,000원 미만 제외
                 balance_amt = float(b['balance'])
                 avg_buy_price = float(b['avg_buy_price'])
                 if balance_amt * avg_buy_price < 10000: 
@@ -183,11 +185,12 @@ class UpbitAutoTrade:
                 curr_price = status['curr_price']
                 yield_rate = (curr_price - avg_buy_price) / avg_buy_price * 100
                 
-                print(f"   👉 {currency}: 수익률 {yield_rate:+.2f}% | MA5({status['curr_ma5']:,.2f}) vs MA10({status['curr_ma10']:,.2f})", end=" ")
+                print(f"   👉 [{currency}] 수익률:{yield_rate:+.2f}% | "
+                      f"MA5:{status['curr_ma5']:,.2f} vs MA10:{status['curr_ma10']:,.2f} | "
+                      f"상태:{'📉매도조건' if status['curr_ma5'] < status['curr_ma10'] else '👌홀딩'}")
 
-                # [조건] 5일선 < 10일선 (데드크로스)
                 if status['curr_ma5'] < status['curr_ma10']:
-                    print("-> 📉 [매도 조건 만족]")
+                    print(f"      🚨 {ticker} 매도 실행합니다!")
                     sell_res = self.upbit.sell_market_order(ticker, balance_amt)
                     
                     if sell_res:
@@ -210,10 +213,9 @@ class UpbitAutoTrade:
                         )
                         self.send_discord_message(discord_msg)
                         print(f"      ✅ 시장가 매도 및 알림 완료!")
-                else:
-                    print("-> 👌 [홀딩]")
                 
-                time.sleep(0.1)
+                # [수정] 0.1초 -> 0.5초로 변경 (API 제한 방지)
+                time.sleep(1.0)
 
             if checked_count == 0:
                 print("   (매도 검증할 1만원 이상 보유 코인이 없습니다)")
@@ -222,18 +224,16 @@ class UpbitAutoTrade:
             print(f"❌ 매도 로직 에러: {e}")
 
     # =========================================================
-    # 4. 매수 로직 (수정: 중복 매수 허용)
+    # 4. 매수 로직
     # =========================================================
     def execute_buy_logic(self):
         print("\n🔴 [매수 검증] 시작...")
         try:
-            # 1. 잔고 체크
             krw_balance = self.upbit.get_balance("KRW")
             if krw_balance < self.AMOUNT_TO_BUY:
                 print(f"⚠️ 잔고 부족({krw_balance:,.0f}원)으로 매수를 건너뜁니다.")
                 return
 
-            # 2. 거래대금 필터링
             tickers = pyupbit.get_tickers(fiat="KRW")
             all_tickers_data = self.get_market_snapshot(tickers)
             
@@ -242,21 +242,25 @@ class UpbitAutoTrade:
                 if info['acc_trade_price_24h'] >= self.TRADE_VALUE:
                     candidates.append(info['market'])
             
-            print(f"   🔎 1차 필터링(거래대금 {self.TRADE_VALUE//100000000}억↑) 통과: {len(candidates)}개")
+            print(f"   🔎 1차 필터링(거래대금 {self.TRADE_VALUE//100000000}억↑) 통과: {len(candidates)}개 (전체 검증 시작)")
 
-            # 3. 기술적 분석
             for ticker in candidates:
-                # [수정됨] 보유 코인 체크(Skip) 로직 삭제 -> 조건 맞으면 추가 매수(불타기) 허용!
-                
                 status = self.get_ma_status(ticker)
-                if not status: continue
+                
+                if not status:
+                    print(f"   😶 [{ticker}] 데이터 부족 또는 조회 실패 (Pass - API제한 등)")
+                    time.sleep(0.5) # 실패했더라도 대기 시간은 가짐
+                    continue
 
-                # 조건 판단
                 cond_now = (status['curr_price'] > status['curr_ma5'] > status['curr_ma10'] > status['curr_ma20'])
                 cond_past = (status['past_ma10'] < status['past_ma20'])
 
+                print(f"   👁️ [{ticker}] {status['curr_price']:,.2f}원 | "
+                      f"정배열(P>5>10>20):{'⭕' if cond_now else '❌'} | "
+                      f"과거(10<20):{'⭕' if cond_past else '❌'}")
+
                 if cond_now and cond_past:
-                    print(f"   🚀 [매수 진입] 조건 만족: {ticker} (추가 매수 가능)")
+                    print(f"      🚀 [매수 진입] 조건 만족: {ticker} (추가 매수 가능)")
                     buy_res = self.upbit.buy_market_order(ticker, self.AMOUNT_TO_BUY)
                     
                     if buy_res:
@@ -272,11 +276,11 @@ class UpbitAutoTrade:
                         self.send_discord_message(discord_msg)
                         print(f"      ✅ 매수 주문 및 알림 완료!")
                         
-                        # 예산 확인
                         curr_krw = self.upbit.get_balance("KRW")
                         if curr_krw < self.AMOUNT_TO_BUY: break
                 
-                time.sleep(0.1)
+                # [수정] 0.1초 -> 0.5초로 변경 (API 제한 방지 핵심)
+                time.sleep(1.0)
 
         except Exception as e:
             print(f"❌ 매수 로직 에러: {e}")
