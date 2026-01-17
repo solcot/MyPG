@@ -20,12 +20,19 @@ class UpbitAutoTrade:
         
         self.LOOP_TIME = int(self.config.get('LOOP_TIME', 30))
         self.AMOUNT_TO_BUY = int(self.config.get('AMOUNT_TO_BUY', 100000))
-        self.TRADE_VALUE = int(self.config.get('TRADE_VALUE', 5000000000)) # 50억 권장
+        self.TRADE_VALUE = int(self.config.get('TRADE_VALUE', 3000000000))
         
-        # [수정] 설정 파일에서 캔들 간격 읽어오기 (기본값: day)
+        # [설정] 캔들 간격 읽어오기
         self.CANDLE_INTERVAL = self.config.get('CANDLE_INTERVAL', 'day')
         
-        start_msg = f"🤖 자동매매 봇 초기화 완료 (주기: {self.LOOP_TIME}분 / 캔들: {self.CANDLE_INTERVAL} / 매수금: {self.AMOUNT_TO_BUY}원)"
+        # [설정] 매도 전략 읽어오기 (기본값: 5-10)
+        self.SELL_STRATEGY = self.config.get('SELL_STRATEGY', '5-10')
+        
+        start_msg = (f"🤖 자동매매 봇 초기화 완료\n"
+                     f"- 주기: {self.LOOP_TIME}분\n"
+                     f"- 캔들: {self.CANDLE_INTERVAL}\n"
+                     f"- 매수금: {self.AMOUNT_TO_BUY}원\n"
+                     f"- 매도전략: {self.SELL_STRATEGY} 데드크로스")
         print(start_msg)
         self.send_discord_message(start_msg)
 
@@ -74,7 +81,7 @@ class UpbitAutoTrade:
     def get_ma_status(self, ticker):
         """이평선 분석 (에러 발생 시 None 반환하여 건너뜀)"""
         try:
-            # [수정] 설정된 CANDLE_INTERVAL 적용 (day, minute240 등)
+            # 설정된 CANDLE_INTERVAL 적용
             df = pyupbit.get_ohlcv(ticker, interval=self.CANDLE_INTERVAL, count=30)
             if df is None or len(df) < 25: return None
             
@@ -82,12 +89,11 @@ class UpbitAutoTrade:
             curr_ma10 = df['close'].rolling(10).mean().iloc[-1]
             curr_ma20 = df['close'].rolling(20).mean().iloc[-1]
             
-            # 2. 현재가 조회
+            # 현재가 조회
             curr_price = pyupbit.get_current_price(ticker)
             if curr_price is None: return None
 
-            # 3. 분봉 데이터 조회 (타임머신)
-            # 과거 시점의 가격을 알아내는 것은 interval과 무관하게 minute1을 쓰는 것이 가장 정확함
+            # 과거 시점 데이터 조회 (타임머신 로직)
             past_time = datetime.now() - timedelta(minutes=self.LOOP_TIME)
             df_past_min = pyupbit.get_ohlcv(ticker, interval="minute1", to=past_time, count=1)
             
@@ -127,6 +133,7 @@ class UpbitAutoTrade:
                 vol = float(b['balance'])
                 valuation_raw = avg_price * vol 
                 
+                # 1만원 미만 소액은 리포트에서 제외
                 if valuation_raw < 10000:
                     continue
 
@@ -163,7 +170,7 @@ class UpbitAutoTrade:
             print(f"⚠️ 리포트 생성 실패: {e}")
 
     # =========================================================
-    # 3. 매도 로직
+    # 3. 매도 로직 (전략 선택 적용)
     # =========================================================
     def execute_sell_logic(self):
         print("\n🔵 [매도 검증] 시작...")
@@ -177,6 +184,8 @@ class UpbitAutoTrade:
                 
                 balance_amt = float(b['balance'])
                 avg_buy_price = float(b['avg_buy_price'])
+                
+                # 1만원 미만 소액은 매도 검증 제외
                 if balance_amt * avg_buy_price < 10000: 
                     continue
                 
@@ -189,12 +198,25 @@ class UpbitAutoTrade:
                 curr_price = status['curr_price']
                 yield_rate = (curr_price - avg_buy_price) / avg_buy_price * 100
                 
-                print(f"   👉 [{currency}] 수익률:{yield_rate:+.2f}% | "
-                      f"MA5:{status['curr_ma5']:,.2f} vs MA10:{status['curr_ma10']:,.2f} | "
-                      f"상태:{'📉매도조건' if status['curr_ma5'] < status['curr_ma10'] else '👌홀딩'}")
+                # [수정] 설정값에 따른 매도 조건 판단
+                is_sell_signal = False
+                strategy_msg = ""
+                
+                if self.SELL_STRATEGY == "10-20":
+                    # MA10 < MA20 일 때 매도
+                    is_sell_signal = (status['curr_ma10'] < status['curr_ma20'])
+                    strategy_msg = f"MA10({status['curr_ma10']:,.0f}) vs MA20({status['curr_ma20']:,.0f})"
+                else:
+                    # 기본값: MA5 < MA10 일 때 매도
+                    is_sell_signal = (status['curr_ma5'] < status['curr_ma10'])
+                    strategy_msg = f"MA5({status['curr_ma5']:,.0f}) vs MA10({status['curr_ma10']:,.0f})"
+                
+                print(f"   👉 [{currency}] 수익률:{yield_rate:+.2f}% | {strategy_msg} | "
+                      f"상태:{'📉매도조건' if is_sell_signal else '👌홀딩'}")
 
-                if status['curr_ma5'] < status['curr_ma10']:
-                    print(f"      🚨 {ticker} 매도 실행합니다!")
+                # 매도 실행
+                if is_sell_signal:
+                    print(f"      🚨 {ticker} 매도 실행합니다! (조건: {self.SELL_STRATEGY})")
                     sell_res = self.upbit.sell_market_order(ticker, balance_amt)
                     
                     if sell_res:
@@ -211,6 +233,7 @@ class UpbitAutoTrade:
                         
                         discord_msg = (
                             f"📉 **[매도 체결 알림]** {ticker}\n"
+                            f"• 전략: {self.SELL_STRATEGY} 데드크로스\n"
                             f"• 수익률: **{yield_rate:+.2f}%**\n"
                             f"• 차익: {diff:,.0f}원\n"
                             f"• 매도가: {sell_price:,.0f}원"
@@ -251,7 +274,7 @@ class UpbitAutoTrade:
                 status = self.get_ma_status(ticker)
                 
                 if not status:
-                    print(f"   😶 [{ticker}] 데이터 부족 또는 조회 실패 (Pass - API제한 등)")
+                    print(f"   😶 [{ticker}] 데이터 부족 또는 조회 실패 (Pass)")
                     time.sleep(0.5) 
                     continue
 
@@ -292,7 +315,7 @@ class UpbitAutoTrade:
     # =========================================================
     def run(self):
         print(f"🔥 AutoTrade 시작... [Loop Time: {self.LOOP_TIME}분]")
-        self.send_discord_message(f"🔥 **AutoTrade 서비스 시작** (Loop: {self.LOOP_TIME}분 / 캔들: {self.CANDLE_INTERVAL} / 불타기 허용)")
+        self.send_discord_message(f"🔥 **AutoTrade 서비스 시작** (Loop: {self.LOOP_TIME}분 / 캔들: {self.CANDLE_INTERVAL} / 매도전략: {self.SELL_STRATEGY})")
         
         while True:
             start_time = datetime.now()
