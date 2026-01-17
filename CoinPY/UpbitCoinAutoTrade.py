@@ -22,7 +22,10 @@ class UpbitAutoTrade:
         self.AMOUNT_TO_BUY = int(self.config.get('AMOUNT_TO_BUY', 100000))
         self.TRADE_VALUE = int(self.config.get('TRADE_VALUE', 5000000000)) # 50억 권장
         
-        start_msg = f"🤖 자동매매 봇 초기화 완료 (주기: {self.LOOP_TIME}분 / 매수금: {self.AMOUNT_TO_BUY}원 / 불타기 허용)"
+        # [수정] 설정 파일에서 캔들 간격 읽어오기 (기본값: day)
+        self.CANDLE_INTERVAL = self.config.get('CANDLE_INTERVAL', 'day')
+        
+        start_msg = f"🤖 자동매매 봇 초기화 완료 (주기: {self.LOOP_TIME}분 / 캔들: {self.CANDLE_INTERVAL} / 매수금: {self.AMOUNT_TO_BUY}원)"
         print(start_msg)
         self.send_discord_message(start_msg)
 
@@ -60,7 +63,7 @@ class UpbitAutoTrade:
                 data = response.json()
                 if isinstance(data, list):
                     result_list.extend(data)
-                time.sleep(0.5) # [수정] 스냅샷 조회 시에도 안전하게 0.5초 대기
+                time.sleep(0.5) 
             except Exception as e:
                 print(f"❌ API 조회 중 에러: {e}")
         return result_list
@@ -71,8 +74,8 @@ class UpbitAutoTrade:
     def get_ma_status(self, ticker):
         """이평선 분석 (에러 발생 시 None 반환하여 건너뜀)"""
         try:
-            # 1. 일봉 데이터 조회
-            df = pyupbit.get_ohlcv(ticker, interval="day", count=30)
+            # [수정] 설정된 CANDLE_INTERVAL 적용 (day, minute240 등)
+            df = pyupbit.get_ohlcv(ticker, interval=self.CANDLE_INTERVAL, count=30)
             if df is None or len(df) < 25: return None
             
             curr_ma5 = df['close'].rolling(5).mean().iloc[-1]
@@ -84,12 +87,14 @@ class UpbitAutoTrade:
             if curr_price is None: return None
 
             # 3. 분봉 데이터 조회 (타임머신)
+            # 과거 시점의 가격을 알아내는 것은 interval과 무관하게 minute1을 쓰는 것이 가장 정확함
             past_time = datetime.now() - timedelta(minutes=self.LOOP_TIME)
             df_past_min = pyupbit.get_ohlcv(ticker, interval="minute1", to=past_time, count=1)
             
             if df_past_min is None or df_past_min.empty: return None
             past_price = df_past_min['close'].iloc[-1]
             
+            # 현재 캔들(마지막 행)을 과거 가격으로 대체하여 과거 MA 계산
             past_series = pd.concat([df['close'].iloc[:-1], pd.Series([past_price])])
             past_ma10 = past_series.rolling(10).mean().iloc[-1]
             past_ma20 = past_series.rolling(20).mean().iloc[-1]
@@ -104,7 +109,6 @@ class UpbitAutoTrade:
                 'name': ticker
             }
         except Exception:
-            # API 제한 등으로 None이 반환될 수 있음
             return None
 
     def report_account_status(self):
@@ -214,8 +218,7 @@ class UpbitAutoTrade:
                         self.send_discord_message(discord_msg)
                         print(f"      ✅ 시장가 매도 및 알림 완료!")
                 
-                # [수정] 0.1초 -> 0.5초로 변경 (API 제한 방지)
-                time.sleep(1.0)
+                time.sleep(0.5)
 
             if checked_count == 0:
                 print("   (매도 검증할 1만원 이상 보유 코인이 없습니다)")
@@ -249,7 +252,7 @@ class UpbitAutoTrade:
                 
                 if not status:
                     print(f"   😶 [{ticker}] 데이터 부족 또는 조회 실패 (Pass - API제한 등)")
-                    time.sleep(0.5) # 실패했더라도 대기 시간은 가짐
+                    time.sleep(0.5) 
                     continue
 
                 cond_now = (status['curr_price'] > status['curr_ma5'] > status['curr_ma10'] > status['curr_ma20'])
@@ -279,8 +282,7 @@ class UpbitAutoTrade:
                         curr_krw = self.upbit.get_balance("KRW")
                         if curr_krw < self.AMOUNT_TO_BUY: break
                 
-                # [수정] 0.1초 -> 0.5초로 변경 (API 제한 방지 핵심)
-                time.sleep(1.0)
+                time.sleep(0.5)
 
         except Exception as e:
             print(f"❌ 매수 로직 에러: {e}")
@@ -290,7 +292,7 @@ class UpbitAutoTrade:
     # =========================================================
     def run(self):
         print(f"🔥 AutoTrade 시작... [Loop Time: {self.LOOP_TIME}분]")
-        self.send_discord_message(f"🔥 **AutoTrade 서비스 시작** (Loop: {self.LOOP_TIME}분 / 불타기 허용)")
+        self.send_discord_message(f"🔥 **AutoTrade 서비스 시작** (Loop: {self.LOOP_TIME}분 / 캔들: {self.CANDLE_INTERVAL} / 불타기 허용)")
         
         while True:
             start_time = datetime.now()
