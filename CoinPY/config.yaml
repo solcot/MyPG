@@ -7,7 +7,7 @@ LOOP_TIME: 2
 AMOUNT_TO_BUY: 15000
 TRADE_VALUE: 3000000000
 
-# day, minute240, minute60 중 택 1
+# day, minute240, minute60, minute10 중 택 1
 CANDLE_INTERVAL: "minute10"
 
 # [추가] 매도 전략 선택
