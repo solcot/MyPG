@@ -15,4 +15,4 @@ CANDLE_INTERVAL: "minute10"
 # "10-20": 10일선이 20일선보다 낮아지면 매도 (느림, 휩소 방어)
 SELL_STRATEGY: "10-20"
 
-AMOUNT: 1,000,000
+AMOUNT: 1000000
