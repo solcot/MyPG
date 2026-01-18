@@ -100,7 +100,7 @@ class UpbitAutoTrade:
         return my_coins
 
     # =========================================================
-    # 2. 핵심 분석 로직 (최적화된 버전)
+    # 2. 핵심 분석 로직 (안전장치 1: 재시도 로직 적용)
     # =========================================================
     def get_ma_status(self, ticker):
         try:
@@ -108,8 +108,14 @@ class UpbitAutoTrade:
             candles_ago = max(1, self.LOOP_TIME // self._get_interval_minutes())
             count_needed = 30 + candles_ago + 5
             
-            # 2. 데이터 조회
-            df = pyupbit.get_ohlcv(ticker, interval=self.CANDLE_INTERVAL, count=count_needed)
+            # 2. 데이터 조회 (재시도 로직 추가)
+            df = None
+            for _ in range(3): # 최대 3회 시도
+                df = pyupbit.get_ohlcv(ticker, interval=self.CANDLE_INTERVAL, count=count_needed)
+                if df is not None and len(df) >= 25:
+                    break
+                time.sleep(0.3) # 실패 시 0.3초 대기
+
             if df is None or len(df) < 25: 
                 return None
             
@@ -121,7 +127,7 @@ class UpbitAutoTrade:
             if pd.isna(curr_ma5) or pd.isna(curr_ma10) or pd.isna(curr_ma20):
                 return None
             
-            # 4. 과거 MA 계산 (인덱싱 활용 - 타임머신 대체)
+            # 4. 과거 MA 계산
             past_idx = -1 - candles_ago
             
             if len(df) < abs(past_idx):
@@ -133,8 +139,14 @@ class UpbitAutoTrade:
             if pd.isna(past_ma10) or pd.isna(past_ma20):
                 return None
             
-            # 5. 현재가 조회
-            curr_price = pyupbit.get_current_price(ticker)
+            # 5. 현재가 조회 (재시도 로직 추가)
+            curr_price = None
+            for _ in range(3):
+                curr_price = pyupbit.get_current_price(ticker)
+                if curr_price is not None:
+                    break
+                time.sleep(0.3)
+
             if curr_price is None: 
                 return None
 
@@ -163,7 +175,7 @@ class UpbitAutoTrade:
         return 1440 
 
     # =========================================================
-    # 3. 계좌 리포트
+    # 3. 계좌 리포트 (안전장치 2: 속도 조절)
     # =========================================================
     def report_account_status(self):
         """계좌 리포트 (상세 출력)"""
@@ -190,6 +202,7 @@ class UpbitAutoTrade:
                 
                 try:
                     curr_price = pyupbit.get_current_price(ticker)
+                    time.sleep(0.1) # [추가] API 부하 방지용 딜레이
                     if curr_price is None: continue
                 except Exception:
                     continue
@@ -218,7 +231,7 @@ class UpbitAutoTrade:
             print(f"⚠️ 리포트 생성 실패: {e}")
 
     # =========================================================
-    # 4. 매도 로직 (수정: 실패 시에도 대기 시간 부여)
+    # 4. 매도 로직
     # =========================================================
     def execute_sell_logic(self):
         print("\n🔵 [매도 검증] 시작...")
@@ -241,10 +254,9 @@ class UpbitAutoTrade:
                 
                 status = self.get_ma_status(ticker)
                 
-                # [수정] 실패 시에도 0.5초 쉬고 넘어가도록 변경 (API 연쇄 오류 방지)
                 if not status: 
                     print(f"   ⚠️ [{currency}] 검증 불가 (데이터 부족 or API 오류로 Skip)")
-                    time.sleep(0.5) # <--- 여기가 핵심 수정 사항입니다!
+                    time.sleep(0.5) 
                     continue
                 
                 checked_count += 1
@@ -294,7 +306,6 @@ class UpbitAutoTrade:
                         self.send_discord_message(discord_msg)
                         print(f"      ✅ 시장가 매도 및 알림 완료!")
                 
-                # 정상 처리 시에도 대기
                 time.sleep(0.5)
 
             if checked_count == 0:
@@ -304,7 +315,7 @@ class UpbitAutoTrade:
             print(f"❌ 매도 로직 에러: {e}")
 
     # =========================================================
-    # 5. 매수 로직 (USD 계열 제외 + 보유코인 스킵 + 상세 로깅)
+    # 5. 매수 로직 (USD 계열 제외)
     # =========================================================
     def execute_buy_logic(self):
         print("\n🔴 [매수 검증] 시작...")
@@ -329,10 +340,8 @@ class UpbitAutoTrade:
 
             for ticker in candidates:
                 # [추가] USD로 시작하는 코인(USDT, USDC 등) 무조건 제외
-                # ticker 예시: "KRW-BTC", "KRW-USDT"
-                symbol = ticker.split('-')[1]  # "BTC", "USDT"
+                symbol = ticker.split('-')[1] 
                 if symbol.startswith('USD'):
-                    # print(f"   🚫 [{ticker}] 스테이블 코인(USD) 제외") # 너무 시끄러우면 주석 처리
                     continue
 
                 # 이미 보유 중이면 스킵
