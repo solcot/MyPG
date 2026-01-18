@@ -79,31 +79,41 @@ class UpbitAutoTrade:
     # 2. 핵심 분석 로직
     # =========================================================
     def get_ma_status(self, ticker):
-        """이평선 분석 (에러 발생 시 None 반환하여 건너뜀)"""
         try:
-            # 설정된 CANDLE_INTERVAL 적용
-            df = pyupbit.get_ohlcv(ticker, interval=self.CANDLE_INTERVAL, count=30)
-            if df is None or len(df) < 25: return None
+            # 충분한 데이터 확보 (과거 시점 포함)
+            candles_ago = max(1, self.LOOP_TIME // self._get_interval_minutes())
+            count_needed = 30 + candles_ago + 5
             
+            df = pyupbit.get_ohlcv(ticker, interval=self.CANDLE_INTERVAL, count=count_needed)
+            if df is None or len(df) < 25: 
+                return None
+            
+            # 현재 MA 계산
             curr_ma5 = df['close'].rolling(5).mean().iloc[-1]
             curr_ma10 = df['close'].rolling(10).mean().iloc[-1]
             curr_ma20 = df['close'].rolling(20).mean().iloc[-1]
             
+            # 현재 MA NaN 체크
+            if pd.isna(curr_ma5) or pd.isna(curr_ma10) or pd.isna(curr_ma20):
+                return None
+            
+            # 과거 MA 계산 (LOOP_TIME 캔들 수만큼 이전)
+            past_idx = -1 - candles_ago
+            
+            if len(df) < abs(past_idx):
+                return None
+            
+            past_ma10 = df['close'].rolling(10).mean().iloc[past_idx]
+            past_ma20 = df['close'].rolling(20).mean().iloc[past_idx]
+            
+            # 과거 MA NaN 체크 (변수 정의 후에!)
+            if pd.isna(past_ma10) or pd.isna(past_ma20):
+                return None
+            
             # 현재가 조회
             curr_price = pyupbit.get_current_price(ticker)
-            if curr_price is None: return None
-
-            # 과거 시점 데이터 조회 (타임머신 로직)
-            past_time = datetime.now() - timedelta(minutes=self.LOOP_TIME)
-            df_past_min = pyupbit.get_ohlcv(ticker, interval="minute1", to=past_time, count=1)
-            
-            if df_past_min is None or df_past_min.empty: return None
-            past_price = df_past_min['close'].iloc[-1]
-            
-            # 현재 캔들(마지막 행)을 과거 가격으로 대체하여 과거 MA 계산
-            past_series = pd.concat([df['close'].iloc[:-1], pd.Series([past_price])])
-            past_ma10 = past_series.rolling(10).mean().iloc[-1]
-            past_ma20 = past_series.rolling(20).mean().iloc[-1]
+            if curr_price is None: 
+                return None
 
             return {
                 'curr_price': curr_price,
@@ -114,8 +124,21 @@ class UpbitAutoTrade:
                 'past_ma20': past_ma20,
                 'name': ticker
             }
-        except Exception:
+        except Exception as e:
+            print(f"⚠️ [{ticker}] MA 계산 실패: {e}")
             return None
+
+    def _get_interval_minutes(self):
+        """캔들 간격을 분 단위로 반환"""
+        if self.CANDLE_INTERVAL == "day":
+            return 1440
+        elif self.CANDLE_INTERVAL == "minute240":
+            return 240
+        elif self.CANDLE_INTERVAL == "minute60":
+            return 60
+        elif self.CANDLE_INTERVAL == "minute10":
+            return 10
+        return 1440  # 기본값
 
     def report_account_status(self):
         """계좌 리포트"""
