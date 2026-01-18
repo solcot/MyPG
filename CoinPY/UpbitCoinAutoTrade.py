@@ -181,6 +181,7 @@ class UpbitAutoTrade:
                 vol = float(b['balance'])
                 valuation_raw = avg_price * vol 
                 
+                # 1만원 미만 소액은 리포트에서 제외
                 if valuation_raw < 10000:
                     continue
 
@@ -217,7 +218,7 @@ class UpbitAutoTrade:
             print(f"⚠️ 리포트 생성 실패: {e}")
 
     # =========================================================
-    # 4. 매도 로직 (상세 검증 & 전략 적용)
+    # 4. 매도 로직 (수정: 실패 시에도 대기 시간 부여)
     # =========================================================
     def execute_sell_logic(self):
         print("\n🔵 [매도 검증] 시작...")
@@ -239,7 +240,12 @@ class UpbitAutoTrade:
                 ticker = f"KRW-{currency}"
                 
                 status = self.get_ma_status(ticker)
-                if not status: continue
+                
+                # [수정] 실패 시에도 0.5초 쉬고 넘어가도록 변경 (API 연쇄 오류 방지)
+                if not status: 
+                    print(f"   ⚠️ [{currency}] 검증 불가 (데이터 부족 or API 오류로 Skip)")
+                    time.sleep(0.5) # <--- 여기가 핵심 수정 사항입니다!
+                    continue
                 
                 checked_count += 1
                 curr_price = status['curr_price']
@@ -288,6 +294,7 @@ class UpbitAutoTrade:
                         self.send_discord_message(discord_msg)
                         print(f"      ✅ 시장가 매도 및 알림 완료!")
                 
+                # 정상 처리 시에도 대기
                 time.sleep(0.5)
 
             if checked_count == 0:
@@ -297,7 +304,7 @@ class UpbitAutoTrade:
             print(f"❌ 매도 로직 에러: {e}")
 
     # =========================================================
-    # 5. 매수 로직 (보유코인 스킵 + 상세 로깅)
+    # 5. 매수 로직 (USD 계열 제외 + 보유코인 스킵 + 상세 로깅)
     # =========================================================
     def execute_buy_logic(self):
         print("\n🔴 [매수 검증] 시작...")
@@ -307,7 +314,7 @@ class UpbitAutoTrade:
                 print(f"⚠️ 잔고 부족({krw_balance:,.0f}원)으로 매수를 건너뜁니다.")
                 return
 
-            # [추가] 보유 중인 코인 목록 조회 (재매수 방지용)
+            # 보유 중인 코인 목록 조회 (재매수 방지용)
             my_coins = self.get_my_coins()
 
             tickers = pyupbit.get_tickers(fiat="KRW")
@@ -321,7 +328,14 @@ class UpbitAutoTrade:
             print(f"   🔎 1차 필터링(거래대금 {self.TRADE_VALUE//100000000}억↑) 통과: {len(candidates)}개 (전체 검증 시작)")
 
             for ticker in candidates:
-                # [핵심] 이미 보유 중이면 스킵
+                # [추가] USD로 시작하는 코인(USDT, USDC 등) 무조건 제외
+                # ticker 예시: "KRW-BTC", "KRW-USDT"
+                symbol = ticker.split('-')[1]  # "BTC", "USDT"
+                if symbol.startswith('USD'):
+                    # print(f"   🚫 [{ticker}] 스테이블 코인(USD) 제외") # 너무 시끄러우면 주석 처리
+                    continue
+
+                # 이미 보유 중이면 스킵
                 if ticker in my_coins:
                     print(f"   🔒 [{ticker}] 이미 보유 중 -> 매수 스킵")
                     continue
@@ -329,14 +343,13 @@ class UpbitAutoTrade:
                 status = self.get_ma_status(ticker)
                 
                 if not status:
-                    # 데이터 부족 등으로 계산 불가 시 패스
                     time.sleep(0.5) 
                     continue
 
                 cond_now = (status['curr_price'] > status['curr_ma5'] > status['curr_ma10'] > status['curr_ma20'])
                 cond_past = (status['past_ma10'] < status['past_ma20'])
 
-                # 상세 로깅 (모든 후보 출력)
+                # 상세 로깅
                 print(f"   👁️ [{ticker}] {status['curr_price']:,.2f}원 | "
                       f"정배열(P>5>10>20):{'⭕' if cond_now else '❌'} | "
                       f"과거(10<20):{'⭕' if cond_past else '❌'}")
