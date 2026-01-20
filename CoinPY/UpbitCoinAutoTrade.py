@@ -27,12 +27,16 @@ class UpbitAutoTrade:
         
         # [설정] 매도 전략 읽어오기 (기본값: 5-10)
         self.SELL_STRATEGY = self.config.get('SELL_STRATEGY', '5-10')
-        
+
+        # [설정] 매수 전략 읽어오기 (기본값: 10-20)
+        self.BUY_STRATEGY = self.config.get('BUY_STRATEGY', '5-10')
+
         start_msg = (f"🤖 자동매매 봇 초기화 완료\n"
                      f"- 주기: {self.LOOP_TIME}분\n"
                      f"- 캔들: {self.CANDLE_INTERVAL}\n"
                      f"- 매수금: {self.AMOUNT_TO_BUY}원\n"
                      f"- 매도전략: {self.SELL_STRATEGY} 데드크로스\n"
+                     f"- 매수전략: {self.BUY_STRATEGY} 골든크로스\n"                     
                      f"- 중복매수: ❌ (보유 코인 스킵)")
         print(start_msg)
         self.send_discord_message(start_msg)
@@ -132,11 +136,12 @@ class UpbitAutoTrade:
             
             if len(df) < abs(past_idx):
                 return None
-            
+
+            past_ma5 = df['close'].rolling(5).mean().iloc[past_idx]
             past_ma10 = df['close'].rolling(10).mean().iloc[past_idx]
             past_ma20 = df['close'].rolling(20).mean().iloc[past_idx]
             
-            if pd.isna(past_ma10) or pd.isna(past_ma20):
+            if pd.isna(past_ma5) or pd.isna(past_ma10) or pd.isna(past_ma20):
                 return None
             
             # 5. 현재가 조회 (재시도 로직 추가)
@@ -155,6 +160,7 @@ class UpbitAutoTrade:
                 'curr_ma5': curr_ma5,
                 'curr_ma10': curr_ma10,
                 'curr_ma20': curr_ma20,
+                'past_ma5': past_ma5,
                 'past_ma10': past_ma10,
                 'past_ma20': past_ma20,
                 'name': ticker
@@ -306,7 +312,7 @@ class UpbitAutoTrade:
                         self.send_discord_message(discord_msg)
                         print(f"      ✅ 시장가 매도 및 알림 완료!")
                 
-                time.sleep(0.5)
+                time.sleep(0.2)
 
             if checked_count == 0:
                 print("   (매도 검증할 1만원 이상 보유 코인이 없습니다)")
@@ -355,16 +361,25 @@ class UpbitAutoTrade:
                     time.sleep(0.5) 
                     continue
 
-                cond_now = (status['curr_price'] > status['curr_ma5'] > status['curr_ma10'] > status['curr_ma20'])
-                cond_past = (status['past_ma10'] < status['past_ma20'])
-
-                # 상세 로깅
-                print(f"   👁️ [{ticker}] {status['curr_price']:,.2f}원 | "
-                      f"정배열(P>5>10>20):{'⭕' if cond_now else '❌'} | "
-                      f"과거(10<20):{'⭕' if cond_past else '❌'}")
+                if self.BUY_STRATEGY == "10-20":
+                    # MA10, MA20 골든크로스일때 매수
+                    cond_now = (status['curr_price'] > status['curr_ma5'] > status['curr_ma10'] > status['curr_ma20'])
+                    cond_past = (status['past_ma10'] < status['past_ma20'])
+                    # 상세 로깅
+                    print(f"   👁️ [{ticker}] {status['curr_price']:,.2f}원 | "
+                        f"정배열(P>5>10>20):{'⭕' if cond_now else '❌'} | "
+                        f"과거(10<20):{'⭕' if cond_past else '❌'}")                    
+                else:
+                    # 기본값: MA5, MA10 골든크로스일때 매수
+                    cond_now = (status['curr_price'] > status['curr_ma5'] > status['curr_ma10'])
+                    cond_past = (status['past_ma5'] < status['past_ma10'])
+                    # 상세 로깅
+                    print(f"   👁️ [{ticker}] {status['curr_price']:,.2f}원 | "
+                        f"정배열(P>5>10):{'⭕' if cond_now else '❌'} | "
+                        f"과거(5<10):{'⭕' if cond_past else '❌'}")                
 
                 if cond_now and cond_past:
-                    print(f"      🚀 [매수 진입] 조건 만족: {ticker}")
+                    print(f"      🚀 [매수 진입] 조건 만족: {ticker} (조건: {self.BUY_STRATEGY})")
                     buy_res = self.upbit.buy_market_order(ticker, self.AMOUNT_TO_BUY)
                     
                     if buy_res:
@@ -375,7 +390,7 @@ class UpbitAutoTrade:
                             f"🚀 **[매수 체결 알림]** {ticker}\n"
                             f"• 매수금액: {self.AMOUNT_TO_BUY:,.0f}원\n"
                             f"• 현재가: {status['curr_price']:,.0f}원 (Approx)\n"
-                            f"• 이평선 정배열 + 골든크로스"
+                            f"• 이평선 정배열 + 골든크로스: {self.BUY_STRATEGY}"
                         )
                         self.send_discord_message(discord_msg)
                         print(f"      ✅ 매수 주문 및 알림 완료!")
@@ -383,7 +398,7 @@ class UpbitAutoTrade:
                         curr_krw = self.upbit.get_balance("KRW")
                         if curr_krw < self.AMOUNT_TO_BUY: break
                 
-                time.sleep(0.5)
+                time.sleep(0.2)
 
         except Exception as e:
             print(f"❌ 매수 로직 에러: {e}")
