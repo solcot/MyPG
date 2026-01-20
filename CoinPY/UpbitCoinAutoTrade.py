@@ -25,19 +25,25 @@ class UpbitAutoTrade:
         # [설정] 캔들 간격 읽어오기
         self.CANDLE_INTERVAL = self.config.get('CANDLE_INTERVAL', 'day')
         
-        # [설정] 매도 전략 읽어오기 (기본값: 5-10)
+        # [설정] 전략
         self.SELL_STRATEGY = self.config.get('SELL_STRATEGY', '5-10')
-
-        # [설정] 매수 전략 읽어오기 (기본값: 10-20)
         self.BUY_STRATEGY = self.config.get('BUY_STRATEGY', '5-10')
 
+        # [설정] 목표 수익률 & 쿨타임
+        self.TARGET_PROFIT_RATE = float(self.config.get('TARGET_PROFIT_RATE', 10.0))
+        self.REBUY_COOLDOWN = int(self.config.get('REBUY_COOLDOWN', 60)) 
+
+        # [메모리] 매도한 코인과 시간을 기록하는 딕셔너리
+        self.sold_log = {}
+        
+        # [핵심] 프로그램 재시작 시 파일에서 과거 매도 기록 복구
+        self.load_recent_sell_log()
+
         start_msg = (f"🤖 자동매매 봇 초기화 완료\n"
-                     f"- 주기: {self.LOOP_TIME}분\n"
-                     f"- 캔들: {self.CANDLE_INTERVAL}\n"
+                     f"- 주기: {self.LOOP_TIME}분 / 캔들: {self.CANDLE_INTERVAL}\n"
                      f"- 매수금: {self.AMOUNT_TO_BUY}원\n"
-                     f"- 매도전략: {self.SELL_STRATEGY} 데드크로스\n"
-                     f"- 매수전략: {self.BUY_STRATEGY} 골든크로스\n"                     
-                     f"- 중복매수: ❌ (보유 코인 스킵)")
+                     f"- 전략: 매수({self.BUY_STRATEGY}) / 매도({self.SELL_STRATEGY})\n"
+                     f"- 익절: {self.TARGET_PROFIT_RATE}% / 쿨타임: {self.REBUY_COOLDOWN}분")
         print(start_msg)
         self.send_discord_message(start_msg)
 
@@ -57,6 +63,44 @@ class UpbitAutoTrade:
         except Exception as e:
             print(f"⚠️ 설정 파일 로드 실패: {e}")
             return {}
+
+    # =========================================================
+    # [NEW] 파일에서 최근 매도 기록을 읽어와 쿨타임 복구
+    # =========================================================
+    def load_recent_sell_log(self):
+        filename = 'SellHistory.ini'
+        if not os.path.exists(filename):
+            return
+
+        print("♻️ 지난 매도 내역 확인 중...")
+        try:
+            with open(filename, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            # 최신 기록부터 거꾸로 확인
+            for line in reversed(lines):
+                parts = line.split(',')
+                if len(parts) < 2: continue
+                
+                # 파일 포맷: 날짜, 티커, ...
+                time_str = parts[0].strip() # 2026-01-20 14:00:00
+                ticker = parts[1].strip()   # KRW-BTC
+                
+                try:
+                    sold_time = datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
+                    # 현재 시간과 비교
+                    elapsed_minutes = (datetime.now() - sold_time).total_seconds() / 60
+                    
+                    # 쿨타임 시간 내에 있는 기록이면 메모리에 복구
+                    if elapsed_minutes < self.REBUY_COOLDOWN:
+                        if ticker not in self.sold_log:
+                            self.sold_log[ticker] = sold_time
+                            remain = int(self.REBUY_COOLDOWN - elapsed_minutes)
+                            print(f"   ↪ ♻️ [복구] {ticker} : {int(elapsed_minutes)}분 전 매도 (재매수 금지 잔여: {remain}분)")
+                except Exception:
+                    continue
+        except Exception as e:
+            print(f"⚠️ 매도 기록 복구 중 오류: {e}")
 
     def log_to_file(self, filename, data_list):
         log_str = ",".join(map(str, data_list))
@@ -104,7 +148,7 @@ class UpbitAutoTrade:
         return my_coins
 
     # =========================================================
-    # 2. 핵심 분석 로직 (안전장치 1: 재시도 로직 적용)
+    # 2. 핵심 분석 로직 (재시도 로직 적용)
     # =========================================================
     def get_ma_status(self, ticker):
         try:
@@ -181,10 +225,9 @@ class UpbitAutoTrade:
         return 1440 
 
     # =========================================================
-    # 3. 계좌 리포트 (안전장치 2: 속도 조절)
+    # 3. 계좌 리포트
     # =========================================================
     def report_account_status(self):
-        """계좌 리포트 (상세 출력)"""
         try:
             balances = self.upbit.get_balances()
             krw_balance = 0
@@ -199,7 +242,6 @@ class UpbitAutoTrade:
                 vol = float(b['balance'])
                 valuation_raw = avg_price * vol 
                 
-                # 1만원 미만 소액은 리포트에서 제외
                 if valuation_raw < 10000:
                     continue
 
@@ -208,7 +250,7 @@ class UpbitAutoTrade:
                 
                 try:
                     curr_price = pyupbit.get_current_price(ticker)
-                    time.sleep(0.1) # [추가] API 부하 방지용 딜레이
+                    time.sleep(0.1) 
                     if curr_price is None: continue
                 except Exception:
                     continue
@@ -237,7 +279,7 @@ class UpbitAutoTrade:
             print(f"⚠️ 리포트 생성 실패: {e}")
 
     # =========================================================
-    # 4. 매도 로직
+    # 4. 매도 로직 (익절 + 쿨타임 기록)
     # =========================================================
     def execute_sell_logic(self):
         print("\n🔵 [매도 검증] 시작...")
@@ -252,7 +294,6 @@ class UpbitAutoTrade:
                 balance_amt = float(b['balance'])
                 avg_buy_price = float(b['avg_buy_price'])
                 
-                # 1만원 미만 소액은 매도 검증 제외
                 if balance_amt * avg_buy_price < 10000: 
                     continue
                 
@@ -269,28 +310,18 @@ class UpbitAutoTrade:
                 curr_price = status['curr_price']
                 yield_rate = (curr_price - avg_buy_price) / avg_buy_price * 100
                 
-                # 설정값에 따른 매도 조건 판단
-                is_sell_signal = False
-                strategy_msg = ""
-                
-                if self.SELL_STRATEGY == "10-20":
-                    # MA10 < MA20 일 때 매도
-                    is_sell_signal = (status['curr_ma10'] < status['curr_ma20'])
-                    strategy_msg = f"MA10({status['curr_ma10']:,.0f}) vs MA20({status['curr_ma20']:,.0f})"
-                else:
-                    # 기본값: MA5 < MA10 일 때 매도
-                    is_sell_signal = (status['curr_ma5'] < status['curr_ma10'])
-                    strategy_msg = f"MA5({status['curr_ma5']:,.0f}) vs MA10({status['curr_ma10']:,.0f})"
-                
-                print(f"   👉 [{currency}] 수익률:{yield_rate:+.2f}% | {strategy_msg} | "
-                      f"상태:{'📉매도조건' if is_sell_signal else '👌홀딩'}")
-
-                # 매도 실행
-                if is_sell_signal:
-                    print(f"      🚨 {ticker} 매도 실행합니다! (조건: {self.SELL_STRATEGY})")
-                    sell_res = self.upbit.sell_market_order(ticker, balance_amt)
+                # ----------------------------------------------------
+                # [익절] 목표 수익률 도달 시
+                # ----------------------------------------------------
+                if yield_rate >= self.TARGET_PROFIT_RATE:
+                    print(f"   🎉 [{currency}] 수익률:{yield_rate:+.2f}% >= 목표({self.TARGET_PROFIT_RATE}%) | 상태:🚀익절매도진행")
+                    print(f"       🚨 {ticker} 목표 수익 달성! 시장가 매도 실행!")
                     
+                    sell_res = self.upbit.sell_market_order(ticker, balance_amt)
                     if sell_res:
+                        # [쿨타임] 매도 시간 기록
+                        self.sold_log[ticker] = datetime.now()
+                        
                         time.sleep(1)
                         sell_price = float(status['curr_price'])
                         diff = sell_price - avg_buy_price
@@ -298,21 +329,67 @@ class UpbitAutoTrade:
                         log_data = [
                             datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                             ticker, avg_buy_price, sell_price, 
-                            diff, f"{yield_rate:.2f}%", ticker
+                            diff, f"{yield_rate:.2f}%", f"{ticker}(Profit)"
                         ]
                         self.log_to_file('SellHistory.ini', log_data)
                         
                         discord_msg = (
-                            f"📉 **[매도 체결 알림]** {ticker}\n"
-                            f"• 전략: {self.SELL_STRATEGY} 데드크로스\n"
+                            f"🎉 **[목표 달성 익절 알림]** {ticker}\n"
                             f"• 수익률: **{yield_rate:+.2f}%**\n"
                             f"• 차익: {diff:,.0f}원\n"
-                            f"• 매도가: {sell_price:,.0f}원"
+                            f"• 쿨타임 시작: {self.REBUY_COOLDOWN}분간 매수 금지"
                         )
                         self.send_discord_message(discord_msg)
-                        print(f"      ✅ 시장가 매도 및 알림 완료!")
+                        print(f"       ✅ 익절 매도 완료!")
+                    
+                    time.sleep(0.5)
+                    continue 
+
+                # ----------------------------------------------------
+                # [손절] 이동평균선 매도 조건 판단
+                # ----------------------------------------------------
+                is_sell_signal = False
+                strategy_msg = ""
                 
-                time.sleep(0.2)
+                if self.SELL_STRATEGY == "10-20":
+                    is_sell_signal = (status['curr_ma10'] < status['curr_ma20'])
+                    strategy_msg = f"MA10({status['curr_ma10']:,.0f}) vs MA20({status['curr_ma20']:,.0f})"
+                else:
+                    is_sell_signal = (status['curr_ma5'] < status['curr_ma10'])
+                    strategy_msg = f"MA5({status['curr_ma5']:,.0f}) vs MA10({status['curr_ma10']:,.0f})"
+                
+                print(f"   👉 [{currency}] 수익률:{yield_rate:+.2f}% | {strategy_msg} | "
+                      f"상태:{'📉매도조건' if is_sell_signal else '👌홀딩'}")
+
+                if is_sell_signal:
+                    print(f"       🚨 {ticker} 데드크로스 발생! 매도 실행 (조건: {self.SELL_STRATEGY})")
+                    sell_res = self.upbit.sell_market_order(ticker, balance_amt)
+                    
+                    if sell_res:
+                        # [쿨타임] 매도 시간 기록
+                        self.sold_log[ticker] = datetime.now()
+
+                        time.sleep(1)
+                        sell_price = float(status['curr_price'])
+                        diff = sell_price - avg_buy_price
+                        
+                        log_data = [
+                            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            ticker, avg_buy_price, sell_price, 
+                            diff, f"{yield_rate:.2f}%", f"{ticker}(DeadCross)"
+                        ]
+                        self.log_to_file('SellHistory.ini', log_data)
+                        
+                        discord_msg = (
+                            f"📉 **[손절/매도 체결 알림]** {ticker}\n"
+                            f"• 전략: {self.SELL_STRATEGY} 데드크로스\n"
+                            f"• 수익률: **{yield_rate:+.2f}%**\n"
+                            f"• 쿨타임 시작: {self.REBUY_COOLDOWN}분간 매수 금지"
+                        )
+                        self.send_discord_message(discord_msg)
+                        print(f"       ✅ 시장가 매도 및 알림 완료!")
+                
+                time.sleep(0.5)
 
             if checked_count == 0:
                 print("   (매도 검증할 1만원 이상 보유 코인이 없습니다)")
@@ -321,7 +398,7 @@ class UpbitAutoTrade:
             print(f"❌ 매도 로직 에러: {e}")
 
     # =========================================================
-    # 5. 매수 로직 (USD 계열 제외)
+    # 5. 매수 로직 (쿨타임 체크 추가)
     # =========================================================
     def execute_buy_logic(self):
         print("\n🔴 [매수 검증] 시작...")
@@ -331,7 +408,6 @@ class UpbitAutoTrade:
                 print(f"⚠️ 잔고 부족({krw_balance:,.0f}원)으로 매수를 건너뜁니다.")
                 return
 
-            # 보유 중인 코인 목록 조회 (재매수 방지용)
             my_coins = self.get_my_coins()
 
             tickers = pyupbit.get_tickers(fiat="KRW")
@@ -345,15 +421,27 @@ class UpbitAutoTrade:
             print(f"   🔎 1차 필터링(거래대금 {self.TRADE_VALUE//100000000}억↑) 통과: {len(candidates)}개 (전체 검증 시작)")
 
             for ticker in candidates:
-                # [추가] USD로 시작하는 코인(USDT, USDC 등) 무조건 제외
                 symbol = ticker.split('-')[1] 
-                if symbol.startswith('USD'):
-                    continue
+                if symbol.startswith('USD'): continue
 
-                # 이미 보유 중이면 스킵
                 if ticker in my_coins:
                     print(f"   🔒 [{ticker}] 이미 보유 중 -> 매수 스킵")
                     continue
+
+                # ----------------------------------------------------
+                # [쿨타임] 최근에 팔았는지 확인 (재매수 방지)
+                # ----------------------------------------------------
+                if ticker in self.sold_log:
+                    last_sold_time = self.sold_log[ticker]
+                    elapsed_minutes = (datetime.now() - last_sold_time).total_seconds() / 60
+                    
+                    if elapsed_minutes < self.REBUY_COOLDOWN:
+                        remain = int(self.REBUY_COOLDOWN - elapsed_minutes)
+                        print(f"   ❄️ [{ticker}] 매도 후 쿨타임 중 (잔여: {remain}분) -> 매수 스킵")
+                        continue
+                    else:
+                        # 쿨타임 지났으면 기록 삭제 (메모리 정리)
+                        del self.sold_log[ticker]
 
                 status = self.get_ma_status(ticker)
                 
@@ -362,18 +450,14 @@ class UpbitAutoTrade:
                     continue
 
                 if self.BUY_STRATEGY == "10-20":
-                    # MA10, MA20 골든크로스일때 매수
                     cond_now = (status['curr_price'] > status['curr_ma5'] > status['curr_ma10'] > status['curr_ma20'])
                     cond_past = (status['past_ma10'] < status['past_ma20'])
-                    # 상세 로깅
                     print(f"   👁️ [{ticker}] {status['curr_price']:,.2f}원 | "
                         f"정배열(P>5>10>20):{'⭕' if cond_now else '❌'} | "
                         f"과거(10<20):{'⭕' if cond_past else '❌'}")                    
                 else:
-                    # 기본값: MA5, MA10 골든크로스일때 매수
                     cond_now = (status['curr_price'] > status['curr_ma5'] > status['curr_ma10'])
                     cond_past = (status['past_ma5'] < status['past_ma10'])
-                    # 상세 로깅
                     print(f"   👁️ [{ticker}] {status['curr_price']:,.2f}원 | "
                         f"정배열(P>5>10):{'⭕' if cond_now else '❌'} | "
                         f"과거(5<10):{'⭕' if cond_past else '❌'}")                
@@ -398,7 +482,7 @@ class UpbitAutoTrade:
                         curr_krw = self.upbit.get_balance("KRW")
                         if curr_krw < self.AMOUNT_TO_BUY: break
                 
-                time.sleep(0.2)
+                time.sleep(0.5)
 
         except Exception as e:
             print(f"❌ 매수 로직 에러: {e}")
