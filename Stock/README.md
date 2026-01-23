@@ -9,6 +9,9 @@ pip install holidayskr
 pip install psycopg2-binary   # pg 연동시 필요
 pip install pandas_market_calendars
 pip install selenium webdriver-manager
+--------------------------------------------------
+pip install pyupbit    # CoinPy 에 필요
+--------------------------------------------------
 
 🚀 : “출발!”, “시작!” 느낌
 
