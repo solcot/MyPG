@@ -8,7 +8,7 @@ DISCORD_WEBHOOK_URL: "https://discord.com/api/webhooks/1462015179935056009/7G_B-
 LOOP_TIME: 15
 
 # 2. 1회 매수 금액 (총 시드가 100만원이라면 10~20만원 권장 = 종목 5~10개 분산)
-AMOUNT_TO_BUY: 50000
+AMOUNT_TO_BUY: 100000
 
 # 3. 거래대금 (잡코인 설거지 방지용, 최소 50억~100억 권장)
 TRADE_VALUE: 5000000000
