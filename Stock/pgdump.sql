@@ -620,7 +620,7 @@ and ma90 > ma120
 and prev1_90 < prev1
 
 and close_price < (p_max_price - 800000)
-and sm.market_cap > 300000000000
+and sm.market_cap > 500000000000
 and sm.change_rate < 15.0
 
 and ((sfv.pbr < 1.0) or (
@@ -979,7 +979,7 @@ and ma10 > ma20
 and prev1_10 < prev1
 
 and close_price < p_max_price
-and sm.market_cap > 300000000000
+and sm.market_cap > 500000000000
 and sm.change_rate < 15.0
 
 and ((sfv.pbr < 1.0) or (
@@ -1188,7 +1188,7 @@ and ma20 > ma40
 and prev1_20 < prev1
 
 and close_price < (p_max_price - 200000)
-and sm.market_cap > 300000000000
+and sm.market_cap > 500000000000
 and sm.change_rate < 15.0
 
 and ((sfv.pbr < 1.0) or (
@@ -1473,7 +1473,7 @@ and ma40 > ma60
 and prev1_40 < prev1
 
 and close_price < (p_max_price - 400000)
-and sm.market_cap > 300000000000
+and sm.market_cap > 500000000000
 and sm.change_rate < 15.0
 
 and ((sfv.pbr < 1.0) or (
@@ -1852,7 +1852,7 @@ and ma60 > ma90
 and prev1_60 < prev1
 
 and close_price < (p_max_price - 600000)
-and sm.market_cap > 300000000000
+and sm.market_cap > 500000000000
 and sm.change_rate < 15.0
 
 and ((sfv.pbr < 1.0) or (
