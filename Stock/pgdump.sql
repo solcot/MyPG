@@ -4106,7 +4106,7 @@ CREATE TABLE public.stockmain (
     name character varying(100),
     close_price numeric(15,2),
     change_price numeric(15,2),
-    change_rate numeric(7,4),
+    change_rate numeric(15,4),
     open_price numeric(15,2),
     high_price numeric(15,2),
     low_price numeric(15,2),
