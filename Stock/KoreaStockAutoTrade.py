@@ -1225,16 +1225,22 @@ def print_today_sell_history():
         send_message_main("📑 오늘 매도 내역 없음")
 
 def print_month_sell_history():
-    """SellHistory.ini 에서 이번달 매도 내역과 총 수익금 출력"""
-    today_str = datetime.now().strftime("%Y%m%d")
-    this_month = today_str[:6]  # YYYYMM 형식
+    """SellHistory.ini 에서 올해 1월부터 현재 월까지의 매도 내역과 총 수익금 출력"""
     if not os.path.exists(SELLHISTORY_FILE):
         send_message("📂 SellHistory.ini 파일이 존재하지 않습니다.")
         return
 
-    total_cnt = 0
-    total_profit = 0
-    found = False
+    now = datetime.now()
+    current_year = now.year
+    current_month = now.month
+
+    # 1. 1월부터 현재 월까지의 데이터를 담을 딕셔너리 초기화
+    monthly_stats = {}
+    for m in range(1, current_month + 1):
+        month_str = f"{current_year}{m:02d}"  # YYYYMM 형식 (예: 202601, 202602)
+        monthly_stats[month_str] = {'cnt': 0, 'profit': 0, 'found': False}
+
+    # 2. 파일 1회 순회하며 해당 월별 데이터 집계
     with open(SELLHISTORY_FILE, "r", encoding="utf-8") as f:
         for line in f:
             if not line.strip():
@@ -1242,24 +1248,33 @@ def print_month_sell_history():
             parts = line.strip().split(maxsplit=12)  # 종목명 포함
             if len(parts) < 11:
                 continue
+            
             sell_date = parts[1]  # 두 번째 컬럼이 매도일
-            if sell_date.startswith(this_month):
+            sell_month = sell_date[:6]  # YYYYMM 추출
+            
+            # 추출한 월(sell_month)이 1월~현재 월 범위에 포함될 경우 누적
+            if sell_month in monthly_stats:
                 try:
                     profit_amt = int(parts[9].replace(",", ""))  # 10번째 컬럼 (수익금)
-                    total_cnt += 1
-                    total_profit += profit_amt
+                    monthly_stats[sell_month]['cnt'] += 1
+                    monthly_stats[sell_month]['profit'] += profit_amt
+                    monthly_stats[sell_month]['found'] = True
                 except Exception:
                     pass
-                found = True
 
-    if found:
-        send_message(f"📊 {this_month}월 총 수익금: {total_cnt:,}건 {total_profit:,}원")
-        send_message("=================")
-        send_message_main(f"📊 {this_month}월 총 수익금: {total_cnt:,}건 {total_profit:,}원")
-    else:
-        send_message(f"📑 {this_month}월 매도 내역 없음")
-        send_message("=================")
-        send_message_main(f"📑 {this_month}월 매도 내역 없음")
+    # 3. 1월부터 현재 월까지 순서대로 출력 (기존 출력 형식 유지)
+    for m in range(1, current_month + 1):
+        month_str = f"{current_year}{m:02d}"
+        stats = monthly_stats[month_str]
+        
+        if stats['found']:
+            send_message(f"📊 {month_str}월 총 수익금: {stats['cnt']:,}건 {stats['profit']:,}원")
+            send_message("=================")
+            send_message_main(f"📊 {month_str}월 총 수익금: {stats['cnt']:,}건 {stats['profit']:,}원")
+        else:
+            send_message(f"📑 {month_str}월 매도 내역 없음")
+            send_message("=================")
+            send_message_main(f"📑 {month_str}월 매도 내역 없음")
 
 def print_year_sell_history():
     """SellHistory.ini 에서 올해 매도 내역과 총 수익금 출력"""
