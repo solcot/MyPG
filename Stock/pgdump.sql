@@ -4573,3 +4573,5 @@ ALTER TABLE ONLY public.stockmain
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict 0UuW0z999XElPy2evau1gMRry9y0089H91jjAhOrIlSZAcScf77cr9Zrpbr1K2U
