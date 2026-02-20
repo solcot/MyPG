@@ -2,8 +2,10 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 13.20
--- Dumped by pg_dump version 13.20
+\restrict 0UuW0z999XElPy2evau1gMRry9y0089H91jjAhOrIlSZAcScf77cr9Zrpbr1K2U
+
+-- Dumped from database version 13.23
+-- Dumped by pg_dump version 13.23
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -371,6 +373,69 @@ trade_date,
 code,
 lag(ma120,      1)      over    (partition      by      code    order   by      trade_date)     as      prev1,
 lag(ma90,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1_90,
+ma5,ma10,ma20,ma40,ma60,ma90,ma120
+from stock_ma
+where trade_date >= (date(p_trade_date) - 15) and trade_date <= p_trade_date
+)--, close_price_check as (
+--select
+--trade_date, code,
+--lag(close_price,      120)    over    (partition      by      code    order   by      trade_date)     as      price_prev120
+--from stockmain
+--)
+select
+    sm.code,
+    sm.name
+from stockmain sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
+--    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+    join stockfdt_pbr_v sfv on sm.trade_date = sfv.trade_date and sm.code = sfv.code
+where
+    sm.trade_date = p_trade_date
+
+and prev1 < ma120
+
+and close_price > ma5
+and close_price > ma10
+and close_price > ma20
+and close_price > ma40
+and close_price > ma60
+and close_price > ma90
+and close_price > ma120
+and ma5 > ma10
+and ma10 > ma20
+and ma20 > ma40
+and ma40 > ma60
+and ma60 > ma90
+and ma90 > ma120
+and prev1_90 < prev1
+
+and close_price < (p_max_price - 800000)
+and sm.market_cap > 500000000000
+and sm.change_rate < 15.0
+and sm.trade_value > 5000000000
+
+and ((sfv.pbr > 0.1 and sfv.pbr < 1.0) or (
+sfv.pbr > 0.1 and sfv.pbr < 3.0
+and sfv.per > 1.0 and sfv.per < 25.0
+and sfv.roe > 5.0
+))
+$$;
+
+
+ALTER FUNCTION public.get_stock_ma120(p_trade_date date, p_max_price numeric) OWNER TO postgres;
+
+--
+-- Name: get_stock_ma120_origin(date, numeric); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_stock_ma120_origin(p_trade_date date DEFAULT '2025-07-01'::date, p_max_price numeric DEFAULT 500000) RETURNS TABLE(code character varying, name character varying)
+    LANGUAGE sql
+    AS $$
+with ma_check as (
+select
+trade_date,
+code,
+lag(ma120,      1)      over    (partition      by      code    order   by      trade_date)     as      prev1,
+lag(ma90,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1_90,
 lag(ma120,      2)      over    (partition      by      code    order   by      trade_date)     as      prev2,
 lag(ma120,      3)      over    (partition      by      code    order   by      trade_date)     as      prev3,
 lag(ma120,      4)      over    (partition      by      code    order   by      trade_date)     as      prev4,
@@ -631,7 +696,7 @@ and sfv.roe > 3.0
 $$;
 
 
-ALTER FUNCTION public.get_stock_ma120(p_trade_date date, p_max_price numeric) OWNER TO postgres;
+ALTER FUNCTION public.get_stock_ma120_origin(p_trade_date date, p_max_price numeric) OWNER TO postgres;
 
 --
 -- Name: get_stock_ma120_test(date, numeric); Type: FUNCTION; Schema: public; Owner: postgres
@@ -918,6 +983,61 @@ trade_date,
 code,
 lag(ma20,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1,
 lag(ma10,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1_10,
+ma5,ma10,ma20,ma40,ma60,ma90,ma120
+from stock_ma
+where trade_date >= (date(p_trade_date) - 15) and trade_date <= p_trade_date
+)--, close_price_check as (
+--select
+--trade_date, code,
+--lag(close_price,        20)     over    (partition      by      code    order   by      trade_date)     as      price_prev20
+--from stockmain
+--)
+select
+    sm.code,
+    sm.name
+from stockmain sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
+--    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+    join stockfdt_pbr_v sfv on sm.trade_date = sfv.trade_date and sm.code = sfv.code
+where
+    sm.trade_date = p_trade_date
+
+and prev1 < ma20
+
+and close_price > ma5
+and close_price > ma10
+and close_price > ma20
+and ma5 > ma10
+and ma10 > ma20
+and prev1_10 < prev1
+
+and close_price < p_max_price
+and sm.market_cap > 500000000000
+and sm.change_rate < 15.0
+and sm.trade_value > 5000000000
+
+and ((sfv.pbr > 0.1 and sfv.pbr < 1.0) or (
+sfv.pbr > 0.1 and sfv.pbr < 3.0
+and sfv.per > 1.0 and sfv.per < 25.0
+and sfv.roe > 5.0
+))
+$$;
+
+
+ALTER FUNCTION public.get_stock_ma20(p_trade_date date, p_max_price numeric) OWNER TO postgres;
+
+--
+-- Name: get_stock_ma20_origin(date, numeric); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_stock_ma20_origin(p_trade_date date DEFAULT '2025-07-01'::date, p_max_price numeric DEFAULT 500000) RETURNS TABLE(code character varying, name character varying)
+    LANGUAGE sql
+    AS $$
+with ma_check as (
+select
+trade_date,
+code,
+lag(ma20,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1,
+lag(ma10,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1_10,
 lag(ma20,       2)      over    (partition      by      code    order   by      trade_date)     as      prev2,
 lag(ma20,       3)      over    (partition      by      code    order   by      trade_date)     as      prev3,
 lag(ma20,       4)      over    (partition      by      code    order   by      trade_date)     as      prev4,
@@ -990,7 +1110,7 @@ and sfv.roe > 3.0
 $$;
 
 
-ALTER FUNCTION public.get_stock_ma20(p_trade_date date, p_max_price numeric) OWNER TO postgres;
+ALTER FUNCTION public.get_stock_ma20_origin(p_trade_date date, p_max_price numeric) OWNER TO postgres;
 
 --
 -- Name: get_stock_ma20_test(date, numeric); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1081,6 +1201,63 @@ ALTER FUNCTION public.get_stock_ma20_test(p_trade_date date, p_max_price numeric
 --
 
 CREATE FUNCTION public.get_stock_ma40(p_trade_date date DEFAULT '2025-07-01'::date, p_max_price numeric DEFAULT 500000) RETURNS TABLE(code character varying, name character varying)
+    LANGUAGE sql
+    AS $$
+with ma_check as (
+select
+trade_date,
+code,
+lag(ma40,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1,
+lag(ma20,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1_20,
+ma5,ma10,ma20,ma40,ma60,ma90,ma120
+from stock_ma
+where trade_date >= (date(p_trade_date) - 15) and trade_date <= p_trade_date
+)--, close_price_check as (
+--select
+--trade_date, code,
+--lag(close_price,      40)     over    (partition      by      code    order   by      trade_date)     as      price_prev40
+--from stockmain
+--)
+select
+    sm.code,
+    sm.name
+from stockmain sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
+--    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+    join stockfdt_pbr_v sfv on sm.trade_date = sfv.trade_date and sm.code = sfv.code
+where
+    sm.trade_date = p_trade_date
+
+and prev1 < ma40
+
+and close_price > ma5
+and close_price > ma10
+and close_price > ma20
+and close_price > ma40
+and ma5 > ma10
+and ma10 > ma20
+and ma20 > ma40
+and prev1_20 < prev1
+
+and close_price < (p_max_price - 200000)
+and sm.market_cap > 500000000000
+and sm.change_rate < 15.0
+and sm.trade_value > 5000000000
+
+and ((sfv.pbr > 0.1 and sfv.pbr < 1.0) or (
+sfv.pbr > 0.1 and sfv.pbr < 3.0
+and sfv.per > 1.0 and sfv.per < 25.0
+and sfv.roe > 5.0
+))
+$$;
+
+
+ALTER FUNCTION public.get_stock_ma40(p_trade_date date, p_max_price numeric) OWNER TO postgres;
+
+--
+-- Name: get_stock_ma40_origin(date, numeric); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_stock_ma40_origin(p_trade_date date DEFAULT '2025-07-01'::date, p_max_price numeric DEFAULT 500000) RETURNS TABLE(code character varying, name character varying)
     LANGUAGE sql
     AS $$
 with ma_check as (
@@ -1199,7 +1376,7 @@ and sfv.roe > 3.0
 $$;
 
 
-ALTER FUNCTION public.get_stock_ma40(p_trade_date date, p_max_price numeric) OWNER TO postgres;
+ALTER FUNCTION public.get_stock_ma40_origin(p_trade_date date, p_max_price numeric) OWNER TO postgres;
 
 --
 -- Name: get_stock_ma40_test(date, numeric); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1328,6 +1505,65 @@ ALTER FUNCTION public.get_stock_ma40_test(p_trade_date date, p_max_price numeric
 --
 
 CREATE FUNCTION public.get_stock_ma60(p_trade_date date DEFAULT '2025-07-01'::date, p_max_price numeric DEFAULT 500000) RETURNS TABLE(code character varying, name character varying)
+    LANGUAGE sql
+    AS $$
+with ma_check as (
+select
+trade_date,
+code,
+lag(ma60,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1,
+lag(ma40,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1_40,
+ma5,ma10,ma20,ma40,ma60,ma90,ma120
+from stock_ma
+where trade_date >= (date(p_trade_date) - 15) and trade_date <= p_trade_date
+)--, close_price_check as (
+--select
+--trade_date, code,
+--lag(close_price,      60)     over    (partition      by      code    order   by      trade_date)     as      price_prev60
+--from stockmain
+--)
+select
+    sm.code,
+    sm.name
+from stockmain sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
+--    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+    join stockfdt_pbr_v sfv on sm.trade_date = sfv.trade_date and sm.code = sfv.code
+where
+    sm.trade_date = p_trade_date
+
+and prev1 < ma60
+
+and close_price > ma5
+and close_price > ma10
+and close_price > ma20
+and close_price > ma40
+and close_price > ma60
+and ma5 > ma10
+and ma10 > ma20
+and ma20 > ma40
+and ma40 > ma60
+and prev1_40 < prev1
+
+and close_price < (p_max_price - 400000)
+and sm.market_cap > 500000000000
+and sm.change_rate < 15.0
+and sm.trade_value > 5000000000
+
+and ((sfv.pbr > 0.1 and sfv.pbr < 1.0) or (
+sfv.pbr > 0.1 and sfv.pbr < 3.0
+and sfv.per > 1.0 and sfv.per < 25.0
+and sfv.roe > 5.0
+))
+$$;
+
+
+ALTER FUNCTION public.get_stock_ma60(p_trade_date date, p_max_price numeric) OWNER TO postgres;
+
+--
+-- Name: get_stock_ma60_origin(date, numeric); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_stock_ma60_origin(p_trade_date date DEFAULT '2025-07-01'::date, p_max_price numeric DEFAULT 500000) RETURNS TABLE(code character varying, name character varying)
     LANGUAGE sql
     AS $$
 with ma_check as (
@@ -1484,7 +1720,7 @@ and sfv.roe > 3.0
 $$;
 
 
-ALTER FUNCTION public.get_stock_ma60(p_trade_date date, p_max_price numeric) OWNER TO postgres;
+ALTER FUNCTION public.get_stock_ma60_origin(p_trade_date date, p_max_price numeric) OWNER TO postgres;
 
 --
 -- Name: get_stock_ma60_test(date, numeric); Type: FUNCTION; Schema: public; Owner: postgres
@@ -1651,6 +1887,67 @@ ALTER FUNCTION public.get_stock_ma60_test(p_trade_date date, p_max_price numeric
 --
 
 CREATE FUNCTION public.get_stock_ma90(p_trade_date date DEFAULT '2025-07-01'::date, p_max_price numeric DEFAULT 500000) RETURNS TABLE(code character varying, name character varying)
+    LANGUAGE sql
+    AS $$
+with ma_check as (
+select
+trade_date,
+code,
+lag(ma90,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1,
+lag(ma60,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1_60,
+ma5,ma10,ma20,ma40,ma60,ma90,ma120
+from stock_ma
+where trade_date >= (date(p_trade_date) - 15) and trade_date <= p_trade_date
+)--, close_price_check as (
+--select
+--trade_date, code,
+--lag(close_price,      90)     over    (partition      by      code    order   by      trade_date)     as      price_prev90
+--from stockmain
+--)
+select
+    sm.code,
+    sm.name
+from stockmain sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
+--    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
+    join stockfdt_pbr_v sfv on sm.trade_date = sfv.trade_date and sm.code = sfv.code
+where
+    sm.trade_date = p_trade_date
+
+and prev1 < ma90
+
+and close_price > ma5
+and close_price > ma10
+and close_price > ma20
+and close_price > ma40
+and close_price > ma60
+and close_price > ma90
+and ma5 > ma10
+and ma10 > ma20
+and ma20 > ma40
+and ma40 > ma60
+and ma60 > ma90
+and prev1_60 < prev1
+
+and close_price < (p_max_price - 600000)
+and sm.market_cap > 500000000000
+and sm.change_rate < 15.0
+and sm.trade_value > 5000000000
+
+and ((sfv.pbr > 0.1 and sfv.pbr < 1.0) or (
+sfv.pbr > 0.1 and sfv.pbr < 3.0
+and sfv.per > 1.0 and sfv.per < 25.0
+and sfv.roe > 5.0
+))
+$$;
+
+
+ALTER FUNCTION public.get_stock_ma90(p_trade_date date, p_max_price numeric) OWNER TO postgres;
+
+--
+-- Name: get_stock_ma90_origin(date, numeric); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_stock_ma90_origin(p_trade_date date DEFAULT '2025-07-01'::date, p_max_price numeric DEFAULT 500000) RETURNS TABLE(code character varying, name character varying)
     LANGUAGE sql
     AS $$
 with ma_check as (
@@ -1863,7 +2160,7 @@ and sfv.roe > 3.0
 $$;
 
 
-ALTER FUNCTION public.get_stock_ma90(p_trade_date date, p_max_price numeric) OWNER TO postgres;
+ALTER FUNCTION public.get_stock_ma90_origin(p_trade_date date, p_max_price numeric) OWNER TO postgres;
 
 --
 -- Name: get_stock_ma90_test(date, numeric); Type: FUNCTION; Schema: public; Owner: postgres
