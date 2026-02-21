@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 0UuW0z999XElPy2evau1gMRry9y0089H91jjAhOrIlSZAcScf77cr9Zrpbr1K2U
+\restrict C7arwwRngBKaUbv886nkSafyTXPetnxQIyMktXfF6aFUm0bXcylE2SWjCvd6hdl
 
 -- Dumped from database version 13.23
 -- Dumped by pg_dump version 13.23
@@ -413,9 +413,9 @@ and sm.market_cap > 500000000000
 and sm.change_rate < 15.0
 and sm.trade_value > 5000000000
 
-and ((sfv.pbr > 0.1 and sfv.pbr < 1.0) or (
-sfv.pbr > 0.1 and sfv.pbr < 3.0
-and sfv.per > 1.0 and sfv.per < 25.0
+and ((sfv.pbr >= 0.0 and sfv.pbr < 1.0) or (
+sfv.pbr >= 0.0 and sfv.pbr < 3.0
+and sfv.per >= 0.0 and sfv.per < 25.0
 and sfv.roe > 5.0
 ))
 $$;
@@ -1015,9 +1015,9 @@ and sm.market_cap > 500000000000
 and sm.change_rate < 15.0
 and sm.trade_value > 5000000000
 
-and ((sfv.pbr > 0.1 and sfv.pbr < 1.0) or (
-sfv.pbr > 0.1 and sfv.pbr < 3.0
-and sfv.per > 1.0 and sfv.per < 25.0
+and ((sfv.pbr >= 0.0 and sfv.pbr < 1.0) or (
+sfv.pbr >= 0.0 and sfv.pbr < 3.0
+and sfv.per >= 0.0 and sfv.per < 25.0
 and sfv.roe > 5.0
 ))
 $$;
@@ -1243,9 +1243,9 @@ and sm.market_cap > 500000000000
 and sm.change_rate < 15.0
 and sm.trade_value > 5000000000
 
-and ((sfv.pbr > 0.1 and sfv.pbr < 1.0) or (
-sfv.pbr > 0.1 and sfv.pbr < 3.0
-and sfv.per > 1.0 and sfv.per < 25.0
+and ((sfv.pbr >= 0.0 and sfv.pbr < 1.0) or (
+sfv.pbr >= 0.0 and sfv.pbr < 3.0
+and sfv.per >= 0.0 and sfv.per < 25.0
 and sfv.roe > 5.0
 ))
 $$;
@@ -1549,9 +1549,9 @@ and sm.market_cap > 500000000000
 and sm.change_rate < 15.0
 and sm.trade_value > 5000000000
 
-and ((sfv.pbr > 0.1 and sfv.pbr < 1.0) or (
-sfv.pbr > 0.1 and sfv.pbr < 3.0
-and sfv.per > 1.0 and sfv.per < 25.0
+and ((sfv.pbr >= 0.0 and sfv.pbr < 1.0) or (
+sfv.pbr >= 0.0 and sfv.pbr < 3.0
+and sfv.per >= 0.0 and sfv.per < 25.0
 and sfv.roe > 5.0
 ))
 $$;
@@ -1933,9 +1933,9 @@ and sm.market_cap > 500000000000
 and sm.change_rate < 15.0
 and sm.trade_value > 5000000000
 
-and ((sfv.pbr > 0.1 and sfv.pbr < 1.0) or (
-sfv.pbr > 0.1 and sfv.pbr < 3.0
-and sfv.per > 1.0 and sfv.per < 25.0
+and ((sfv.pbr >= 0.0 and sfv.pbr < 1.0) or (
+sfv.pbr >= 0.0 and sfv.pbr < 3.0
+and sfv.per >= 0.0 and sfv.per < 25.0
 and sfv.roe > 5.0
 ))
 $$;
@@ -4574,4 +4574,4 @@ ALTER TABLE ONLY public.stockmain
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0UuW0z999XElPy2evau1gMRry9y0089H91jjAhOrIlSZAcScf77cr9Zrpbr1K2U
+\unrestrict C7arwwRngBKaUbv886nkSafyTXPetnxQIyMktXfF6aFUm0bXcylE2SWjCvd6hdl
