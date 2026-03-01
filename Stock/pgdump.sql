@@ -1,5 +1,5 @@
 --
--- PostgreSQL database dump
+-- PostgreSQL database dump_V10
 --
 
 \restrict C7arwwRngBKaUbv886nkSafyTXPetnxQIyMktXfF6aFUm0bXcylE2SWjCvd6hdl
@@ -150,7 +150,8 @@ BEGIN
       ON a.trade_date = c.trade_date AND a.code = c.code
     WHERE a.trade_date = p_trade_date
 --      AND a.close_price < 300000
-      AND a.market_cap > 1000000000000   --1조
+--      AND a.market_cap > 1000000000000   --1조
+      AND a.market_cap > 500000000000   --5천억
 --and c.pbr < 1.0
 --and (c.pbr/c.per*100)::decimal(10,2) > 5.0
 
@@ -267,7 +268,8 @@ BEGIN
       ON a.trade_date = c.trade_date AND a.code = c.code
     WHERE a.trade_date = p_trade_date
 --      AND a.close_price < 300000
-      AND a.market_cap > 1000000000000   --1조
+--      AND a.market_cap > 1000000000000   --1조
+      AND a.market_cap > 500000000000   --5천억
 --      AND c.pbr < 1.00
 --      AND c.per < 5.00
 --      AND a.trade_value > 1000000000
