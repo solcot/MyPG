@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict w6MFcc8OhQGec15rjY4fg1euZswkjOjmJ3ilHkL5rZGhhd2BVPYh3oEZOiobgjb
+\restrict psU7VBNyi0moACAmWXmPxAref4vboQXcFgY0Ck7aQRiAS2wQ8pAeppRIFETlrY7
 
 -- Dumped from database version 13.23
 -- Dumped by pg_dump version 13.23
@@ -296,6 +296,69 @@ $$;
 
 
 ALTER FUNCTION public.get_stock_filter_results_pbr(p_trade_date date) OWNER TO postgres;
+
+--
+-- Name: get_stock_filter_results_roe(date); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.get_stock_filter_results_roe(p_trade_date date) RETURNS TABLE(code text, name text, close_price integer, ratio numeric, trade_value_uk integer, market_cap_chunuk integer, pbr numeric, per numeric, dividend_per_share numeric, dividend_yield numeric, roe numeric)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        a.code::text,
+        a.name::text,
+        a.close_price::int,
+        ((a.close_price - a.open_price) / a.close_price * 100)::numeric(5,2) AS ratio,
+        (a.trade_value::numeric / 100000000)::int AS trade_value_uk,
+        (a.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
+        c.pbr::numeric,
+        c.per::numeric,
+        c.dividend_per_share::numeric,
+        c.dividend_yield::numeric,
+        (c.pbr/c.per*100)::decimal(10,2) as roe
+    FROM stockmain a
+    JOIN stock_ma b
+      ON a.trade_date = b.trade_date AND a.code = b.code
+    JOIN stockfdt c
+      ON a.trade_date = c.trade_date AND a.code = c.code
+    WHERE a.trade_date = p_trade_date
+--      AND a.close_price < 300000
+      --AND a.market_cap > 1000000000000   --1조
+      AND a.market_cap > 500000000000   --5천억
+--and c.pbr < 1.0
+--and (c.pbr/c.per*100)::decimal(10,2) > 5.0
+
+--      AND c.pbr < 1.00
+--      AND c.per < 5.00
+--      AND a.trade_value > 1000000000
+
+--and (a.close_price-a.open_price)/a.close_price*100 >= 0.3
+--and (a.close_price-a.open_price)/a.close_price*100 <= 3.0
+--and market_cap < 2000000000000
+
+--and (LEAST(a.open_price,a.close_price) - a.low_price) >= (a.high_price - GREATEST(a.open_price,a.close_price))*1.1
+
+--and a.close_price > ma5
+--and ma5 > ma10
+--and ma10 > ma20
+--and ma20 > ma40
+
+--and ma40 > ma60
+--and ma60 > ma90
+--and ma90 > ma120
+
+and c.pbr is not null
+and c.per is not null
+
+    ORDER BY roe DESC
+    LIMIT 300;
+END;
+$$;
+
+
+ALTER FUNCTION public.get_stock_filter_results_roe(p_trade_date date) OWNER TO postgres;
 
 --
 -- Name: get_stock_ma10(date, numeric); Type: FUNCTION; Schema: public; Owner: postgres
@@ -4980,4 +5043,4 @@ ALTER TABLE ONLY public.stockmain
 -- PostgreSQL database dump complete
 --
 
-\unrestrict w6MFcc8OhQGec15rjY4fg1euZswkjOjmJ3ilHkL5rZGhhd2BVPYh3oEZOiobgjb
+\unrestrict psU7VBNyi0moACAmWXmPxAref4vboQXcFgY0Ck7aQRiAS2wQ8pAeppRIFETlrY7
