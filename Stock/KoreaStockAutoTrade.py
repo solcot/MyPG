@@ -97,129 +97,21 @@ def get_last_trading_day():
         day -= timedelta(days=1)
     return day.strftime('%Y%m%d')
 
-def get_all_symbols20(p_trade_date='20250901', p_max_price=500000):
-    trade_date = p_trade_date
-
-    # PostgreSQL 접속 후 쿼리 실행
+# 1. 공통 함수 (기존 로직 유지)
+def get_all_symbols_by_ma(p_trade_date, p_max_price, p_ma):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                sql = """
-                    select * from get_stock_ma20(%s, %s);
-                """
-                cur.execute(sql, (trade_date,p_max_price))
+                # DB의 프로시저 호출 시 차감된 p_max_price가 전달됩니다.
+                sql = f"select * from get_stock_ma{p_ma}(%s, %s);"
+                cur.execute(sql, (p_trade_date, p_max_price))
                 rows = cur.fetchall()
-
-                symbols_name_dict = {str(code).zfill(6): name for code, name in rows}
-
-        send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 20일 이평 매수종목 반환")
-        #send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 40일 이평 매수종목 반환")
-        send_message(symbols_name_dict)
-        #send_message_main(symbols_name_dict)
-        return symbols_name_dict
-
+                res_dict = {str(code).zfill(6): name for code, name in rows}
+        
+        send_message(f"✅ [{p_trade_date}] {p_ma}일 이평 매수종목: {len(res_dict)}건 (기준가: {p_max_price:,.0f}원)")
+        return res_dict
     except Exception as e:
-        send_message(f"❌ DB 조회 중 오류 발생: {e}")
-        return {}
-
-def get_all_symbols40(p_trade_date='20250901', p_max_price=500000):
-    trade_date = p_trade_date
-
-    # PostgreSQL 접속 후 쿼리 실행
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                sql = """
-                    select * from get_stock_ma40(%s, %s);
-                """
-                cur.execute(sql, (trade_date,p_max_price))
-                rows = cur.fetchall()
-
-                symbols_name_dict = {str(code).zfill(6): name for code, name in rows}
-
-        send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 40일 이평 매수종목 반환")
-        #send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 40일 이평 매수종목 반환")
-        send_message(symbols_name_dict)
-        #send_message_main(symbols_name_dict)
-        return symbols_name_dict
-
-    except Exception as e:
-        send_message(f"❌ DB 조회 중 오류 발생: {e}")
-        return {}
-
-def get_all_symbols60(p_trade_date='20250901', p_max_price=500000):
-    trade_date = p_trade_date
-
-    # PostgreSQL 접속 후 쿼리 실행
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                sql = """
-                    select * from get_stock_ma60(%s, %s);
-                """
-                cur.execute(sql, (trade_date,p_max_price))
-                rows = cur.fetchall()
-
-                symbols_name_dict = {str(code).zfill(6): name for code, name in rows}
-
-        send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 60일 이평 매수종목 반환")
-        #send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 60일 이평 매수종목 반환")
-        send_message(symbols_name_dict)
-        #send_message_main(symbols_name_dict)
-        return symbols_name_dict
-
-    except Exception as e:
-        send_message(f"❌ DB 조회 중 오류 발생: {e}")
-        return {}
-
-def get_all_symbols90(p_trade_date='20250901', p_max_price=500000):
-    trade_date = p_trade_date
-
-    # PostgreSQL 접속 후 쿼리 실행
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                sql = """
-                    select * from get_stock_ma90(%s, %s);
-                """
-                cur.execute(sql, (trade_date,p_max_price))
-                rows = cur.fetchall()
-
-                symbols_name_dict = {str(code).zfill(6): name for code, name in rows}
-
-        send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 90일 이평 매수종목 반환")
-        #send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 90일 이평 매수종목 반환")
-        send_message(symbols_name_dict)
-        #send_message_main(symbols_name_dict)
-        return symbols_name_dict
-
-    except Exception as e:
-        send_message(f"❌ DB 조회 중 오류 발생: {e}")
-        return {}
-
-def get_all_symbols120(p_trade_date='20250901', p_max_price=500000):
-    trade_date = p_trade_date
-
-    # PostgreSQL 접속 후 쿼리 실행
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                sql = """
-                    select * from get_stock_ma120(%s, %s);
-                """
-                cur.execute(sql, (trade_date,p_max_price))
-                rows = cur.fetchall()
-
-                symbols_name_dict = {str(code).zfill(6): name for code, name in rows}
-
-        send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 120일 이평 매수종목 반환")
-        #send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_name_dict)}건 120일 이평 매수종목 반환")
-        send_message(symbols_name_dict)
-        #send_message_main(symbols_name_dict)
-        return symbols_name_dict
-
-    except Exception as e:
-        send_message(f"❌ DB 조회 중 오류 발생: {e}")
+        send_message(f"❌ {p_ma}일 DB 조회 중 오류: {e}")
         return {}
 
 def get_all_symbols_sell(p_trade_date='20250901'):
@@ -1367,20 +1259,56 @@ try:
         is_open, trade_date = check_market_status_pre_market()
         #send_message(f"✅ [{is_open},{trade_date}] ---")
         MAX_BUY_PRICE = AMOUNT_TO_BUY
-        symbols_buy_pool20 = get_all_symbols20(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 20
-        symbols_buy_pool40 = get_all_symbols40(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 40
-        symbols_buy_pool60 = get_all_symbols60(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 60
-        symbols_buy_pool90 = get_all_symbols90(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 90
-        symbols_buy_pool120 = get_all_symbols120(p_trade_date=trade_date, p_max_price=MAX_BUY_PRICE)  # 금일 매수 종목 120
-        symbols_buy_pool = {
-            **symbols_buy_pool20,
-            **symbols_buy_pool40,
-            **symbols_buy_pool60,
-            **symbols_buy_pool90,
-            **symbols_buy_pool120
+
+        #ma_list = [20, 40, 60, 90, 120]
+        ma_list = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]
+        # [수정] 이평선별 차감 금액 설정 (키값을 숫자로 두어 계산 편의성 제공)
+        #---deduction_map = {
+        #---    20: 0,
+        #---    40: 200000,
+        #---    60: 400000,
+        #---    90: 600000,
+        #---    120: 800000
+        #---}
+        deduction_map = {
+            10: 800000,
+            20: 0,
+            30: 100000,
+            40: 200000,
+            50: 300000,
+            60: 400000,
+            70: 500000,
+            80: 600000,
+            90: 700000,
+            100: 800000,
+            110: 900000,
+            120: 950000
         }
-        send_message(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_buy_pool)}건 이평 매수종목 반환")
-        send_message_main(f"✅ [{trade_date}]일 DB 조회 완료: {len(symbols_buy_pool)}건 이평 매수종목 반환")
+        # 각 이평선별 결과를 따로 담을 저장소
+        ma_results = {}
+        # 전체를 합칠 최종 딕셔너리
+        symbols_buy_pool = {}
+        for ma in ma_list:
+            # [수정] 차감된 매수 기준가 계산
+            # deduction_map에 정의되지 않은 ma가 올 경우를 대비해 기본값 0 설정
+            current_max_price = MAX_BUY_PRICE - deduction_map.get(ma, 0)
+            
+            # 데이터 조회 시 차감된 가격(current_max_price) 전달
+            pool_part = get_all_symbols_by_ma(trade_date, current_max_price, ma)
+            
+            # [할당] 개별 저장 (하위 로직용)
+            ma_results[str(ma)] = pool_part
+            
+            # [통합] 전체 풀에 합치기
+            symbols_buy_pool.update(pool_part)
+
+        # 필요시 아래 사용
+        # pool_20 = ma_results.get('20', {})
+        # pool_60 = ma_results.get('60', {})
+
+        # 최종 결과 보고
+        send_message(f"📊 최종 통합 매수 종목 총 {len(symbols_buy_pool)}건 이평 매수종목 반환")
+        send_message_main(f"📊 최종 통합 매수 종목 총 {len(symbols_buy_pool)}건 이평 매수종목 반환")
         send_message(symbols_buy_pool)
         send_message_main(symbols_buy_pool)
 
@@ -1448,41 +1376,35 @@ try:
         TOTAL_LOSE_EXIT_PCT = settings['TOTAL_LOSE_EXIT_PCT']
         # --- 설정 파일 로드 끝 ---------------------------------------------------------------------------------------------
 
+        # 1. 제외 리스트가 존재할 경우에만 필터링 수행
         if EXCLUDE_LIST and len(EXCLUDE_LIST) > 0:
-            # ✅ 변경: 딕셔너리에서 제외할 종목들을 필터링하여 새로운 딕셔너리 생성
-            symbols_buy_pool20 = {
-                sym: name
-                for sym, name in symbols_buy_pool20.items()
-                if sym not in EXCLUDE_LIST
-            }
-        if EXCLUDE_LIST and len(EXCLUDE_LIST) > 0:
-            # ✅ 변경: 딕셔너리에서 제외할 종목들을 필터링하여 새로운 딕셔너리 생성
-            symbols_buy_pool40 = {
-                sym: name
-                for sym, name in symbols_buy_pool40.items()
-                if sym not in EXCLUDE_LIST
-            }
-        if EXCLUDE_LIST and len(EXCLUDE_LIST) > 0:
-            # ✅ 변경: 딕셔너리에서 제외할 종목들을 필터링하여 새로운 딕셔너리 생성
-            symbols_buy_pool60 = {
-                sym: name
-                for sym, name in symbols_buy_pool60.items()
-                if sym not in EXCLUDE_LIST
-            }
-        if EXCLUDE_LIST and len(EXCLUDE_LIST) > 0:
-            # ✅ 변경: 딕셔너리에서 제외할 종목들을 필터링하여 새로운 딕셔너리 생성
-            symbols_buy_pool90 = {
-                sym: name
-                for sym, name in symbols_buy_pool90.items()
-                if sym not in EXCLUDE_LIST
-            }
-        if EXCLUDE_LIST and len(EXCLUDE_LIST) > 0:
-            # ✅ 변경: 딕셔너리에서 제외할 종목들을 필터링하여 새로운 딕셔너리 생성
-            symbols_buy_pool120 = {
-                sym: name
-                for sym, name in symbols_buy_pool120.items()
-                if sym not in EXCLUDE_LIST
-            }
+            # ma_results 딕셔너리에 저장된 모든 이평선(20, 40, 60, 90, 120)을 순회
+            for ma in ma_list:
+                ma_str = str(ma)
+                
+                # 현재 이평선에 해당하는 종목 풀 가져오기
+                target_pool = ma_results.get(ma_str, {})
+                
+                if target_pool:
+                    # ✅ 필터링: EXCLUDE_LIST에 없는 종목들로만 새로운 딕셔너리 구성
+                    filtered_pool = {
+                        sym: name
+                        for sym, name in target_pool.items()
+                        if sym not in EXCLUDE_LIST
+                    }
+                    
+                    # 필터링된 결과로 기존 ma_results 데이터 업데이트
+                    ma_results[ma_str] = filtered_pool
+                    
+                    # (선택 사항) 필터링 결과 로그 출력
+                    diff_count = len(target_pool) - len(filtered_pool)
+                    if diff_count > 0:
+                        print(f"🚫 {ma}일 이평 풀에서 제외 종목 {diff_count}건 필터링 완료")
+
+            # 2. 전체 통합 풀(symbols_buy_pool)도 필터링된 데이터로 재구성
+            #symbols_buy_pool = {}
+            #for ma in ma_list:
+            #    symbols_buy_pool.update(ma_results.get(str(ma), {}))
 
         bought_list = [] # 매수 완료된 종목 리스트
         total_cash = get_balance() # 보유 현금 조회 (10,000원 제외)
@@ -1607,76 +1529,41 @@ try:
                     send_message(f"🚫 장시작 신규매수 중단: 계좌 잔고 부족(<{AMOUNT_TO_BUY:,}원)")
                     send_message_main(f"🚫 장시작 신규매수 중단: 계좌 잔고 부족(<{AMOUNT_TO_BUY:,}원)")     
                 else:
-                    for sym, stock_name in symbols_buy_pool20.items():
-                        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
-                        if remaining_buy_count > 1:
-                            #if sym in bought_list:
-                            #    continue
-                            current_price = get_current_price(sym)
-                            if current_price is None:
-                                send_message(f"[{stock_name}({sym})] 가격수신실패. 다음 종목으로 넘어갑니다.")
-                                continue 
-                            send_message(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
-                            send_message_main(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
-                            result = safe_buy(sym, AMOUNT_TO_BUY, current_price, stock_name)
-                            if result:
-                                time.sleep(1.5)
-                    for sym, stock_name in symbols_buy_pool40.items():
-                        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
-                        if remaining_buy_count > 1:
-                            #if sym in bought_list:
-                            #    continue
-                            current_price = get_current_price(sym)
-                            if current_price is None:
-                                send_message(f"[{stock_name}({sym})] 가격수신실패. 다음 종목으로 넘어갑니다.")
-                                continue 
-                            send_message(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
-                            send_message_main(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
-                            result = safe_buy(sym, AMOUNT_TO_BUY-200000, current_price, stock_name)
-                            if result:
-                                time.sleep(1.5)
-                    for sym, stock_name in symbols_buy_pool60.items():
-                        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
-                        if remaining_buy_count > 1:
-                            #if sym in bought_list:
-                            #    continue
-                            current_price = get_current_price(sym)
-                            if current_price is None:
-                                send_message(f"[{stock_name}({sym})] 가격수신실패. 다음 종목으로 넘어갑니다.")
-                                continue 
-                            send_message(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
-                            send_message_main(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
-                            result = safe_buy(sym, AMOUNT_TO_BUY-400000, current_price, stock_name)
-                            if result:
-                                time.sleep(1.5)
-                    for sym, stock_name in symbols_buy_pool90.items():
-                        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
-                        if remaining_buy_count > 1:
-                            #if sym in bought_list:
-                            #    continue
-                            current_price = get_current_price(sym)
-                            if current_price is None:
-                                send_message(f"[{stock_name}({sym})] 가격수신실패. 다음 종목으로 넘어갑니다.")
-                                continue 
-                            send_message(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
-                            send_message_main(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
-                            result = safe_buy(sym, AMOUNT_TO_BUY-600000, current_price, stock_name)
-                            if result:
-                                time.sleep(1.5)
-                    for sym, stock_name in symbols_buy_pool120.items():
-                        remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
-                        if remaining_buy_count > 1:
-                            #if sym in bought_list:
-                            #    continue
-                            current_price = get_current_price(sym)
-                            if current_price is None:
-                                send_message(f"[{stock_name}({sym})] 가격수신실패. 다음 종목으로 넘어갑니다.")
-                                continue 
-                            send_message(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
-                            send_message_main(f"📈 {stock_name}({sym})({current_price}) 장시작 매수를 시도합니다.")
-                            result = safe_buy(sym, AMOUNT_TO_BUY-800000, current_price, stock_name)
-                            if result:
-                                time.sleep(1.5)
+                    # ma_list 순서대로 루프 실행 (20 -> 40 -> 60 -> 90 -> 120)
+                    for ma in ma_list:
+                        target_pool = ma_results.get(ma, {})
+                        
+                        # 해당 이평선 풀에 종목이 없으면 스킵
+                        if not target_pool:
+                            continue
+                            
+                        for sym, stock_name in target_pool.items():
+                            # TARGET_BUY_COUNT 도달 여부 체크 (기존 로직 유지)
+                            remaining_buy_count = TARGET_BUY_COUNT - len(bought_list)
+                            
+                            if remaining_buy_count > 1:
+                                # [중복 매수 방지] 이미 매수한 종목이면 스킵
+                                #if sym in bought_list:
+                                #    continue
+
+                                current_price = get_current_price(sym)
+                                if current_price is None:
+                                    send_message(f"[{stock_name}({sym})] 가격수신실패. 다음 종목으로 넘어갑니다.")
+                                    continue 
+
+                                send_message(f"📈 {stock_name}({sym})({current_price}) [{ma}일 이평] 장시작 매수를 시도합니다.")
+                                send_message_main(f"📈 {stock_name}({sym})({current_price}) [{ma}일 이평] 장시작 매수를 시도합니다.")
+                                
+                                # 이평선별로 차감된 금액 계산
+                                buy_amount = AMOUNT_TO_BUY - deduction_map.get(ma, 0)
+                                
+                                # 매수 실행
+                                result = safe_buy(sym, buy_amount, current_price, stock_name)
+                                
+                                if result:
+                                    # 매수 성공 시 bought_list에 추가 (실제 safe_buy 내부에서 추가한다면 생략 가능)
+                                    # bought_list.append(sym) 
+                                    time.sleep(1.5)
 
                 bought_list = []
                 stock_dict = get_stock_balance()
