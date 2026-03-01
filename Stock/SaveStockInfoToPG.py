@@ -102,10 +102,10 @@ def load_settings():
 # =================================================================================
 # DB 저장 및 계산 함수들 (덮어쓰기 모드로 수정됨)
 # =================================================================================
-
 def save_moving_average_by_date(conn, trade_date):
     """
     [수정됨] 해당 날짜의 기존 이평선 데이터를 삭제 후 다시 계산하여 저장
+    (5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120일)
     """
     trade_date_obj = pd.to_datetime(trade_date, format='%Y%m%d').date()
 
@@ -135,7 +135,8 @@ def save_moving_average_by_date(conn, trade_date):
     df['trade_date'] = pd.to_datetime(df['trade_date'])
     df['close_price'] = df['close_price'].astype(float)
 
-    ma_days = [5, 10, 20, 40, 60, 90, 120]
+    # [수정1] 30, 50, 70, 80, 100, 110일 추가
+    ma_days = [5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]
     values = []
 
     for code, group in df.groupby('code'):
@@ -152,10 +153,12 @@ def save_moving_average_by_date(conn, trade_date):
             else:
                 ma_vals[days] = None
         
+        # [수정2] values 목록에 새로 추가된 이평선 값 반영
         values.append((
             trade_date_obj, code,
-            ma_vals[5], ma_vals[10], ma_vals[20], 
-            ma_vals[40], ma_vals[60], ma_vals[90], ma_vals[120]
+            ma_vals[5], ma_vals[10], ma_vals[20], ma_vals[30],
+            ma_vals[40], ma_vals[50], ma_vals[60], ma_vals[70], 
+            ma_vals[80], ma_vals[90], ma_vals[100], ma_vals[110], ma_vals[120]
         ))
 
     # [핵심 수정] DELETE 후 INSERT
@@ -164,9 +167,13 @@ def save_moving_average_by_date(conn, trade_date):
         cur.execute("DELETE FROM stock_ma WHERE trade_date = %s", (trade_date_obj,))
         
         # 2. 데이터 삽입 (ON CONFLICT 제거)
+        # [수정3] INSERT 쿼리에 신규 컬럼명 및 %s 바인딩 개수 수정 (총 15개)
         sql = """
-            INSERT INTO stock_ma (trade_date, code, ma5, ma10, ma20, ma40, ma60, ma90, ma120)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO stock_ma (
+                trade_date, code, ma5, ma10, ma20, ma30, ma40, ma50, 
+                ma60, ma70, ma80, ma90, ma100, ma110, ma120
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         execute_batch(cur, sql, values, page_size=1000)
         
@@ -543,8 +550,8 @@ def get_all_symbols_common(trade_date, max_price, days):
                 cur.execute(sql, (trade_date, max_price))
                 rows = cur.fetchall()
                 symbols = {str(code).zfill(6): name for code, name in rows}
-        
-        send_message(f"✅ [{trade_date}] {days}일 이평 매수종목: {len(symbols)}건")
+
+        send_message(f"✅ [{trade_date}] {days}일 이평 매수종목: {len(symbols)}건 (기준가: {max_price:,.0f}원)")        
         
         # [보완] 내용이 너무 길면 잘라서 보내거나 생략
         str_symbols = str(symbols)
@@ -562,14 +569,32 @@ def get_all_symbols_common(trade_date, max_price, days):
 # Main Execution
 # =================================================================================
 if __name__ == "__main__":
-    trade_date_p = datetime.now()
+    #trade_date_p = datetime.now()
+    #trade_date = trade_date_p.strftime('%Y%m%d')
+    trade_date_p = datetime.strptime('20260227', "%Y%m%d")
     trade_date = trade_date_p.strftime('%Y%m%d')
-    # trade_date = '20260105' # 테스트시 주석 해제
 
     settings = load_settings()
     AMOUNT_TO_BUY = settings['AMOUNT_TO_BUY']
-    MAX_BUY_PRICE = AMOUNT_TO_BUY
+    MAX_BUY_PRICE = AMOUNT_TO_BUY  # 기본 기준가
     
+    # [설정] 이평선 리스트 및 차감 금액 맵
+    ma_list = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]
+    deduction_map = {
+        10: 800000,
+        20: 0,
+        30: 100000,
+        40: 200000,
+        50: 300000,
+        60: 400000,
+        70: 500000,
+        80: 600000,
+        90: 700000,
+        100: 800000,
+        110: 900000,
+        120: 950000
+    }
+
     krx_cal = mcal.get_calendar('XKRX') 
 
     if is_trading_day(trade_date_p):
@@ -583,15 +608,30 @@ if __name__ == "__main__":
             insert_all_symbols(trade_date, session)
             
             # 3. 매수 풀 계산
-            # 코드를 줄이기 위해 루프 사용 가능하지만 기존 스타일 유지
             pool = {}
-            for d in [20, 40, 60, 90, 120]:
-                pool.update(get_all_symbols_common(trade_date, MAX_BUY_PRICE, d))
+            # ma_list를 순회하며 각 이평선별 차감된 기준가 적용
+            for d in ma_list:
+                # 차감 금액 계산 (map에 없을 경우 0원 차감)
+                current_deduction = deduction_map.get(d, 0)
+                calculated_max_price = MAX_BUY_PRICE - current_deduction
+                
+                # 계산된 기준가가 0보다 클 때만 조회 수행
+                if calculated_max_price > 0:
+                    #print(f"🔍 [{trade_date}] {d}일 이평 조회 시작 (차감가 적용: {calculated_max_price:,.0f}원)")
+                    pool.update(get_all_symbols_common(trade_date, calculated_max_price, d))
+                else:
+                    print(f"⏩ [{trade_date}] {d}일 이평 스킵 (차감 후 기준가가 0원 이하: {calculated_max_price:,.0f}원)")
             
             send_message(f"✅ [{trade_date}] 최종 합산 매수종목: {len(pool)}건")
             send_message_main(f"✅ [{trade_date}] 최종 합산 매수종목: {len(pool)}건")
-            send_message(pool)
-            send_message_main(pool)
+            
+            # 종목 리스트 출력 (내용이 너무 길 경우에 대한 안전 처리)
+            str_pool = str(pool)
+            if len(str_pool) > 1900:
+                send_message(f"⚠️ 종목 리스트가 너무 길어 상세 출력을 생략합니다. (총 {len(pool)}개)")
+            else:
+                send_message(pool)
+                send_message_main(pool)
             
         else:
             print("❌ 로그인을 하지 못해 작업을 중단합니다.")
@@ -599,5 +639,51 @@ if __name__ == "__main__":
     else:
         send_message(f"⏩ {trade_date}는 거래일이 아니므로 처리를 스킵합니다.")
         send_message_main(f"⏩ {trade_date}는 거래일이 아니므로 처리를 스킵합니다.")
+
+
+
+#-----if __name__ == "__main__":
+#-----    # 1. 환경 설정 및 캘린더 로드
+#-----    settings = load_settings()
+#-----    AMOUNT_TO_BUY = settings['AMOUNT_TO_BUY']
+#-----    MAX_BUY_PRICE = AMOUNT_TO_BUY
+#-----    krx_cal = mcal.get_calendar('XKRX') 
+#-----
+#-----    # 2. 시작 날짜와 종료 날짜 설정
+#-----    start_date = datetime(2026, 2, 1)
+#-----    end_date = datetime(2026, 3, 1)
+#-----    
+#-----    # 3. 로그인 처리 (루프 밖에서 한 번만 수행하여 세션 유지)
+#-----    session = get_authenticated_session()
+#-----    
+#-----    if session is None:
+#-----        print("❌ 로그인을 하지 못해 작업을 중단합니다.")
+#-----    else:
+#-----        # 4. 시작일부터 종료일까지 루프 수행
+#-----        current_date = start_date
+#-----        while current_date <= end_date:
+#-----            trade_date = current_date.strftime('%Y%m%d')
+#-----            
+#-----            # 영업일 여부 체크
+#-----            if is_trading_day(current_date):
+#-----                print(f"\n🚀 {trade_date} 데이터 수집 시작...")
+#-----                
+#-----                # 데이터 수집 및 저장
+#-----                try:
+#-----                    insert_all_symbols_fdt(trade_date, session)
+#-----                    insert_all_symbols(trade_date, session)
+#-----                    
+#-----                except Exception as e:
+#-----                    print(f"❌ {trade_date} 처리 중 에러 발생: {e}")
+#-----            else:
+#-----                print(f"⏩ {trade_date}는 휴장일이므로 스킵합니다.")
+#-----            
+#-----            # 다음 날짜로 이동
+#-----            current_date += timedelta(days=1)
+#-----            
+#-----            # 과도한 API 요청 방지를 위해 루프 사이 짧은 휴식 (권장)
+#-----            time.sleep(1)
+#-----
+#-----        send_message(f"✅ {start_date.strftime('%Y%m%d')} ~ {end_date.strftime('%Y%m%d')} 기간 수집 완료")
 
 
