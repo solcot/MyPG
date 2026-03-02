@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict psU7VBNyi0moACAmWXmPxAref4vboQXcFgY0Ck7aQRiAS2wQ8pAeppRIFETlrY7
+\restrict TelhfhZxDjcfvCMsrhdORD8MeSDGw0kVLeklFzPZOPayVDLgHOzejoOJMybz7Dj
 
 -- Dumped from database version 13.23
 -- Dumped by pg_dump version 13.23
@@ -367,43 +367,41 @@ ALTER FUNCTION public.get_stock_filter_results_roe(p_trade_date date) OWNER TO p
 CREATE FUNCTION public.get_stock_ma10(p_trade_date date DEFAULT '2025-07-01'::date, p_max_price numeric DEFAULT 500000) RETURNS TABLE(code character varying, name character varying)
     LANGUAGE sql
     AS $$
-with ma_check as (
-select
-trade_date,
-code,
-lag(ma10,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1,
-lag(ma5,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1_5,
-ma5,ma10,ma20,ma30,ma40,ma50,ma60,ma70,ma80,ma90,ma100,ma110,ma120
-from stock_ma
-where trade_date >= (date(p_trade_date) - 15) and trade_date <= p_trade_date
+WITH ma_check AS (
+    SELECT trade_date, code,
+        LAG(ma10, 1) OVER (PARTITION BY code ORDER BY trade_date) AS prev1,
+        LAG(ma5,  1) OVER (PARTITION BY code ORDER BY trade_date) AS prev1_5,
+        ma5, ma10, ma20, ma30, ma40, ma50, ma60, ma70, ma80, ma90, ma100, ma110, ma120
+    FROM stock_ma
+    WHERE trade_date >= (DATE(p_trade_date) - 15) AND trade_date <= p_trade_date
 )
-select
-    sm.code,
-    sm.name
-from stockmain sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
---    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
-    join stockfdt_pbr_v sfv on sm.trade_date = sfv.trade_date and sm.code = sfv.code
-where
-    sm.trade_date = p_trade_date
+SELECT sm.code, sm.name
+FROM stockmain sm
+JOIN ma_check mc ON sm.trade_date = mc.trade_date AND sm.code = mc.code
+JOIN stockfdt_pbr_v sfv ON sm.trade_date = sfv.trade_date AND sm.code = sfv.code
+WHERE sm.trade_date = p_trade_date
 
-and prev1 < ma10
+-- 1. 골든크로스 조건 (어제는 5일선이 10일선 아래)
+AND mc.prev1_5 < mc.prev1
 
-and close_price > ma5
-and ma5 > ma10
-and prev1_5 < prev1
+-- 2. 핵심 정배열 유지
+AND sm.close_price > mc.ma5
+AND mc.ma5 > mc.ma10
 
-and ma20 > ma10
+-- 3. 억제기 (아직 20일선은 위에 있음)
+AND mc.ma20 > mc.ma10
 
-and close_price < p_max_price
-and sm.market_cap > 500000000000
-and sm.change_rate < 15.0
-and sm.trade_value > 5000000000
+-- 4. 수급 및 가치 필터
+AND sm.close_price < p_max_price
+AND sm.market_cap > 500000000000
+AND sm.change_rate < 15.0
+AND sm.trade_value > 5000000000
+AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 25.0 AND sfv.roe > 5.0))
 
-and ((sfv.pbr >= 0.0 and sfv.pbr < 1.0) or (
-sfv.pbr >= 0.0 and sfv.pbr < 3.0
-and sfv.per >= 0.0 and sfv.per < 25.0
-and sfv.roe > 5.0
-))
+-- 5. 안전장치 3개
+AND sm.close_price <= mc.ma20 * 1.15
+AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)
+AND sm.change_rate > 0.0
 $$;
 
 
@@ -462,6 +460,17 @@ sfv.pbr >= 0.0 and sfv.pbr < 3.0
 and sfv.per >= 0.0 and sfv.per < 25.0
 and sfv.roe > 5.0
 ))
+
+-- 새로 추가된 안전장치 3개
+-- 1. 추격 매수 금지 (단기 과열 방지): 모든 함수 동일하게 ma20 사용!
+-- (120일 정배열이든 60일 정배열이든, 최근 20일선 대비 15% 이상 붕 떠있으면 단기 고점이므로 안 산다)
+AND sm.close_price <= mc.ma20 * 1.15
+-- 2. 미세 돌파 속임수 방지 (당일 모멘텀 확인): 당일 단기 추세인 ma5를 기준!
+-- (개선 아이디어) 5일선 대비 1% 이상 높거나, '당일 상승률이 2% 이상'으로 힘 있게 올라갔다면 인정!
+AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)
+-- 3. 당일 양봉/상승 마감 확정
+AND sm.change_rate > 0.0
+
 $$;
 
 
@@ -586,6 +595,17 @@ sfv.pbr >= 0.0 and sfv.pbr < 3.0
 and sfv.per >= 0.0 and sfv.per < 25.0
 and sfv.roe > 5.0
 ))
+
+-- 새로 추가된 안전장치 3개
+-- 1. 추격 매수 금지 (단기 과열 방지): 모든 함수 동일하게 ma20 사용!
+-- (120일 정배열이든 60일 정배열이든, 최근 20일선 대비 15% 이상 붕 떠있으면 단기 고점이므로 안 산다)
+AND sm.close_price <= mc.ma20 * 1.15
+-- 2. 미세 돌파 속임수 방지 (당일 모멘텀 확인): 당일 단기 추세인 ma5를 기준!
+-- (개선 아이디어) 5일선 대비 1% 이상 높거나, '당일 상승률이 2% 이상'으로 힘 있게 올라갔다면 인정!
+AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)
+-- 3. 당일 양봉/상승 마감 확정
+AND sm.change_rate > 0.0
+
 $$;
 
 
@@ -646,6 +666,17 @@ sfv.pbr >= 0.0 and sfv.pbr < 3.0
 and sfv.per >= 0.0 and sfv.per < 25.0
 and sfv.roe > 5.0
 ))
+
+-- 새로 추가된 안전장치 3개
+-- 1. 추격 매수 금지 (단기 과열 방지): 모든 함수 동일하게 ma20 사용!
+-- (120일 정배열이든 60일 정배열이든, 최근 20일선 대비 15% 이상 붕 떠있으면 단기 고점이므로 안 산다)
+AND sm.close_price <= mc.ma20 * 1.15
+-- 2. 미세 돌파 속임수 방지 (당일 모멘텀 확인): 당일 단기 추세인 ma5를 기준!
+-- (개선 아이디어) 5일선 대비 1% 이상 높거나, '당일 상승률이 2% 이상'으로 힘 있게 올라갔다면 인정!
+AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)
+-- 3. 당일 양봉/상승 마감 확정
+AND sm.change_rate > 0.0
+
 $$;
 
 
@@ -1205,44 +1236,42 @@ ALTER FUNCTION public.get_stock_ma120_test(p_trade_date date, p_max_price numeri
 CREATE FUNCTION public.get_stock_ma20(p_trade_date date DEFAULT '2025-07-01'::date, p_max_price numeric DEFAULT 500000) RETURNS TABLE(code character varying, name character varying)
     LANGUAGE sql
     AS $$
-with ma_check as (
-select
-trade_date,
-code,
-lag(ma20,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1,
-lag(ma10,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1_10,
-ma5,ma10,ma20,ma30,ma40,ma50,ma60,ma70,ma80,ma90,ma100,ma110,ma120
-from stock_ma
-where trade_date >= (date(p_trade_date) - 15) and trade_date <= p_trade_date
+WITH ma_check AS (
+    SELECT trade_date, code,
+        LAG(ma20, 1) OVER (PARTITION BY code ORDER BY trade_date) AS prev1,
+        LAG(ma10, 1) OVER (PARTITION BY code ORDER BY trade_date) AS prev1_10,
+        ma5, ma10, ma20, ma30, ma40, ma50, ma60, ma70, ma80, ma90, ma100, ma110, ma120
+    FROM stock_ma
+    WHERE trade_date >= (DATE(p_trade_date) - 15) AND trade_date <= p_trade_date
 )
-select
-    sm.code,
-    sm.name
-from stockmain sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
---    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
-    join stockfdt_pbr_v sfv on sm.trade_date = sfv.trade_date and sm.code = sfv.code
-where
-    sm.trade_date = p_trade_date
+SELECT sm.code, sm.name
+FROM stockmain sm
+JOIN ma_check mc ON sm.trade_date = mc.trade_date AND sm.code = mc.code
+JOIN stockfdt_pbr_v sfv ON sm.trade_date = sfv.trade_date AND sm.code = sfv.code
+WHERE sm.trade_date = p_trade_date
 
-and prev1 < ma20
+-- 1. 골든크로스 조건 (어제는 10일선이 20일선 아래)
+AND mc.prev1_10 < mc.prev1
 
-and close_price > ma5
-and ma5 > ma10
-and ma10 > ma20
-and prev1_10 < prev1
+-- 2. 핵심 정배열 유지
+AND sm.close_price > mc.ma5
+AND mc.ma5 > mc.ma10
+AND mc.ma10 > mc.ma20
 
-and ma30 > ma20
+-- 3. 억제기 (아직 40일선은 위에 있음 - 30일선 제외)
+AND mc.ma40 > mc.ma20
 
-and close_price < p_max_price
-and sm.market_cap > 500000000000
-and sm.change_rate < 15.0
-and sm.trade_value > 5000000000
+-- 4. 수급 및 가치 필터
+AND sm.close_price < p_max_price
+AND sm.market_cap > 500000000000
+AND sm.change_rate < 15.0
+AND sm.trade_value > 5000000000
+AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 25.0 AND sfv.roe > 5.0))
 
-and ((sfv.pbr >= 0.0 and sfv.pbr < 1.0) or (
-sfv.pbr >= 0.0 and sfv.pbr < 3.0
-and sfv.per >= 0.0 and sfv.per < 25.0
-and sfv.roe > 5.0
-))
+-- 5. 안전장치 3개
+AND sm.close_price <= mc.ma20 * 1.15
+AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)
+AND sm.change_rate > 0.0
 $$;
 
 
@@ -1465,6 +1494,17 @@ sfv.pbr >= 0.0 and sfv.pbr < 3.0
 and sfv.per >= 0.0 and sfv.per < 25.0
 and sfv.roe > 5.0
 ))
+
+-- 새로 추가된 안전장치 3개
+-- 1. 추격 매수 금지 (단기 과열 방지): 모든 함수 동일하게 ma20 사용!
+-- (120일 정배열이든 60일 정배열이든, 최근 20일선 대비 15% 이상 붕 떠있으면 단기 고점이므로 안 산다)
+AND sm.close_price <= mc.ma20 * 1.15
+-- 2. 미세 돌파 속임수 방지 (당일 모멘텀 확인): 당일 단기 추세인 ma5를 기준!
+-- (개선 아이디어) 5일선 대비 1% 이상 높거나, '당일 상승률이 2% 이상'으로 힘 있게 올라갔다면 인정!
+AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)
+-- 3. 당일 양봉/상승 마감 확정
+AND sm.change_rate > 0.0
+
 $$;
 
 
@@ -1477,46 +1517,43 @@ ALTER FUNCTION public.get_stock_ma30(p_trade_date date, p_max_price numeric) OWN
 CREATE FUNCTION public.get_stock_ma40(p_trade_date date DEFAULT '2025-07-01'::date, p_max_price numeric DEFAULT 500000) RETURNS TABLE(code character varying, name character varying)
     LANGUAGE sql
     AS $$
-with ma_check as (
-select
-trade_date,
-code,
-lag(ma40,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1,
-lag(ma30,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1_30,
-ma5,ma10,ma20,ma30,ma40,ma50,ma60,ma70,ma80,ma90,ma100,ma110,ma120
-from stock_ma
-where trade_date >= (date(p_trade_date) - 15) and trade_date <= p_trade_date
+WITH ma_check AS (
+    SELECT trade_date, code,
+        LAG(ma40, 1) OVER (PARTITION BY code ORDER BY trade_date) AS prev1,
+        LAG(ma20, 1) OVER (PARTITION BY code ORDER BY trade_date) AS prev1_20,
+        ma5, ma10, ma20, ma30, ma40, ma50, ma60, ma70, ma80, ma90, ma100, ma110, ma120
+    FROM stock_ma
+    WHERE trade_date >= (DATE(p_trade_date) - 15) AND trade_date <= p_trade_date
 )
-select
-    sm.code,
-    sm.name
-from stockmain sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
---    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
-    join stockfdt_pbr_v sfv on sm.trade_date = sfv.trade_date and sm.code = sfv.code
-where
-    sm.trade_date = p_trade_date
+SELECT sm.code, sm.name
+FROM stockmain sm
+JOIN ma_check mc ON sm.trade_date = mc.trade_date AND sm.code = mc.code
+JOIN stockfdt_pbr_v sfv ON sm.trade_date = sfv.trade_date AND sm.code = sfv.code
+WHERE sm.trade_date = p_trade_date
 
-and prev1 < ma40
+-- 1. 골든크로스 조건 (어제는 20일선이 40일선 아래)
+AND mc.prev1_20 < mc.prev1
 
-and close_price > ma5
-and ma5 > ma10
-and ma10 > ma20
-and ma20 > ma30
-and ma30 > ma40
-and prev1_30 < prev1
+-- 2. 핵심 정배열 유지 (30일선 조건 삭제)
+AND sm.close_price > mc.ma5
+AND mc.ma5 > mc.ma10
+AND mc.ma10 > mc.ma20
+AND mc.ma20 > mc.ma40
 
-and ma50 > ma40
+-- 3. 억제기 (아직 60일선은 위에 있음 - 50일선 제외)
+AND mc.ma60 > mc.ma40
 
-and close_price < p_max_price
-and sm.market_cap > 500000000000
-and sm.change_rate < 15.0
-and sm.trade_value > 5000000000
+-- 4. 수급 및 가치 필터
+AND sm.close_price < p_max_price
+AND sm.market_cap > 500000000000
+AND sm.change_rate < 15.0
+AND sm.trade_value > 5000000000
+AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 25.0 AND sfv.roe > 5.0))
 
-and ((sfv.pbr >= 0.0 and sfv.pbr < 1.0) or (
-sfv.pbr >= 0.0 and sfv.pbr < 3.0
-and sfv.per >= 0.0 and sfv.per < 25.0
-and sfv.roe > 5.0
-))
+-- 5. 안전장치 3개
+AND sm.close_price <= mc.ma20 * 1.15
+AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)
+AND sm.change_rate > 0.0
 $$;
 
 
@@ -1817,6 +1854,17 @@ sfv.pbr >= 0.0 and sfv.pbr < 3.0
 and sfv.per >= 0.0 and sfv.per < 25.0
 and sfv.roe > 5.0
 ))
+
+-- 새로 추가된 안전장치 3개
+-- 1. 추격 매수 금지 (단기 과열 방지): 모든 함수 동일하게 ma20 사용!
+-- (120일 정배열이든 60일 정배열이든, 최근 20일선 대비 15% 이상 붕 떠있으면 단기 고점이므로 안 산다)
+AND sm.close_price <= mc.ma20 * 1.15
+-- 2. 미세 돌파 속임수 방지 (당일 모멘텀 확인): 당일 단기 추세인 ma5를 기준!
+-- (개선 아이디어) 5일선 대비 1% 이상 높거나, '당일 상승률이 2% 이상'으로 힘 있게 올라갔다면 인정!
+AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)
+-- 3. 당일 양봉/상승 마감 확정
+AND sm.change_rate > 0.0
+
 $$;
 
 
@@ -1829,48 +1877,44 @@ ALTER FUNCTION public.get_stock_ma50(p_trade_date date, p_max_price numeric) OWN
 CREATE FUNCTION public.get_stock_ma60(p_trade_date date DEFAULT '2025-07-01'::date, p_max_price numeric DEFAULT 500000) RETURNS TABLE(code character varying, name character varying)
     LANGUAGE sql
     AS $$
-with ma_check as (
-select
-trade_date,
-code,
-lag(ma60,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1,
-lag(ma50,       1)      over    (partition      by      code    order   by      trade_date)     as      prev1_50,
-ma5,ma10,ma20,ma30,ma40,ma50,ma60,ma70,ma80,ma90,ma100,ma110,ma120
-from stock_ma
-where trade_date >= (date(p_trade_date) - 15) and trade_date <= p_trade_date
+WITH ma_check AS (
+    SELECT trade_date, code,
+        LAG(ma60, 1) OVER (PARTITION BY code ORDER BY trade_date) AS prev1,
+        LAG(ma40, 1) OVER (PARTITION BY code ORDER BY trade_date) AS prev1_40,
+        ma5, ma10, ma20, ma30, ma40, ma50, ma60, ma70, ma80, ma90, ma100, ma110, ma120
+    FROM stock_ma
+    WHERE trade_date >= (DATE(p_trade_date) - 15) AND trade_date <= p_trade_date
 )
-select
-    sm.code,
-    sm.name
-from stockmain sm join ma_check mc on sm.trade_date = mc.trade_date and sm.code = mc.code
---    join close_price_check cc on sm.trade_date = cc.trade_date and sm.code = cc.code
-    join stockfdt_pbr_v sfv on sm.trade_date = sfv.trade_date and sm.code = sfv.code
-where
-    sm.trade_date = p_trade_date
+SELECT sm.code, sm.name
+FROM stockmain sm
+JOIN ma_check mc ON sm.trade_date = mc.trade_date AND sm.code = mc.code
+JOIN stockfdt_pbr_v sfv ON sm.trade_date = sfv.trade_date AND sm.code = sfv.code
+WHERE sm.trade_date = p_trade_date
 
-and prev1 < ma60
+-- 1. 골든크로스 조건 (어제는 40일선이 60일선 아래)
+AND mc.prev1_40 < mc.prev1
 
-and close_price > ma5
-and ma5 > ma10
-and ma10 > ma20
-and ma20 > ma30
-and ma30 > ma40
-and ma40 > ma50
-and ma50 > ma60
-and prev1_50 < prev1
+-- 2. 핵심 정배열 유지 (30, 50일선 조건 삭제)
+AND sm.close_price > mc.ma5
+AND mc.ma5 > mc.ma10
+AND mc.ma10 > mc.ma20
+AND mc.ma20 > mc.ma40
+AND mc.ma40 > mc.ma60
 
-and ma70 > ma60
+-- 3. 억제기 (가장 무거운 장기 이평선 120일선은 아직 위에 있음)
+AND mc.ma120 > mc.ma60
 
-and close_price < p_max_price
-and sm.market_cap > 500000000000
-and sm.change_rate < 15.0
-and sm.trade_value > 5000000000
+-- 4. 수급 및 가치 필터
+AND sm.close_price < p_max_price
+AND sm.market_cap > 500000000000
+AND sm.change_rate < 15.0
+AND sm.trade_value > 5000000000
+AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 25.0 AND sfv.roe > 5.0))
 
-and ((sfv.pbr >= 0.0 and sfv.pbr < 1.0) or (
-sfv.pbr >= 0.0 and sfv.pbr < 3.0
-and sfv.per >= 0.0 and sfv.per < 25.0
-and sfv.roe > 5.0
-))
+-- 5. 안전장치 3개
+AND sm.close_price <= mc.ma20 * 1.15
+AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)
+AND sm.change_rate > 0.0
 $$;
 
 
@@ -2249,6 +2293,17 @@ sfv.pbr >= 0.0 and sfv.pbr < 3.0
 and sfv.per >= 0.0 and sfv.per < 25.0
 and sfv.roe > 5.0
 ))
+
+-- 새로 추가된 안전장치 3개
+-- 1. 추격 매수 금지 (단기 과열 방지): 모든 함수 동일하게 ma20 사용!
+-- (120일 정배열이든 60일 정배열이든, 최근 20일선 대비 15% 이상 붕 떠있으면 단기 고점이므로 안 산다)
+AND sm.close_price <= mc.ma20 * 1.15
+-- 2. 미세 돌파 속임수 방지 (당일 모멘텀 확인): 당일 단기 추세인 ma5를 기준!
+-- (개선 아이디어) 5일선 대비 1% 이상 높거나, '당일 상승률이 2% 이상'으로 힘 있게 올라갔다면 인정!
+AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)
+-- 3. 당일 양봉/상승 마감 확정
+AND sm.change_rate > 0.0
+
 $$;
 
 
@@ -2305,6 +2360,17 @@ sfv.pbr >= 0.0 and sfv.pbr < 3.0
 and sfv.per >= 0.0 and sfv.per < 25.0
 and sfv.roe > 5.0
 ))
+
+-- 새로 추가된 안전장치 3개
+-- 1. 추격 매수 금지 (단기 과열 방지): 모든 함수 동일하게 ma20 사용!
+-- (120일 정배열이든 60일 정배열이든, 최근 20일선 대비 15% 이상 붕 떠있으면 단기 고점이므로 안 산다)
+AND sm.close_price <= mc.ma20 * 1.15
+-- 2. 미세 돌파 속임수 방지 (당일 모멘텀 확인): 당일 단기 추세인 ma5를 기준!
+-- (개선 아이디어) 5일선 대비 1% 이상 높거나, '당일 상승률이 2% 이상'으로 힘 있게 올라갔다면 인정!
+AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)
+-- 3. 당일 양봉/상승 마감 확정
+AND sm.change_rate > 0.0
+
 $$;
 
 
@@ -2362,6 +2428,17 @@ sfv.pbr >= 0.0 and sfv.pbr < 3.0
 and sfv.per >= 0.0 and sfv.per < 25.0
 and sfv.roe > 5.0
 ))
+
+-- 새로 추가된 안전장치 3개
+-- 1. 추격 매수 금지 (단기 과열 방지): 모든 함수 동일하게 ma20 사용!
+-- (120일 정배열이든 60일 정배열이든, 최근 20일선 대비 15% 이상 붕 떠있으면 단기 고점이므로 안 산다)
+AND sm.close_price <= mc.ma20 * 1.15
+-- 2. 미세 돌파 속임수 방지 (당일 모멘텀 확인): 당일 단기 추세인 ma5를 기준!
+-- (개선 아이디어) 5일선 대비 1% 이상 높거나, '당일 상승률이 2% 이상'으로 힘 있게 올라갔다면 인정!
+AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)
+-- 3. 당일 양봉/상승 마감 확정
+AND sm.change_rate > 0.0
+
 $$;
 
 
@@ -2809,18 +2886,14 @@ ALTER FUNCTION public.get_stock_ma90_test(p_trade_date date, p_max_price numeric
 CREATE FUNCTION public.get_stock_sell(p_trade_date date DEFAULT '2025-07-01'::date) RETURNS TABLE(code character varying, name character varying)
     LANGUAGE sql
     AS $$
-select
+SELECT
     sm.code,
     sm.name
-from stockmain sm join stock_ma mc
-on sm.trade_date = mc.trade_date and sm.code = mc.code
---where ma20 > ma10
-where ma10 > ma5
-and sm.trade_date = p_trade_date
---and sm.code not in (
---'376930' --노을
---,'018880' --한온시스템
---)
+FROM stockmain sm
+JOIN stock_ma mc ON sm.trade_date = mc.trade_date AND sm.code = mc.code
+WHERE sm.trade_date = p_trade_date
+  -- 매도 핵심 로직: 오늘 종가가 10일선 대비 확실하게 1% 이상 뚫고 내려갔을 때 (단기 지지선 붕괴 확정)
+  AND sm.close_price < mc.ma10 * 0.99
 $$;
 
 
@@ -5043,4 +5116,4 @@ ALTER TABLE ONLY public.stockmain
 -- PostgreSQL database dump complete
 --
 
-\unrestrict psU7VBNyi0moACAmWXmPxAref4vboQXcFgY0Ck7aQRiAS2wQ8pAeppRIFETlrY7
+\unrestrict TelhfhZxDjcfvCMsrhdORD8MeSDGw0kVLeklFzPZOPayVDLgHOzejoOJMybz7Dj
