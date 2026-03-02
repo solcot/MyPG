@@ -32,13 +32,13 @@ AND mc.ma20 > mc.ma10
 -- 4. 수급 및 가치 필터
 AND sm.close_price < p_max_price
 AND sm.market_cap > 500000000000
-AND sm.change_rate < 5.0   -- 15.0
+AND sm.change_rate < 5.0
 AND sm.trade_value > 5000000000
-AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 25.0 AND sfv.roe > 5.0))
+AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 20.0 AND sfv.roe > 5.0))
 
 -- 5. 안전장치 3개
 AND sm.close_price <= mc.ma20 * 1.15   
-AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)  
+AND (sm.close_price >= mc.ma5 * 1.015 OR sm.change_rate >= 3.0)  
 AND sm.change_rate > 0.0
 $function$;
 
@@ -78,13 +78,13 @@ AND mc.ma40 > mc.ma20
 -- 4. 수급 및 가치 필터
 AND sm.close_price < p_max_price
 AND sm.market_cap > 500000000000
-AND sm.change_rate < 5.0   -- 15.0
+AND sm.change_rate < 5.0
 AND sm.trade_value > 5000000000
-AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 25.0 AND sfv.roe > 5.0))
+AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 20.0 AND sfv.roe > 5.0))
 
 -- 5. 안전장치 3개
 AND sm.close_price <= mc.ma20 * 1.15   
-AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)  
+AND (sm.close_price >= mc.ma5 * 1.015 OR sm.change_rate >= 3.0)  
 AND sm.change_rate > 0.0
 $function$;
 
@@ -125,13 +125,13 @@ AND mc.ma60 > mc.ma40
 -- 4. 수급 및 가치 필터
 AND sm.close_price < p_max_price
 AND sm.market_cap > 500000000000
-AND sm.change_rate < 5.0   -- 15.0
+AND sm.change_rate < 5.0
 AND sm.trade_value > 5000000000
-AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 25.0 AND sfv.roe > 5.0))
+AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 20.0 AND sfv.roe > 5.0))
 
 -- 5. 안전장치 3개
 AND sm.close_price <= mc.ma20 * 1.15   
-AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)  
+AND (sm.close_price >= mc.ma5 * 1.015 OR sm.change_rate >= 3.0)  
 AND sm.change_rate > 0.0
 $function$;
 
@@ -173,12 +173,14 @@ AND mc.ma120 > mc.ma60
 -- 4. 수급 및 가치 필터
 AND sm.close_price < p_max_price
 AND sm.market_cap > 500000000000
-AND sm.change_rate < 5.0   -- 15.0
+AND sm.change_rate < 5.0
 AND sm.trade_value > 5000000000
-AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 25.0 AND sfv.roe > 5.0))
+AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 20.0 AND sfv.roe > 5.0))
 
 -- 5. 안전장치 3개
 AND sm.close_price <= mc.ma20 * 1.15   
-AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)  
+AND (sm.close_price >= mc.ma5 * 1.015 OR sm.change_rate >= 3.0)  
 AND sm.change_rate > 0.0
 $function$;
+
+
