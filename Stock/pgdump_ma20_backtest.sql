@@ -1,4 +1,4 @@
- backtest: 2021.02.01 ~ 2025.11.30
+*********************************************** backtest: 2021.02.01 ~ 2025.11.30
 * 매도: ma10*0.97
 * 매수: sm.change_rate < 15.0
  총 매매 횟수 | 익절 횟수 | 손절 횟수 | 평균 수익률(%) | 총 합산 손익금(원)
@@ -25,9 +25,25 @@
 --------------+-----------+-----------+----------------+--------------------
           864 |       307 |       557 |           1.67 |           14419273 
 
+* 매도: ma10*0.97
+* 매수: sm.change_rate < 5.0
+       (sm.close_price >= mc.ma5 * 1.015 OR sm.change_rate >= 3.0)
+ 총 매매 횟수 | 익절 횟수 | 손절 횟수 | 평균 수익률(%) | 총 합산 손익금(원)
+--------------+-----------+-----------+----------------+--------------------
+          721 |       273 |       448 |           2.19 |           15806384
+
+* 매도: ma10*0.97   <-- 0.99
+* 매수: sm.change_rate < 5.0   <-- 15.0
+       sfv.per < 20.0   <-- 25.0
+       (sm.close_price >= mc.ma5 * 1.015 OR sm.change_rate >= 3.0)   <-- 1.01 , 2.0
+ 총 매매 횟수 | 익절 횟수 | 손절 횟수 | 평균 수익률(%) | 총 합산 손익금(원)
+--------------+-----------+-----------+----------------+--------------------
+          667 |       256 |       411 |           2.43 |           16191332
+
 
 
 -------------------------------------------------------------------------------------------------------------
+
 
 WITH ma_base AS (
     -- 1. 매수 및 매도 계산을 위한 이평선 데이터 추출 (12월~2월 말까지 넉넉히)
@@ -66,11 +82,11 @@ AND sm.close_price < 1000000
 AND sm.market_cap > 500000000000 --500000000000
 AND sm.change_rate < 5.0
 AND sm.trade_value > 5000000000 --5000000000
-AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 25.0 AND sfv.roe > 5.0))
+AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 20.0 AND sfv.roe > 5.0))
 
 -- 5. 안전장치 3개
 AND sm.close_price <= mc.ma20 * 1.15   
-AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)  
+AND (sm.close_price >= mc.ma5 * 1.015 OR sm.change_rate >= 3.0)
 AND sm.change_rate > 0.0
 
 ),
@@ -160,11 +176,11 @@ AND sm.close_price < 1000000
 AND sm.market_cap > 500000000000 --500000000000
 AND sm.change_rate < 5.0
 AND sm.trade_value > 5000000000 --5000000000
-AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 25.0 AND sfv.roe > 5.0))
+AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 20.0 AND sfv.roe > 5.0))
 
 -- 5. 안전장치 3개
-AND sm.close_price <= mc.ma20 * 1.15   
-AND (sm.close_price >= mc.ma5 * 1.01 OR sm.change_rate >= 2.0)  
+AND sm.close_price <= mc.ma20 * 1.15 
+AND (sm.close_price >= mc.ma5 * 1.015 OR sm.change_rate >= 3.0)
 AND sm.change_rate > 0.0
 
 ),
