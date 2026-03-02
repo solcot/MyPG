@@ -108,7 +108,17 @@ def get_all_symbols_by_ma(p_trade_date, p_max_price, p_ma):
                 rows = cur.fetchall()
                 res_dict = {str(code).zfill(6): name for code, name in rows}
         
-        send_message(f"✅ [{p_trade_date}] {p_ma}일 이평 매수종목: {len(res_dict)}건 (기준가: {p_max_price:,.0f}원)")
+        # [수정] 결과가 1건 이상일 때만 디스코드/로그 메시지 전송
+        if len(res_dict) > 0:
+            send_message(f"✅ [{p_trade_date}] {p_ma}일 이평 매수종목: {len(res_dict)}건 (기준가: {p_max_price:,.0f}원)")
+
+            # [보완] 내용이 너무 길면 잘라서 보내거나 생략
+            str_symbols = str(res_dict)
+            if len(str_symbols) > 1900:
+                send_message(f"⚠️ 종목 리스트가 너무 길어 출력을 생략합니다. (총 {len(res_dict)}개)")
+            else:
+                send_message(res_dict)
+
         return res_dict
     except Exception as e:
         send_message(f"❌ {p_ma}일 DB 조회 중 오류: {e}")
@@ -1260,30 +1270,22 @@ try:
         #send_message(f"✅ [{is_open},{trade_date}] ---")
         MAX_BUY_PRICE = AMOUNT_TO_BUY
 
-        #ma_list = [20, 40, 60, 90, 120]
-        ma_list = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]
-        # [수정] 이평선별 차감 금액 설정 (키값을 숫자로 두어 계산 편의성 제공)
-        #---deduction_map = {
-        #---    20: 0,
-        #---    40: 200000,
-        #---    60: 400000,
-        #---    90: 600000,
-        #---    120: 800000
-        #---}
+        # ✅ [수정됨] 핵심 이평선 4단계로 압축 (10, 20, 40, 60)
+        ma_list = [10, 20, 40, 60]
+        # ✅ [수정됨] 피라미딩 자금 관리에 맞춘 차감액(Deduction) 설정
         deduction_map = {
-            10: 800000,
-            20: 0,
-            30: 100000,
-            40: 200000,
-            50: 300000,
-            60: 400000,
-            70: 500000,
-            80: 600000,
-            90: 700000,
-            100: 800000,
-            110: 900000,
-            120: 950000
+            10: 800000,  # 100만 - 80만 = 20만 원 (1차 정찰병 진입)
+            20: 0,       # 100만 -  0만 = 100만 원 (메인 비중 탑재 - 생명선 돌파)
+            40: 600000,  # 100만 - 60만 = 40만 원 (1차 불타기 - 추세 확인)
+            60: 800000   # 100만 - 80만 = 20만 원 (마지막 불타기 - 중기 추세 돌파)
         }
+        #---deduction_map = {
+        #---    10: 1600000,  # 200만 - 160만 = 40만 원 (정찰병)
+        #---    20: 0,        # 200만 -   0만 = 200만 원 (메인 비중 - 생명선)
+        #---    40: 1200000,  # 200만 - 120만 = 80만 원 (1차 불타기)
+        #---    60: 1600000   # 200만 - 160만 = 40만 원 (마지막 불타기)
+        #---}
+
         # 각 이평선별 결과를 따로 담을 저장소
         ma_results = {}
         # 전체를 합칠 최종 딕셔너리
@@ -1427,10 +1429,8 @@ try:
         t_9 = t_now.replace(**T_9_TIME)
         t_start = t_now.replace(**T_START_TIME)
 
-        t_notbuy = t_now.replace(hour=14, minute=30, second=0,microsecond=0)
-        t_oldstocksell = t_now.replace(hour=15, minute=0, second=0, microsecond=0)
-        t_notstoploss = t_now.replace(hour=15, minute=10, second=0,microsecond=0)
-        #t_notbuy = t_now.replace(hour=15, minute=30, second=0,microsecond=0)
+        t_oldstocksell = t_now.replace(hour=15, minute=0, second=0, microsecond=0)    # 1095일 이상 장기 보유 종목 매도
+        t_notstoploss = t_now.replace(hour=15, minute=10, second=0,microsecond=0)     # 물타기 금지 시간대
         #t_oldstocksell = t_now.replace(hour=16, minute=0, second=0, microsecond=0)
         #t_notstoploss = t_now.replace(hour=16, minute=10, second=0,microsecond=0)
 
@@ -1646,16 +1646,7 @@ try:
 
                     last_stop_loss_check_time = t_now # 마지막 체크 시간 업데이트
                 # 물타기 감시 로직 끝 ------------------------------------------------------------------
-                # 익절 감시 로직 -----------------------------------------------------------                
-                #---if t_notbuy < t_now < t_sell:  # PM 02:30 ~ PM 03:23 : BREAK_EVEN_PCT 조정
-                #---    BREAK_EVEN_PCT1 = 3.0
-                #---    BREAK_EVEN_LOSE_PCT1 = 0.3
-                #---    BREAK_EVEN_PCT2 = 5.0
-                #---    BREAK_EVEN_LOSE_PCT2 = 0.3
-                #---    BREAK_EVEN_PCT3 = 7.0
-                #---    BREAK_EVEN_LOSE_PCT3 = 0.3
-                #---    TAKE_PROFIT_PCT = 9.0
-                #---    TAKE_PROFIT_LOSE_PCT = 0.3
+                # 익절 감시 로직 -----------------------------------------------------------------------                
                 if (t_now - last_profit_taking_check_time).total_seconds() >= 15: # 15초마다 체크
                     profited_flag = 0
                     burn_in_list_flag = 0
