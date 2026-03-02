@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict TelhfhZxDjcfvCMsrhdORD8MeSDGw0kVLeklFzPZOPayVDLgHOzejoOJMybz7Dj
+\restrict Afy6njYevXnrzekJ8yQXIVp5AB8yWlxTRh9h0rXkjMwzAnXNTUZG6DxnKlcOo1j
 
 -- Dumped from database version 13.23
 -- Dumped by pg_dump version 13.23
@@ -2893,7 +2893,7 @@ FROM stockmain sm
 JOIN stock_ma mc ON sm.trade_date = mc.trade_date AND sm.code = mc.code
 WHERE sm.trade_date = p_trade_date
   -- 매도 핵심 로직: 오늘 종가가 10일선 대비 확실하게 1% 이상 뚫고 내려갔을 때 (단기 지지선 붕괴 확정)
-  AND sm.close_price < mc.ma10 * 0.99
+  AND sm.close_price < mc.ma10 * 0.97
 $$;
 
 
@@ -5116,4 +5116,4 @@ ALTER TABLE ONLY public.stockmain
 -- PostgreSQL database dump complete
 --
 
-\unrestrict TelhfhZxDjcfvCMsrhdORD8MeSDGw0kVLeklFzPZOPayVDLgHOzejoOJMybz7Dj
+\unrestrict Afy6njYevXnrzekJ8yQXIVp5AB8yWlxTRh9h0rXkjMwzAnXNTUZG6DxnKlcOo1j
