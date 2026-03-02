@@ -551,14 +551,17 @@ def get_all_symbols_common(trade_date, max_price, days):
                 rows = cur.fetchall()
                 symbols = {str(code).zfill(6): name for code, name in rows}
 
-        send_message(f"✅ [{trade_date}] {days}일 이평 매수종목: {len(symbols)}건 (기준가: {max_price:,.0f}원)")        
-        
-        # [보완] 내용이 너무 길면 잘라서 보내거나 생략
-        str_symbols = str(symbols)
-        if len(str_symbols) > 1900:
-             send_message(f"⚠️ 종목 리스트가 너무 길어 출력을 생략합니다. (총 {len(symbols)}개)")
-        else:
-             send_message(symbols)
+
+        # [수정] 결과가 1건 이상일 때만 디스코드/로그 메시지 전송
+        if len(symbols) > 0:
+            send_message(f"✅ [{trade_date}] {days}일 이평 매수종목: {len(symbols)}건 (기준가: {max_price:,.0f}원)")
+
+            # [보완] 내용이 너무 길면 잘라서 보내거나 생략
+            str_symbols = str(symbols)
+            if len(str_symbols) > 1900:
+                send_message(f"⚠️ 종목 리스트가 너무 길어 출력을 생략합니다. (총 {len(symbols)}개)")
+            else:
+                send_message(symbols)
              
         return symbols
     except Exception as e:
@@ -569,31 +572,30 @@ def get_all_symbols_common(trade_date, max_price, days):
 # Main Execution
 # =================================================================================
 if __name__ == "__main__":
-    #trade_date_p = datetime.now()
-    #trade_date = trade_date_p.strftime('%Y%m%d')
-    trade_date_p = datetime.strptime('20260227', "%Y%m%d")
+    trade_date_p = datetime.now()
     trade_date = trade_date_p.strftime('%Y%m%d')
+    #trade_date_p = datetime.strptime('20260227', "%Y%m%d")
+    #trade_date = trade_date_p.strftime('%Y%m%d')
 
     settings = load_settings()
     AMOUNT_TO_BUY = settings['AMOUNT_TO_BUY']
     MAX_BUY_PRICE = AMOUNT_TO_BUY  # 기본 기준가
     
-    # [설정] 이평선 리스트 및 차감 금액 맵
-    ma_list = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]
+    # ✅ [수정됨] 핵심 이평선 4단계로 압축 (10, 20, 40, 60)
+    ma_list = [10, 20, 40, 60]
+    # ✅ [수정됨] 피라미딩 자금 관리에 맞춘 차감액(Deduction) 설정
     deduction_map = {
-        10: 800000,
-        20: 0,
-        30: 100000,
-        40: 200000,
-        50: 300000,
-        60: 400000,
-        70: 500000,
-        80: 600000,
-        90: 700000,
-        100: 800000,
-        110: 900000,
-        120: 950000
+        10: 800000,  # 100만 - 80만 = 20만 원 (1차 정찰병 진입)
+        20: 0,       # 100만 -  0만 = 100만 원 (메인 비중 탑재 - 생명선 돌파)
+        40: 600000,  # 100만 - 60만 = 40만 원 (1차 불타기 - 추세 확인)
+        60: 800000   # 100만 - 80만 = 20만 원 (마지막 불타기 - 중기 추세 돌파)
     }
+    #---deduction_map = {
+    #---    10: 1600000,  # 200만 - 160만 = 40만 원 (정찰병)
+    #---    20: 0,        # 200만 -   0만 = 200만 원 (메인 비중 - 생명선)
+    #---    40: 1200000,  # 200만 - 120만 = 80만 원 (1차 불타기)
+    #---    60: 1600000   # 200만 - 160만 = 40만 원 (마지막 불타기)
+    #---}
 
     krx_cal = mcal.get_calendar('XKRX') 
 
