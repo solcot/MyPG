@@ -33,7 +33,7 @@ AND mc.ma40 > mc.ma20
 -- 4. 수급 및 가치 필터
 AND sm.close_price < 1000000
 AND sm.market_cap > 500000000000 --500000000000
-AND sm.change_rate < 15.0
+AND sm.change_rate < 5.0
 AND sm.trade_value > 5000000000 --5000000000
 AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 25.0 AND sfv.roe > 5.0))
 
@@ -127,7 +127,7 @@ AND mc.ma40 > mc.ma20
 -- 4. 수급 및 가치 필터
 AND sm.close_price < 1000000
 AND sm.market_cap > 500000000000 --500000000000
-AND sm.change_rate < 15.0
+AND sm.change_rate < 5.0
 AND sm.trade_value > 5000000000 --5000000000
 AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 25.0 AND sfv.roe > 5.0))
 
