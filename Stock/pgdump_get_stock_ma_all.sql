@@ -34,7 +34,7 @@ AND sm.close_price < p_max_price
 AND sm.market_cap > 500000000000
 AND sm.change_rate < 5.0
 AND sm.trade_value > 17000000000
-AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 20.0 AND sfv.roe > 5.0))
+AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 20.0 AND sfv.roe > 7.0))
 
 -- 5. 안전장치 3개
 AND sm.close_price <= mc.ma10 * 1.15  
@@ -80,7 +80,7 @@ AND sm.close_price < p_max_price
 AND sm.market_cap > 500000000000
 AND sm.change_rate < 5.0
 AND sm.trade_value > 5000000000
-AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 20.0 AND sfv.roe > 5.0))
+AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 20.0 AND sfv.roe > 7.0))
 
 -- 5. 안전장치 3개
 AND sm.close_price <= mc.ma20 * 1.15   
@@ -127,7 +127,7 @@ AND sm.close_price < p_max_price
 AND sm.market_cap > 500000000000
 AND sm.change_rate < 5.0
 AND sm.trade_value > 5000000000
-AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 20.0 AND sfv.roe > 5.0))
+AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 20.0 AND sfv.roe > 7.0))
 
 -- 5. 안전장치 3개
 AND sm.close_price <= mc.ma20 * 1.15   
@@ -175,7 +175,7 @@ AND sm.close_price < p_max_price
 AND sm.market_cap > 500000000000
 AND sm.change_rate < 5.0
 AND sm.trade_value > 5000000000
-AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 20.0 AND sfv.roe > 5.0))
+AND ((sfv.pbr >= 0.0 AND sfv.pbr < 1.0) OR (sfv.pbr >= 0.0 AND sfv.pbr < 3.0 AND sfv.per >= 0.0 AND sfv.per < 20.0 AND sfv.roe > 7.0))
 
 -- 5. 안전장치 3개
 AND sm.close_price <= mc.ma20 * 1.15   
