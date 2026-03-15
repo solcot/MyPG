@@ -470,3 +470,384 @@ END;
 $$;
 
 
+
+CREATE OR REPLACE FUNCTION run_backtest(
+    p_start_date   TEXT    DEFAULT '20260101',
+    p_end_date     TEXT    DEFAULT '20260315',
+    p_invest_per   BIGINT  DEFAULT 1000000
+)
+RETURNS TABLE (
+    매수일          DATE,
+    종목코드        VARCHAR(20),
+    종목명          VARCHAR(100),
+    섹터            VARCHAR(50),
+    등급            TEXT,
+    매수가          NUMERIC(15,2),
+    매수주수        INTEGER,
+    실투자금        BIGINT,
+    매도일          DATE,
+    매도가          NUMERIC(15,2),
+    회수금          BIGINT,
+    손익금액        BIGINT,
+    수익률_pct      NUMERIC(10,2),
+    보유일수        INTEGER,
+    매도사유        TEXT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_start       DATE;
+    v_end         DATE;
+    v_db_last     DATE;     -- ★ DB에 존재하는 실제 마지막 거래일
+    v_date        DATE;
+    v_shares      INTEGER;
+    v_actual_inv  BIGINT;
+    r_pos         RECORD;
+    r_buy         RECORD;
+    r_sell        RECORD;
+    v_sold        BOOLEAN;
+BEGIN
+    v_start := TO_DATE(p_start_date,
+        CASE WHEN p_start_date ~ '^\d{8}$' THEN 'YYYYMMDD' ELSE 'YYYY-MM-DD' END);
+    v_end   := TO_DATE(p_end_date,
+        CASE WHEN p_end_date   ~ '^\d{8}$' THEN 'YYYYMMDD' ELSE 'YYYY-MM-DD' END);
+
+    -- ★ DB 실제 마지막 거래일 조회
+    SELECT MAX(trade_date) INTO v_db_last FROM stockmain;
+
+    IF v_db_last IS NULL THEN
+        RAISE EXCEPTION 'stockmain 테이블에 데이터가 없습니다.';
+    END IF;
+
+    DROP TABLE IF EXISTS _bt_positions;
+    CREATE TEMP TABLE _bt_positions (
+        buy_date    DATE,
+        code        VARCHAR(20),
+        name        VARCHAR(100),
+        sector      VARCHAR(50),
+        grade       TEXT,
+        buy_price   NUMERIC(15,2),
+        shares      INTEGER,
+        actual_inv  BIGINT
+    );
+
+    -- ================================================================
+    -- PHASE 1. p_start_date ~ p_end_date : 매수 + 매도 동시 진행
+    -- ================================================================
+    FOR v_date IN
+        SELECT DISTINCT trade_date
+        FROM   stockmain
+        WHERE  trade_date BETWEEN v_start AND v_end
+        ORDER  BY trade_date
+    LOOP
+
+        -- ── 보유 종목 매도 조건 체크
+        FOR r_pos IN SELECT * FROM _bt_positions LOOP
+
+            SELECT sm.close_price
+            INTO   r_sell
+            FROM   stockmain sm
+            JOIN   stock_ma  ma ON sm.trade_date = ma.trade_date
+                               AND sm.code       = ma.code
+            WHERE  sm.trade_date = v_date
+              AND  sm.code       = r_pos.code
+              AND  sm.close_price < ma.ma10 * 0.97;
+
+            IF FOUND THEN
+                매수일     := r_pos.buy_date;
+                종목코드   := r_pos.code;
+                종목명     := r_pos.name;
+                섹터       := r_pos.sector;
+                등급       := r_pos.grade;
+                매수가     := r_pos.buy_price;
+                매수주수   := r_pos.shares;
+                실투자금   := r_pos.actual_inv;
+                매도일     := v_date;
+                매도가     := r_sell.close_price;
+                회수금     := (r_sell.close_price * r_pos.shares)::BIGINT;
+                손익금액   := 회수금 - r_pos.actual_inv;
+                수익률_pct := ROUND(손익금액::NUMERIC / r_pos.actual_inv * 100, 2);
+                보유일수   := v_date - r_pos.buy_date;
+                매도사유   := 'MA10 -3% 이탈';
+                RETURN NEXT;
+                DELETE FROM _bt_positions WHERE code = r_pos.code;
+            END IF;
+
+        END LOOP;
+
+        -- ── 신규 매수 신호 탐색 (p_end_date 이내에서만 매수)
+        FOR r_buy IN
+            SELECT f.종목코드, f.종목명, f.섹터, f.등급, f.종가
+            FROM   get_stock_filter_results_total(TO_CHAR(v_date, 'YYYYMMDD')) f
+            WHERE  f.등급 IN ('★★★ 최우선', '★★  우선')
+              AND  NOT EXISTS (
+                      SELECT 1 FROM _bt_positions p
+                      WHERE  p.code = f.종목코드
+                  )
+        LOOP
+            v_shares     := FLOOR(p_invest_per::NUMERIC / NULLIF(r_buy.종가, 0));
+            v_actual_inv := (v_shares * r_buy.종가)::BIGINT;
+            CONTINUE WHEN v_shares <= 0;
+
+            INSERT INTO _bt_positions
+                (buy_date, code, name, sector, grade, buy_price, shares, actual_inv)
+            VALUES
+                (v_date, r_buy.종목코드, r_buy.종목명,
+                 r_buy.섹터, r_buy.등급, r_buy.종가,
+                 v_shares, v_actual_inv);
+        END LOOP;
+
+    END LOOP;  -- PHASE 1 END
+
+    -- ================================================================
+    -- ★ PHASE 2. p_end_date 이후 ~ DB 마지막 날까지
+    --            매수는 없고 보유 종목 매도 조건만 계속 체크
+    -- ================================================================
+    FOR v_date IN
+        SELECT DISTINCT trade_date
+        FROM   stockmain
+        WHERE  trade_date > v_end           -- p_end_date 다음날부터
+          AND  trade_date <= v_db_last      -- DB 마지막 날까지
+        ORDER  BY trade_date
+    LOOP
+
+        -- 보유 종목이 없으면 루프 조기 종료
+        EXIT WHEN NOT EXISTS (SELECT 1 FROM _bt_positions);
+
+        FOR r_pos IN SELECT * FROM _bt_positions LOOP
+
+            SELECT sm.close_price
+            INTO   r_sell
+            FROM   stockmain sm
+            JOIN   stock_ma  ma ON sm.trade_date = ma.trade_date
+                               AND sm.code       = ma.code
+            WHERE  sm.trade_date = v_date
+              AND  sm.code       = r_pos.code
+              AND  sm.close_price < ma.ma10 * 0.97;
+
+            IF FOUND THEN
+                매수일     := r_pos.buy_date;
+                종목코드   := r_pos.code;
+                종목명     := r_pos.name;
+                섹터       := r_pos.sector;
+                등급       := r_pos.grade;
+                매수가     := r_pos.buy_price;
+                매수주수   := r_pos.shares;
+                실투자금   := r_pos.actual_inv;
+                매도일     := v_date;
+                매도가     := r_sell.close_price;
+                회수금     := (r_sell.close_price * r_pos.shares)::BIGINT;
+                손익금액   := 회수금 - r_pos.actual_inv;
+                수익률_pct := ROUND(손익금액::NUMERIC / r_pos.actual_inv * 100, 2);
+                보유일수   := v_date - r_pos.buy_date;
+                매도사유   := 'MA10 -3% 이탈';   -- ★ 매수 기간 이후라도 정상 매도
+                RETURN NEXT;
+                DELETE FROM _bt_positions WHERE code = r_pos.code;
+            END IF;
+
+        END LOOP;
+
+    END LOOP;  -- PHASE 2 END
+
+    -- ================================================================
+    -- ★ PHASE 3. DB 마지막 날까지 매도 조건 못 만난 종목만 강제청산
+    --            → DB 마지막 거래일(v_db_last) 종가로 청산
+    -- ================================================================
+    FOR r_pos IN SELECT * FROM _bt_positions LOOP
+
+        SELECT sm.close_price
+        INTO   r_sell
+        FROM   stockmain sm
+        WHERE  sm.trade_date = v_db_last
+          AND  sm.code       = r_pos.code;
+
+        매수일     := r_pos.buy_date;
+        종목코드   := r_pos.code;
+        종목명     := r_pos.name;
+        섹터       := r_pos.sector;
+        등급       := r_pos.grade;
+        매수가     := r_pos.buy_price;
+        매수주수   := r_pos.shares;
+        실투자금   := r_pos.actual_inv;
+        매도일     := v_db_last;
+        매도가     := COALESCE(r_sell.close_price, r_pos.buy_price);
+        회수금     := (COALESCE(r_sell.close_price, r_pos.buy_price)
+                       * r_pos.shares)::BIGINT;
+        손익금액   := 회수금 - r_pos.actual_inv;
+        수익률_pct := ROUND(손익금액::NUMERIC / r_pos.actual_inv * 100, 2);
+        보유일수   := v_db_last - r_pos.buy_date;
+        매도사유   := '강제청산(DB마지막날)';   -- ★ 사유 명확히 구분
+        RETURN NEXT;
+
+    END LOOP;
+
+    DROP TABLE IF EXISTS _bt_positions;
+    RETURN;
+
+EXCEPTION WHEN OTHERS THEN
+    DROP TABLE IF EXISTS _bt_positions;
+    RAISE;
+END;
+$$;
+
+
+
+
+
+
+
+-- =====================================================================
+-- 공통 CTE: 백테스트 결과를 한 번만 실행해 재사용
+-- =====================================================================
+WITH bt AS (
+    SELECT * FROM run_backtest('20260101', '20260315', 1000000)
+)
+
+
+-- =====================================================================
+-- 1. 전체 거래 내역 (금액 포함)
+-- =====================================================================
+SELECT
+    매수일,
+    종목코드,
+    종목명,
+    등급,
+    매수가,
+    매수주수,
+    TO_CHAR(실투자금, 'FM999,999,999') || ' 원'     AS 실투자금,
+    매도일,
+    매도가,
+    TO_CHAR(회수금,   'FM999,999,999') || ' 원'     AS 회수금,
+    TO_CHAR(손익금액, 'FM999,999,999') || ' 원'     AS 손익금액,
+    수익률_pct                                      AS "수익률(%)",
+    보유일수,
+    매도사유
+FROM bt
+ORDER BY 매수일, 수익률_pct DESC;
+
+
+-- =====================================================================
+-- 2. 종합 성과 요약 (금액 포함)
+-- =====================================================================
+SELECT
+    COUNT(*)                                                    AS 총거래수,
+    COUNT(*) FILTER (WHERE 수익률_pct > 0)                      AS 수익거래수,
+    COUNT(*) FILTER (WHERE 수익률_pct <= 0)                     AS 손실거래수,
+    ROUND(
+        COUNT(*) FILTER (WHERE 수익률_pct > 0)::NUMERIC
+        / NULLIF(COUNT(*), 0) * 100, 1
+    )                                                           AS "승률(%)",
+
+    -- 투자금 관련
+    TO_CHAR(SUM(실투자금), 'FM999,999,999,999') || ' 원'        AS 총투자금_합산,
+    TO_CHAR(SUM(손익금액), 'FM999,999,999,999') || ' 원'        AS 총손익금액,
+    TO_CHAR(SUM(손익금액) FILTER (WHERE 손익금액 > 0),
+            'FM999,999,999,999') || ' 원'                       AS 총수익금액,
+    TO_CHAR(SUM(손익금액) FILTER (WHERE 손익금액 <= 0),
+            'FM999,999,999,999') || ' 원'                       AS 총손실금액,
+
+    -- 수익률 관련
+    ROUND(AVG(수익률_pct), 2)                                    AS "평균수익률(%)",
+    ROUND(MAX(수익률_pct), 2)                                    AS "최대수익(%)",
+    ROUND(MIN(수익률_pct), 2)                                    AS "최대손실(%)",
+    ROUND(
+        AVG(수익률_pct) FILTER (WHERE 수익률_pct > 0), 2
+    )                                                           AS "평균수익(수익거래,%)",
+    ROUND(
+        AVG(수익률_pct) FILTER (WHERE 수익률_pct <= 0), 2
+    )                                                           AS "평균손실(손실거래,%)",
+    ROUND(
+        AVG(수익률_pct) FILTER (WHERE 수익률_pct > 0)
+        / ABS(NULLIF(AVG(수익률_pct) FILTER (WHERE 수익률_pct <= 0), 0)),
+    2)                                                          AS "손익비",
+    ROUND(AVG(보유일수), 1)                                      AS "평균보유일수"
+FROM bt;
+
+
+-- =====================================================================
+-- 3. 등급별 성과 비교 (금액 포함)
+-- =====================================================================
+SELECT
+    등급,
+    COUNT(*)                                                    AS 거래수,
+    ROUND(
+        COUNT(*) FILTER (WHERE 수익률_pct > 0)::NUMERIC
+        / NULLIF(COUNT(*), 0) * 100, 1
+    )                                                           AS "승률(%)",
+    TO_CHAR(SUM(손익금액), 'FM999,999,999,999') || ' 원'        AS 총손익금액,
+    TO_CHAR(AVG(손익금액)::BIGINT, 'FM999,999,999') || ' 원'    AS 거래당평균손익,
+    ROUND(AVG(수익률_pct), 2)                                    AS "평균수익률(%)",
+    ROUND(MAX(수익률_pct), 2)                                    AS "최대수익(%)",
+    ROUND(MIN(수익률_pct), 2)                                    AS "최대손실(%)"
+FROM bt
+GROUP BY 등급
+ORDER BY 등급;
+
+
+-- =====================================================================
+-- 4. 섹터별 성과 비교 (금액 포함)
+-- =====================================================================
+SELECT
+    섹터,
+    COUNT(*)                                                    AS 거래수,
+    ROUND(AVG(수익률_pct), 2)                                    AS "평균수익률(%)",
+    TO_CHAR(SUM(손익금액), 'FM999,999,999,999') || ' 원'        AS 섹터총손익,
+    TO_CHAR(AVG(손익금액)::BIGINT, 'FM999,999,999') || ' 원'    AS 거래당평균손익,
+    ROUND(
+        COUNT(*) FILTER (WHERE 수익률_pct > 0)::NUMERIC
+        / NULLIF(COUNT(*), 0) * 100, 1
+    )                                                           AS "승률(%)"
+FROM bt
+GROUP BY 섹터
+HAVING COUNT(*) >= 2
+ORDER BY SUM(손익금액) DESC;
+
+
+-- =====================================================================
+-- 5. 매도 사유별 통계 (금액 포함)
+-- =====================================================================
+SELECT
+    매도사유,
+    COUNT(*)                                                    AS 거래수,
+    TO_CHAR(SUM(손익금액), 'FM999,999,999,999') || ' 원'        AS 총손익금액,
+    TO_CHAR(AVG(손익금액)::BIGINT, 'FM999,999,999') || ' 원'    AS 거래당평균손익,
+    ROUND(AVG(수익률_pct), 2)                                    AS "평균수익률(%)",
+    ROUND(AVG(보유일수), 1)                                      AS "평균보유일수"
+FROM bt
+GROUP BY 매도사유;
+
+
+-- =====================================================================
+-- 6. 월별 수익률 및 손익 금액 추이
+-- =====================================================================
+SELECT
+    TO_CHAR(매도일, 'YYYY-MM')                                  AS 월,
+    COUNT(*)                                                    AS 거래수,
+    ROUND(AVG(수익률_pct), 2)                                    AS "평균수익률(%)",
+    TO_CHAR(SUM(손익금액), 'FM999,999,999,999') || ' 원'        AS 월별총손익,
+    TO_CHAR(SUM(손익금액) FILTER (WHERE 손익금액 > 0),
+            'FM999,999,999,999') || ' 원'                       AS 월별수익합,
+    TO_CHAR(SUM(손익금액) FILTER (WHERE 손익금액 <= 0),
+            'FM999,999,999,999') || ' 원'                       AS 월별손실합
+FROM bt
+GROUP BY TO_CHAR(매도일, 'YYYY-MM')
+ORDER BY 월;
+
+
+-- =====================================================================
+-- 7. 종목별 누적 손익 랭킹 (동일 종목 여러 번 거래 시 합산)
+-- =====================================================================
+SELECT
+    종목코드,
+    종목명,
+    섹터,
+    COUNT(*)                                                    AS 거래횟수,
+    TO_CHAR(SUM(손익금액), 'FM999,999,999,999') || ' 원'        AS 누적손익,
+    ROUND(AVG(수익률_pct), 2)                                    AS "평균수익률(%)",
+    ROUND(AVG(보유일수), 1)                                      AS "평균보유일수"
+FROM bt
+GROUP BY 종목코드, 종목명, 섹터
+ORDER BY SUM(손익금액) DESC
+LIMIT 20;
+
+
