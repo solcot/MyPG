@@ -512,20 +512,20 @@ def insert_all_symbols_fdt(p_trade_date, session):
         save_to_postgres_fdt(df, trade_date, conn)
 
 def insert_all_symbols(trade_date, session):
-    print(f"✅ [stock_ma] 거래일: {trade_date} 데이터 수집 시작")
+    print(f"✅ [StockMain] 거래일: {trade_date} 데이터 수집 시작")
 
-    #--- df = fetch_krx_data(trade_date, session)
-#--- 
-    #--- if df is None or df.empty:
-    #---     print("❌ StockMain 데이터 로드 실패")
-    #---     return
-#--- 
-    #--- send_message(f"✅ StockMain 전체 종목 수: {len(df)}")
-    #--- send_message_main(f"✅ StockMain 전체 종목 수: {len(df)}")
-#--- 
-    #--- # 2. DB 저장
-    #--- with get_db_connection() as conn:
-    #---     save_to_postgres(df, trade_date, conn)
+    df = fetch_krx_data(trade_date, session)
+
+    if df is None or df.empty:
+        print("❌ StockMain 데이터 로드 실패")
+        return
+
+    send_message(f"✅ StockMain 전체 종목 수: {len(df)}")
+    send_message_main(f"✅ StockMain 전체 종목 수: {len(df)}")
+
+    # 2. DB 저장
+    with get_db_connection() as conn:
+        save_to_postgres(df, trade_date, conn)
     
     # 3. 이평선 계산
     with get_db_connection() as conn:
@@ -599,7 +599,7 @@ if __name__ == "__main__":
                 
                 # 데이터 수집 및 저장
                 try:
-                    #insert_all_symbols_fdt(trade_date, session)
+                    insert_all_symbols_fdt(trade_date, session)
                     insert_all_symbols(trade_date, session)
                     
                 except Exception as e:
