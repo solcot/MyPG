@@ -173,7 +173,7 @@ scoring AS (
 
     WHERE
         m.market_cap  >= 150000000000          -- 시총 1,500억 이상
-        AND m.market_cap  <= 5000000000000     -- 시총 5조 이하
+        --AND m.market_cap  <= 5000000000000     -- 시총 5조 이하
         AND m.trade_value >= 5000000000        -- 거래대금 50억 이상
         AND f.per > 0 AND f.per <= 15          -- PER 0 초과 15 이하
         AND f.pbr > 0 AND f.pbr <= 3.0        -- PBR 0 초과 3 이하
@@ -421,7 +421,7 @@ BEGIN
 
         WHERE
             m.market_cap  >= 150000000000       -- 시총 1,500억 이상
-            AND m.market_cap  <= 5000000000000  -- 시총 5조 이하
+            --AND m.market_cap  <= 5000000000000  -- 시총 5조 이하
             AND m.trade_value >= 5000000000     -- 거래대금 50억 이상
             AND f.per > 0 AND f.per <= 15       -- PER 0 초과 15 이하
             AND f.pbr > 0 AND f.pbr <= 3.0     -- PBR 0 초과 3 이하
