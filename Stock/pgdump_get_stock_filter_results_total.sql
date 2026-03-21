@@ -22,6 +22,7 @@ RETURNS TABLE (
     "선행PER"       NUMERIC(10,2),
     "PBR"           NUMERIC(10,2),
     "ROE(%)"        NUMERIC(10,2),
+    "선행ROE(%)"        NUMERIC(10,2),
     "배당수익률(%)" NUMERIC(10,2),
     종합점수        INTEGER,
     등급            TEXT
@@ -91,6 +92,7 @@ scoring AS (
         f.pbr,
         f.dividend_yield,
         ROUND(v.roe, 2)                                           AS roe,
+        ROUND(v.forward_roe, 2)                                   AS forward_roe,
         av.avg_vol_5d,
 
         -- ★ 멀티팩터 점수 산출 (최대 17점)
@@ -200,6 +202,7 @@ SELECT
     forward_per,
     pbr,
     roe,
+    forward_roe,
     dividend_yield,
     total_score,
     CASE
@@ -247,10 +250,11 @@ RETURNS TABLE (
     "선행PER"             NUMERIC(10,2),
     "PBR"                 NUMERIC(10,2),
     "ROE(%)"              NUMERIC(10,2),
+    "선행ROE(%)"              NUMERIC(10,2),
     "배당수익률(%)"       NUMERIC(10,2),
     종합점수              INTEGER,
-    등급                  TEXT,
-    기준일                DATE           -- ★ 어떤 날짜 기준인지 확인용
+    등급                  TEXT
+    --기준일                DATE           -- ★ 어떤 날짜 기준인지 확인용
 )
 LANGUAGE plpgsql
 STABLE
@@ -346,6 +350,7 @@ BEGIN
             f.pbr,
             f.dividend_yield,
             ROUND(v.roe, 2)                                       AS roe,
+            ROUND(v.forward_roe, 2)                               AS forward_roe,
             av.avg_vol_5d,
 
             -- ── 멀티팩터 점수 산출 (최대 17점) ──────────────────────
@@ -448,6 +453,7 @@ BEGIN
         s.forward_per,
         s.pbr,
         s.roe,
+        s.forward_roe,
         s.dividend_yield,
         s.total_score,
         CASE
@@ -455,8 +461,8 @@ BEGIN
             WHEN s.total_score >= 11 THEN '★★  우선'
             WHEN s.total_score >= 8  THEN '★   관심'
             ELSE                          '△  대기'
-        END,
-        v_actual_date                            -- 실제 적용된 거래일 반환
+        END
+        --v_actual_date                            -- 실제 적용된 거래일 반환
 
     FROM scoring s
     WHERE s.total_score >= 8
@@ -849,5 +855,3 @@ FROM bt
 GROUP BY 종목코드, 종목명, 섹터
 ORDER BY SUM(손익금액) DESC
 LIMIT 20;
-
-
