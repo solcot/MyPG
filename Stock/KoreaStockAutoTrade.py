@@ -1535,7 +1535,7 @@ try:
                 else:
                     # ma_list 순서대로 루프 실행 (20 -> 40 -> 60 -> 90 -> 120)
                     for ma in ma_list:
-                        target_pool = ma_results.get(ma, {})
+                        target_pool = ma_results.get(str(ma), {})
                         
                         # 해당 이평선 풀에 종목이 없으면 스킵
                         if not target_pool:
