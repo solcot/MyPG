@@ -1,11 +1,13 @@
-WITH calc_quarterly_roe AS (
-    -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 계산
+cat > bond1.sql <<'EEOFF'
+WITH calc_quarterly_data AS (
+    -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
     SELECT 
         code,
         to_char(trade_date, 'YYYY-Q"Q"') AS quarter,
-        AVG(roe) AS avg_roe
+        AVG(roe) AS avg_roe,
+        AVG(pbr) AS avg_pbr  -- 💡 [추가] 과거 시장 평가(권리금)를 추적하기 위한 PBR 평균
     FROM stockfdt_pbr_v
-    where trade_date >= '20160101'
+    WHERE trade_date >= '20160101'
     GROUP BY code, to_char(trade_date, 'YYYY-Q"Q"')
 ),
 find_min_roe AS (
@@ -15,17 +17,21 @@ find_min_roe AS (
         quarter,
         avg_roe,
         MIN(avg_roe) OVER (PARTITION BY code) AS min_roe_ever,
+        AVG(avg_roe) OVER (PARTITION BY code) AS avg_roe_ever,
         MAX(avg_roe) OVER (PARTITION BY code) AS max_roe_ever,
-        BOOL_OR(avg_roe IS NULL) OVER (PARTITION BY code) AS has_null_roe
-    FROM calc_quarterly_roe
+        BOOL_OR(avg_roe IS NULL) OVER (PARTITION BY code) AS has_null_roe,
+        AVG(avg_pbr) OVER (PARTITION BY code) AS hist_avg_pbr -- 💡 [추가] 10년 평균 PBR 산출
+    FROM calc_quarterly_data
 ),
 filtered_data AS (
     -- 3단계: 불량 종목(5% 미만 or NULL 이력) 싹 다 제거!
     SELECT 
         code,
         quarter,
-        round(min_roe_ever,2) as min_roe_ever,
-        round(max_roe_ever,2) as max_roe_ever,
+        ROUND(min_roe_ever, 2) AS min_roe_ever,
+        ROUND(avg_roe_ever, 2) AS avg_roe_ever,
+        ROUND(max_roe_ever, 2) AS max_roe_ever,
+        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, -- 💡 [추가] 다음 단계로 전달
         ROUND(avg_roe, 2) AS avg_roe
     FROM find_min_roe
     WHERE min_roe_ever >= 5
@@ -34,7 +40,11 @@ filtered_data AS (
 pivot_data AS (
     -- 4단계: 2015-1Q부터 2026-1Q까지 45분기 절대 시간 피벗 전개!
     SELECT 
-        code,max(min_roe_ever) min_roe_ever,max(max_roe_ever) max_roe_ever,
+        code,
+        MAX(min_roe_ever) AS min_roe_ever,
+        MAX(avg_roe_ever) AS avg_roe_ever,
+        MAX(max_roe_ever) AS max_roe_ever,
+        MAX(hist_avg_pbr) AS hist_avg_pbr, -- 💡 [추가] 최종 계산을 위해 메인 쿼리로 전달
         -- [2015년]
         --MAX(avg_roe) FILTER (WHERE quarter = '2015-1Q') AS "2015-1Q",
         --MAX(avg_roe) FILTER (WHERE quarter = '2015-2Q') AS "2015-2Q",
@@ -117,8 +127,9 @@ select  (b.trade_value::numeric / 100000000)::int AS trade_value_uk,
         a.*
 from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code
 where expected_cagr >= 10.0
-order by expected_cagr desc
-;
+order by expected_cagr desc;
+EEOFF
+
 
 
 
@@ -199,6 +210,7 @@ CREATE VIEW public.stockfdt_pbr_v AS
 '미래의 진짜 예상 주가'를 산출해 주면 완벽하게 해결됩니다!"
 
 
+cat > bond2.sql <<'EEOFF'
 WITH calc_quarterly_data AS (
     -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
     SELECT 
@@ -217,6 +229,7 @@ find_min_roe AS (
         quarter,
         avg_roe,
         MIN(avg_roe) OVER (PARTITION BY code) AS min_roe_ever,
+        AVG(avg_roe) OVER (PARTITION BY code) AS avg_roe_ever,
         MAX(avg_roe) OVER (PARTITION BY code) AS max_roe_ever,
         BOOL_OR(avg_roe IS NULL) OVER (PARTITION BY code) AS has_null_roe,
         AVG(avg_pbr) OVER (PARTITION BY code) AS hist_avg_pbr -- 💡 [추가] 10년 평균 PBR 산출
@@ -228,6 +241,7 @@ filtered_data AS (
         code,
         quarter,
         ROUND(min_roe_ever, 2) AS min_roe_ever,
+        ROUND(avg_roe_ever, 2) AS avg_roe_ever,
         ROUND(max_roe_ever, 2) AS max_roe_ever,
         ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, -- 💡 [추가] 다음 단계로 전달
         ROUND(avg_roe, 2) AS avg_roe
@@ -240,6 +254,7 @@ pivot_data AS (
     SELECT 
         code,
         MAX(min_roe_ever) AS min_roe_ever,
+        MAX(avg_roe_ever) AS avg_roe_ever,
         MAX(max_roe_ever) AS max_roe_ever,
         MAX(hist_avg_pbr) AS hist_avg_pbr, -- 💡 [추가] 최종 계산을 위해 메인 쿼리로 전달
         
@@ -341,4 +356,5 @@ FROM last_data a
 JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code
 WHERE a.expected_cagr >= 10.0
 ORDER BY a.expected_cagr DESC;
+EEOFF
 
