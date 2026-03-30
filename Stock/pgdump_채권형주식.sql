@@ -1,4 +1,4 @@
-cat > bond1.sql <<'EEOFF'
+cat > bond1_pbr_to_1.sql <<'EEOFF'
 WITH calc_quarterly_data AS (
     -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
     SELECT 
@@ -210,7 +210,7 @@ CREATE VIEW public.stockfdt_pbr_v AS
 '미래의 진짜 예상 주가'를 산출해 주면 완벽하게 해결됩니다!"
 
 
-cat > bond2.sql <<'EEOFF'
+cat > bond2_pbr_to_avg.sql <<'EEOFF'
 WITH calc_quarterly_data AS (
     -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
     SELECT 
