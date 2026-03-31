@@ -1,3 +1,28 @@
+create table mytrade
+(
+code varchar(20) not null,
+trade_div varchar(10),
+trade_status smallint,
+trade_expected_cagr numeric(10,2),
+remark varchar(100),
+created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE ONLY mytrade
+    ADD CONSTRAINT mytrade_pkey PRIMARY KEY (code);
+
+COMMENT ON COLUMN public.mytrade.trade_div IS 'bond1:bpb_1, bond2:bpr_avg';
+COMMENT ON COLUMN public.mytrade.trade_status IS '0:예정, 1:매수, 2:매도';
+
+insert into mytrade(code,trade_div,trade_status,trade_expected_cagr,remark) values('192400', 'bond1', '0', 15.33, '쿠쿠홀딩스: 27400'); 
+insert into mytrade(code,trade_div,trade_status,trade_expected_cagr,remark) values('023910', 'bond1', '0', 15.22, '대한약품: 28350'); 
+
+insert into mytrade(code,trade_div,trade_status,trade_expected_cagr,remark) values('049720', 'bond2', '0', 24.35, '고려신용정보: 10270'); 
+insert into mytrade(code,trade_div,trade_status,trade_expected_cagr,remark) values('092130', 'bond2', '0', 23.97, '이크레더블: 14500'); 
+insert into mytrade(code,trade_div,trade_status,trade_expected_cagr,remark) values('092730', 'bond2', '0', 21.15, '네오팜: 16950'); 
+insert into mytrade(code,trade_div,trade_status,trade_expected_cagr,remark) values('030190', 'bond2', '0', 19.96, 'NICE평가정보: 16040'); 
+
+
 cat > bond1_pbr_to_1.sql <<'EEOFF'
 WITH calc_quarterly_data AS (
     -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
@@ -134,7 +159,9 @@ select  (b.trade_value::numeric / 100000000)::int AS trade_value_uk,
         (b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
         b.sector,
         a.*
+        ,c.trade_status, c.trade_expected_cagr, remark
 from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code
+join mytrade c on b.code = c.code and c.trade_div = 'bond1'
 where expected_cagr >= 10.0
 order by expected_cagr desc;
 EEOFF
@@ -361,8 +388,10 @@ SELECT
     (b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
     b.sector,
     a.*
+    ,c.trade_status, c.trade_expected_cagr, remark
 FROM last_data a 
 JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code
+join mytrade c on b.code = c.code and c.trade_div = 'bond2'
 WHERE a.expected_cagr >= 10.0
 ORDER BY a.expected_cagr DESC;
 EEOFF
