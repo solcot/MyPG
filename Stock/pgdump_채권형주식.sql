@@ -107,15 +107,24 @@ pivot_data AS (
 ),
 last_data AS (
 select 
-    ROUND(bps * POWER(1 + min_roe_ever / 100.0, 10)) AS future_bps,
-    ROUND((bps * POWER(1 + min_roe_ever / 100.0, 10)) / close_price, 2) AS return_multiple,
+    -- 💡 1. 10년 후 예상 BPS (장부 가치)
+    ROUND(a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1 AS future_bps,
+    
+    -- 💡 2. 10년 후 예상 주가 (미래 BPS * 역대 평균 PBR)
+    ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
+    
+    -- 💡 3. 10년 후 투자 승수 = (미래 예상 주가 / 현재 주가) [0 나누기 방어 추가]
+    ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
+    
+    -- 💡 4. 최종 예상 연평균 복리 수익률 (CAGR)
     ROUND(
         (POWER(
-            (bps * POWER(1 + min_roe_ever / 100.0, 10)) / close_price,  -- (미래가치 / 현재가치)
-            1.0 / 10.0                                                  -- ^ (1/10)
+            ((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0),  
+            1.0 / 10.0                                                  
         ) - 1) * 100, 
     2) AS expected_cagr,
-*
+    
+    * -- USING(code)로 합쳐진 a와 b의 모든 컬럼 (code는 단 1번만 출력됨)
 from stockfdt_pbr_v a join pivot_data b USING (code)
 where a.trade_date = (select max(trade_date) from stockfdt_pbr_v)
 AND a.bps > 0           -- 💡 [방어코드] 자본잠식 기업 에러 방지
