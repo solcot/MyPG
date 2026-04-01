@@ -23,6 +23,16 @@ insert into mytrade(code,trade_div,trade_status,trade_expected_cagr,remark) valu
 insert into mytrade(code,trade_div,trade_status,trade_expected_cagr,remark) values('030190', 'bond2', '0', 19.96, 'NICE평가정보: 16040'); 
 
 
+
+select code,to_char(trade_date, 'YYYY-Q"Q"') qt,avg(roe)::int roe,max(per) per,max(pbr) pbr 
+from stockfdt_pbr_v 
+where code='229000' 
+and trade_date >= '20150101' 
+GROUP BY code, to_char(trade_date, 'YYYY-Q"Q"');
+
+
+
+
 cat > bond1_pbr_to_1.sql <<'EEOFF'
 WITH calc_quarterly_data AS (
     -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
