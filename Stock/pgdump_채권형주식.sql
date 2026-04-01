@@ -32,7 +32,7 @@ WITH calc_quarterly_data AS (
         AVG(roe) AS avg_roe,
         AVG(pbr) AS avg_pbr  -- 💡 [추가] 과거 시장 평가(권리금)를 추적하기 위한 PBR 평균
     FROM stockfdt_pbr_v
-    WHERE trade_date >= '20160101'
+    WHERE trade_date >= '20150101'
     GROUP BY code, to_char(trade_date, 'YYYY-Q"Q"')
 ),
 find_min_roe AS (
@@ -71,10 +71,10 @@ pivot_data AS (
         MAX(max_roe_ever) AS max_roe_ever,
         MAX(hist_avg_pbr) AS hist_avg_pbr, -- 💡 [추가] 최종 계산을 위해 메인 쿼리로 전달
         -- [2015년]
-        --MAX(avg_roe) FILTER (WHERE quarter = '2015-1Q') AS "2015-1Q",
-        --MAX(avg_roe) FILTER (WHERE quarter = '2015-2Q') AS "2015-2Q",
-        --MAX(avg_roe) FILTER (WHERE quarter = '2015-3Q') AS "2015-3Q",
-        --MAX(avg_roe) FILTER (WHERE quarter = '2015-4Q') AS "2015-4Q",
+        MAX(avg_roe) FILTER (WHERE quarter = '2015-1Q') AS "2015-1Q",
+        MAX(avg_roe) FILTER (WHERE quarter = '2015-2Q') AS "2015-2Q",
+        MAX(avg_roe) FILTER (WHERE quarter = '2015-3Q') AS "2015-3Q",
+        MAX(avg_roe) FILTER (WHERE quarter = '2015-4Q') AS "2015-4Q",
         -- [2016년]
         MAX(avg_roe) FILTER (WHERE quarter = '2016-1Q') AS "2016-1Q",
         MAX(avg_roe) FILTER (WHERE quarter = '2016-2Q') AS "2016-2Q",
@@ -126,14 +126,17 @@ pivot_data AS (
         MAX(avg_roe) FILTER (WHERE quarter = '2025-3Q') AS "2025-3Q",
         MAX(avg_roe) FILTER (WHERE quarter = '2025-4Q') AS "2025-4Q",
         -- [2026년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2026-1Q') AS "2026-1Q"
+        MAX(avg_roe) FILTER (WHERE quarter = '2026-1Q') AS "2026-1Q",
+        MAX(avg_roe) FILTER (WHERE quarter = '2026-2Q') AS "2026-2Q",
+        MAX(avg_roe) FILTER (WHERE quarter = '2026-3Q') AS "2026-3Q",
+        MAX(avg_roe) FILTER (WHERE quarter = '2026-4Q') AS "2026-4Q"
     FROM filtered_data
     GROUP BY code
 ),
 last_data AS (
 select 
     -- 💡 1. 10년 후 예상 BPS (장부 가치)
-    ROUND(a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1 AS future_bps,
+    ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
     
     -- 💡 2. 10년 후 예상 주가 (미래 BPS * 역대 평균 PBR)
     ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
@@ -159,9 +162,9 @@ select  (b.trade_value::numeric / 100000000)::int AS trade_value_uk,
         (b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
         b.sector,
         a.*
-        ,c.trade_status, c.trade_expected_cagr, remark
+        --,c.trade_status, c.trade_expected_cagr, remark
 from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code
-join mytrade c on b.code = c.code and c.trade_div = 'bond1'
+--join mytrade c on b.code = c.code and c.trade_div = 'bond1'
 where expected_cagr >= 10.0
 order by expected_cagr desc;
 EEOFF
@@ -225,7 +228,8 @@ CREATE VIEW public.stockfdt_pbr_v AS
     forward_per,
     (pbr / forward_per * 100::numeric)::numeric(10,2) AS forward_roe,
     close_price,
-    bps::int bps
+    (close_price/pbr)::int bps,
+    bps::int krx_bps
    FROM stockfdt;
 
 
@@ -255,7 +259,7 @@ WITH calc_quarterly_data AS (
         AVG(roe) AS avg_roe,
         AVG(pbr) AS avg_pbr  -- 💡 [추가] 과거 시장 평가(권리금)를 추적하기 위한 PBR 평균
     FROM stockfdt_pbr_v
-    WHERE trade_date >= '20160101'
+    WHERE trade_date >= '20150101'
     GROUP BY code, to_char(trade_date, 'YYYY-Q"Q"')
 ),
 find_min_roe AS (
@@ -295,10 +299,10 @@ pivot_data AS (
         MAX(hist_avg_pbr) AS hist_avg_pbr, -- 💡 [추가] 최종 계산을 위해 메인 쿼리로 전달
         
         -- [2015년] (주석 처리된 부분은 그대로 유지하셨군요. 좋습니다!)
-        --MAX(avg_roe) FILTER (WHERE quarter = '2015-1Q') AS "2015-1Q",
-        --MAX(avg_roe) FILTER (WHERE quarter = '2015-2Q') AS "2015-2Q",
-        --MAX(avg_roe) FILTER (WHERE quarter = '2015-3Q') AS "2015-3Q",
-        --MAX(avg_roe) FILTER (WHERE quarter = '2015-4Q') AS "2015-4Q",
+        MAX(avg_roe) FILTER (WHERE quarter = '2015-1Q') AS "2015-1Q",
+        MAX(avg_roe) FILTER (WHERE quarter = '2015-2Q') AS "2015-2Q",
+        MAX(avg_roe) FILTER (WHERE quarter = '2015-3Q') AS "2015-3Q",
+        MAX(avg_roe) FILTER (WHERE quarter = '2015-4Q') AS "2015-4Q",
         
         -- [2016년]
         MAX(avg_roe) FILTER (WHERE quarter = '2016-1Q') AS "2016-1Q",
@@ -351,7 +355,10 @@ pivot_data AS (
         MAX(avg_roe) FILTER (WHERE quarter = '2025-3Q') AS "2025-3Q",
         MAX(avg_roe) FILTER (WHERE quarter = '2025-4Q') AS "2025-4Q",
         -- [2026년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2026-1Q') AS "2026-1Q"
+        MAX(avg_roe) FILTER (WHERE quarter = '2026-1Q') AS "2026-1Q",
+        MAX(avg_roe) FILTER (WHERE quarter = '2026-2Q') AS "2026-2Q",
+        MAX(avg_roe) FILTER (WHERE quarter = '2026-3Q') AS "2026-3Q",
+        MAX(avg_roe) FILTER (WHERE quarter = '2026-4Q') AS "2026-4Q"
     FROM filtered_data
     GROUP BY code
 ),
@@ -359,7 +366,7 @@ last_data AS (
     -- 5단계: 재무 가치평가 (Valuation) 및 미래 주가 산출
     SELECT 
         -- 💡 1. 10년 후 예상 BPS (장부 가치)
-        ROUND(a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) AS future_bps,
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
         
         -- 💡 2. 10년 후 예상 주가 (미래 BPS * 역대 평균 PBR)
         ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
@@ -388,11 +395,10 @@ SELECT
     (b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
     b.sector,
     a.*
-    ,c.trade_status, c.trade_expected_cagr, remark
+    --,c.trade_status, c.trade_expected_cagr, remark
 FROM last_data a 
 JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code
-join mytrade c on b.code = c.code and c.trade_div = 'bond2'
+--join mytrade c on b.code = c.code and c.trade_div = 'bond2'
 WHERE a.expected_cagr >= 10.0
 ORDER BY a.expected_cagr DESC;
 EEOFF
-
