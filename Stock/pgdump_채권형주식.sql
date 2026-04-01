@@ -23,13 +23,13 @@ insert into mytrade(code,trade_div,trade_status,trade_expected_cagr,remark) valu
 insert into mytrade(code,trade_div,trade_status,trade_expected_cagr,remark) values('030190', 'bond2', '0', 19.96, 'NICE평가정보: 16040'); 
 
 
-
+"
 select code,to_char(trade_date, 'YYYY-Q"Q"') qt,avg(roe)::int roe,max(per) per,max(pbr) pbr 
 from stockfdt_pbr_v 
 where code='229000' 
 and trade_date >= '20150101' 
 GROUP BY code, to_char(trade_date, 'YYYY-Q"Q"');
-
+"
 
 
 
@@ -172,37 +172,15 @@ select  (b.trade_value::numeric / 100000000)::int AS trade_value_uk,
         (b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
         b.sector,
         a.*
-        --,c.trade_status, c.trade_expected_cagr, remark
-from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code
---join mytrade c on b.code = c.code and c.trade_div = 'bond1'
-where expected_cagr >= 10.0
-order by expected_cagr desc;
+        ,c.trade_status, c.trade_expected_cagr, remark
+from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code and a.expected_cagr >= 15.0
+full outer join (select * from mytrade where trade_div = 'bond1') c on b.code = c.code
+order by a.expected_cagr desc;
 EEOFF
 
 
 
 
-select 
-    ROUND(bps * POWER(1 + min_roe_ever / 100.0, 10)) AS future_bps,
-    ROUND((bps * POWER(1 + min_roe_ever / 100.0, 10)) / close_price, 2) AS return_multiple,
-    ROUND(
-        (POWER(
-            (bps * POWER(1 + min_roe_ever / 100.0, 10)) / close_price,  -- (미래가치 / 현재가치)
-            1.0 / 10.0                                                  -- ^ (1/10)
-        ) - 1) * 100, 
-    2) AS expected_cagr
-;
-
-select 
-    ROUND(85756 * POWER(1 + 5.6 / 100.0, 10)) AS future_bps,
-    ROUND((85756 * POWER(1 + 5.6 / 100.0, 10)) / 23500, 2) AS return_multiple,
-    ROUND(
-        (POWER(
-            (85756 * POWER(1 + 5.6 / 100.0, 10)) / 23500,  -- (미래가치 / 현재가치)
-            1.0 / 10.0                                                  -- ^ (1/10)
-        ) - 1) * 100, 
-    2) AS expected_cagr
-;
 
 
 
@@ -405,10 +383,8 @@ SELECT
     (b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
     b.sector,
     a.*
-    --,c.trade_status, c.trade_expected_cagr, remark
-FROM last_data a 
-JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code
---join mytrade c on b.code = c.code and c.trade_div = 'bond2'
-WHERE a.expected_cagr >= 10.0
+        ,c.trade_status, c.trade_expected_cagr, remark
+from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code and a.expected_cagr >= 15.0
+full outer join (select * from mytrade where trade_div = 'bond2') c on b.code = c.code
 ORDER BY a.expected_cagr DESC;
 EEOFF
