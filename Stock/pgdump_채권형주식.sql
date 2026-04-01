@@ -1,3 +1,4 @@
+drop table mytrade;
 create table mytrade
 (
 code varchar(20) not null,
@@ -9,60 +10,59 @@ created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 ALTER TABLE ONLY mytrade
-    ADD CONSTRAINT mytrade_pkey PRIMARY KEY (code);
+    ADD CONSTRAINT mytrade_pkey PRIMARY KEY (code,created_at);
 
 COMMENT ON COLUMN public.mytrade.trade_div IS 'bond1:bpb_1, bond2:bpr_avg';
 COMMENT ON COLUMN public.mytrade.trade_status IS '0:예정, 1:매수, 2:매도';
 
-insert into mytrade(code,trade_div,trade_status,trade_expected_cagr,remark) values('192400', 'bond1', '0', 15.33, '쿠쿠홀딩스: 27400'); 
-insert into mytrade(code,trade_div,trade_status,trade_expected_cagr,remark) values('023910', 'bond1', '0', 15.22, '대한약품: 28350'); 
-
-insert into mytrade(code,trade_div,trade_status,trade_expected_cagr,remark) values('049720', 'bond2', '0', 24.35, '고려신용정보: 10270'); 
-insert into mytrade(code,trade_div,trade_status,trade_expected_cagr,remark) values('092130', 'bond2', '0', 23.97, '이크레더블: 14500'); 
-insert into mytrade(code,trade_div,trade_status,trade_expected_cagr,remark) values('092730', 'bond2', '0', 21.15, '네오팜: 16950'); 
-insert into mytrade(code,trade_div,trade_status,trade_expected_cagr,remark) values('030190', 'bond2', '0', 19.96, 'NICE평가정보: 16040'); 
 
 
 "
-select code,to_char(trade_date, 'YYYY-Q"Q"') qt,avg(roe)::int roe,max(per) per,max(pbr) pbr 
-from stockfdt_pbr_v 
-where code='229000' 
-and trade_date >= '20150101' 
-GROUP BY code, to_char(trade_date, 'YYYY-Q"Q"');
+select code,to_char(trade_date, 'YYYY') as year,avg(roe)::int roe,max(per) per,max(pbr) pbr
+from stockfdt_pbr_v
+where code='316140'
+and trade_date >= '20150101'
+GROUP BY code, to_char(trade_date, 'YYYY')
+order by year;
+
+select code,trade_date,roe,per,pbr
+from stockfdt_pbr_v
+where code='316140' 
+order by trade_date;
 "
 
 
 
 cat > bond1_pbr_to_1.sql <<'EEOFF'
-WITH calc_quarterly_data AS (
+WITH calc_yearly_data AS (
     -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
     SELECT 
         code,
-        to_char(trade_date, 'YYYY-Q"Q"') AS quarter,
+        to_char(trade_date, 'YYYY') AS year,
         AVG(roe) AS avg_roe,
         AVG(pbr) AS avg_pbr  -- 💡 [추가] 과거 시장 평가(권리금)를 추적하기 위한 PBR 평균
     FROM stockfdt_pbr_v
-    WHERE trade_date >= '20150101'
-    GROUP BY code, to_char(trade_date, 'YYYY-Q"Q"')
+    WHERE trade_date >= '20160101'
+    GROUP BY code, to_char(trade_date, 'YYYY')
 ),
 find_min_roe AS (
     -- 2단계: 최악의 ROE 찾기 및 NULL 빵꾸 이력 추적
     SELECT 
         code,
-        quarter,
+        year,
         avg_roe,
         MIN(avg_roe) OVER (PARTITION BY code) AS min_roe_ever,
         AVG(avg_roe) OVER (PARTITION BY code) AS avg_roe_ever,
         MAX(avg_roe) OVER (PARTITION BY code) AS max_roe_ever,
         BOOL_OR(avg_roe IS NULL) OVER (PARTITION BY code) AS has_null_roe,
         AVG(avg_pbr) OVER (PARTITION BY code) AS hist_avg_pbr -- 💡 [추가] 10년 평균 PBR 산출
-    FROM calc_quarterly_data
+    FROM calc_yearly_data
 ),
 filtered_data AS (
     -- 3단계: 불량 종목(5% 미만 or NULL 이력) 싹 다 제거!
     SELECT 
         code,
-        quarter,
+        year,
         ROUND(min_roe_ever, 2) AS min_roe_ever,
         ROUND(avg_roe_ever, 2) AS avg_roe_ever,
         ROUND(max_roe_ever, 2) AS max_roe_ever,
@@ -80,66 +80,28 @@ pivot_data AS (
         MAX(avg_roe_ever) AS avg_roe_ever,
         MAX(max_roe_ever) AS max_roe_ever,
         MAX(hist_avg_pbr) AS hist_avg_pbr, -- 💡 [추가] 최종 계산을 위해 메인 쿼리로 전달
-        -- [2015년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2015-1Q') AS "2015-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2015-2Q') AS "2015-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2015-3Q') AS "2015-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2015-4Q') AS "2015-4Q",
         -- [2016년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2016-1Q') AS "2016-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2016-2Q') AS "2016-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2016-3Q') AS "2016-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2016-4Q') AS "2016-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2016') AS "2016",
         -- [2017년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2017-1Q') AS "2017-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2017-2Q') AS "2017-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2017-3Q') AS "2017-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2017-4Q') AS "2017-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2017') AS "2017",
         -- [2018년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2018-1Q') AS "2018-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2018-2Q') AS "2018-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2018-3Q') AS "2018-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2018-4Q') AS "2018-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2018') AS "2018",
         -- [2019년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2019-1Q') AS "2019-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2019-2Q') AS "2019-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2019-3Q') AS "2019-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2019-4Q') AS "2019-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2019') AS "2019",
         -- [2020년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2020-1Q') AS "2020-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2020-2Q') AS "2020-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2020-3Q') AS "2020-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2020-4Q') AS "2020-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2020') AS "2020",
         -- [2021년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2021-1Q') AS "2021-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2021-2Q') AS "2021-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2021-3Q') AS "2021-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2021-4Q') AS "2021-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2021') AS "2021",
         -- [2022년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2022-1Q') AS "2022-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2022-2Q') AS "2022-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2022-3Q') AS "2022-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2022-4Q') AS "2022-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2022') AS "2022",
         -- [2023년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2023-1Q') AS "2023-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2023-2Q') AS "2023-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2023-3Q') AS "2023-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2023-4Q') AS "2023-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2023') AS "2023",
         -- [2024년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2024-1Q') AS "2024-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2024-2Q') AS "2024-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2024-3Q') AS "2024-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2024-4Q') AS "2024-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2024') AS "2024",
         -- [2025년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2025-1Q') AS "2025-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2025-2Q') AS "2025-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2025-3Q') AS "2025-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2025-4Q') AS "2025-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2025') AS "2025",
         -- [2026년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2026-1Q') AS "2026-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2026-2Q') AS "2026-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2026-3Q') AS "2026-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2026-4Q') AS "2026-4Q"
+        MAX(avg_roe) FILTER (WHERE year = '2026') AS "2026"
     FROM filtered_data
     GROUP BY code
 ),
@@ -168,12 +130,12 @@ where a.trade_date = (select max(trade_date) from stockfdt_pbr_v)
 AND a.bps > 0           -- 💡 [방어코드] 자본잠식 기업 에러 방지
 AND a.close_price > 0   -- 💡 [방어코드] 거래정지(0원) 에러 방지
 )
-select  (b.trade_value::numeric / 100000000)::int AS trade_value_uk,
+select  c.trade_status, c.trade_expected_cagr, remark,
+        (b.trade_value::numeric / 100000000)::int AS trade_value_uk,
         (b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
         b.sector,
         a.*
-        ,c.trade_status, c.trade_expected_cagr, remark
-from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code and a.expected_cagr >= 15.0
+from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code and a.expected_cagr >= 10.0
 full outer join (select * from mytrade where trade_div = 'bond1') c on b.code = c.code
 order by a.expected_cagr desc;
 EEOFF
@@ -239,35 +201,35 @@ CREATE VIEW public.stockfdt_pbr_v AS
 
 
 cat > bond2_pbr_to_avg.sql <<'EEOFF'
-WITH calc_quarterly_data AS (
+WITH calc_yearly_data AS (
     -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
     SELECT 
         code,
-        to_char(trade_date, 'YYYY-Q"Q"') AS quarter,
+        to_char(trade_date, 'YYYY') AS year,
         AVG(roe) AS avg_roe,
         AVG(pbr) AS avg_pbr  -- 💡 [추가] 과거 시장 평가(권리금)를 추적하기 위한 PBR 평균
     FROM stockfdt_pbr_v
-    WHERE trade_date >= '20150101'
-    GROUP BY code, to_char(trade_date, 'YYYY-Q"Q"')
+    WHERE trade_date >= '20160101'
+    GROUP BY code, to_char(trade_date, 'YYYY')
 ),
 find_min_roe AS (
     -- 2단계: 최악의 ROE 찾기, NULL 이력 추적 및 '역대 평균 PBR' 산출
     SELECT 
         code,
-        quarter,
+        year,
         avg_roe,
         MIN(avg_roe) OVER (PARTITION BY code) AS min_roe_ever,
         AVG(avg_roe) OVER (PARTITION BY code) AS avg_roe_ever,
         MAX(avg_roe) OVER (PARTITION BY code) AS max_roe_ever,
         BOOL_OR(avg_roe IS NULL) OVER (PARTITION BY code) AS has_null_roe,
         AVG(avg_pbr) OVER (PARTITION BY code) AS hist_avg_pbr -- 💡 [추가] 10년 평균 PBR 산출
-    FROM calc_quarterly_data
+    FROM calc_yearly_data
 ),
 filtered_data AS (
     -- 3단계: 불량 종목(5% 미만 or NULL 이력) 싹 다 제거!
     SELECT 
         code,
-        quarter,
+        year,
         ROUND(min_roe_ever, 2) AS min_roe_ever,
         ROUND(avg_roe_ever, 2) AS avg_roe_ever,
         ROUND(max_roe_ever, 2) AS max_roe_ever,
@@ -285,68 +247,28 @@ pivot_data AS (
         MAX(avg_roe_ever) AS avg_roe_ever,
         MAX(max_roe_ever) AS max_roe_ever,
         MAX(hist_avg_pbr) AS hist_avg_pbr, -- 💡 [추가] 최종 계산을 위해 메인 쿼리로 전달
-        
-        -- [2015년] (주석 처리된 부분은 그대로 유지하셨군요. 좋습니다!)
-        MAX(avg_roe) FILTER (WHERE quarter = '2015-1Q') AS "2015-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2015-2Q') AS "2015-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2015-3Q') AS "2015-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2015-4Q') AS "2015-4Q",
-        
         -- [2016년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2016-1Q') AS "2016-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2016-2Q') AS "2016-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2016-3Q') AS "2016-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2016-4Q') AS "2016-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2016') AS "2016",
         -- [2017년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2017-1Q') AS "2017-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2017-2Q') AS "2017-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2017-3Q') AS "2017-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2017-4Q') AS "2017-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2017') AS "2017",
         -- [2018년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2018-1Q') AS "2018-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2018-2Q') AS "2018-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2018-3Q') AS "2018-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2018-4Q') AS "2018-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2018') AS "2018",
         -- [2019년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2019-1Q') AS "2019-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2019-2Q') AS "2019-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2019-3Q') AS "2019-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2019-4Q') AS "2019-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2019') AS "2019",
         -- [2020년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2020-1Q') AS "2020-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2020-2Q') AS "2020-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2020-3Q') AS "2020-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2020-4Q') AS "2020-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2020') AS "2020",
         -- [2021년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2021-1Q') AS "2021-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2021-2Q') AS "2021-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2021-3Q') AS "2021-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2021-4Q') AS "2021-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2021') AS "2021",
         -- [2022년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2022-1Q') AS "2022-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2022-2Q') AS "2022-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2022-3Q') AS "2022-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2022-4Q') AS "2022-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2022') AS "2022",
         -- [2023년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2023-1Q') AS "2023-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2023-2Q') AS "2023-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2023-3Q') AS "2023-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2023-4Q') AS "2023-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2023') AS "2023",
         -- [2024년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2024-1Q') AS "2024-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2024-2Q') AS "2024-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2024-3Q') AS "2024-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2024-4Q') AS "2024-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2024') AS "2024",
         -- [2025년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2025-1Q') AS "2025-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2025-2Q') AS "2025-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2025-3Q') AS "2025-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2025-4Q') AS "2025-4Q",
+        MAX(avg_roe) FILTER (WHERE year = '2025') AS "2025",
         -- [2026년]
-        MAX(avg_roe) FILTER (WHERE quarter = '2026-1Q') AS "2026-1Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2026-2Q') AS "2026-2Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2026-3Q') AS "2026-3Q",
-        MAX(avg_roe) FILTER (WHERE quarter = '2026-4Q') AS "2026-4Q"
+        MAX(avg_roe) FILTER (WHERE year = '2026') AS "2026"
     FROM filtered_data
     GROUP BY code
 ),
@@ -379,12 +301,260 @@ last_data AS (
 )
 -- 6단계: 거래대금/시가총액 조인 및 최종 결과 추출
 SELECT  
+    c.trade_status, c.trade_expected_cagr, remark,
     (b.trade_value::numeric / 100000000)::int AS trade_value_uk,
     (b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
     b.sector,
     a.*
-        ,c.trade_status, c.trade_expected_cagr, remark
-from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code and a.expected_cagr >= 15.0
+from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code and a.expected_cagr >= 10.0
 full outer join (select * from mytrade where trade_div = 'bond2') c on b.code = c.code
 ORDER BY a.expected_cagr DESC;
 EEOFF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+===============================================================================> insert
+
+cat > bond1_pbr_to_1_insert.sql <<'EEOFF'
+insert into mytrade
+WITH calc_yearly_data AS (
+    -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
+    SELECT 
+        code,
+        to_char(trade_date, 'YYYY') AS year,
+        AVG(roe) AS avg_roe,
+        AVG(pbr) AS avg_pbr  -- 💡 [추가] 과거 시장 평가(권리금)를 추적하기 위한 PBR 평균
+    FROM stockfdt_pbr_v
+    WHERE trade_date >= '20160101'
+    GROUP BY code, to_char(trade_date, 'YYYY')
+),
+find_min_roe AS (
+    -- 2단계: 최악의 ROE 찾기 및 NULL 빵꾸 이력 추적
+    SELECT 
+        code,
+        year,
+        avg_roe,
+        MIN(avg_roe) OVER (PARTITION BY code) AS min_roe_ever,
+        AVG(avg_roe) OVER (PARTITION BY code) AS avg_roe_ever,
+        MAX(avg_roe) OVER (PARTITION BY code) AS max_roe_ever,
+        BOOL_OR(avg_roe IS NULL) OVER (PARTITION BY code) AS has_null_roe,
+        AVG(avg_pbr) OVER (PARTITION BY code) AS hist_avg_pbr -- 💡 [추가] 10년 평균 PBR 산출
+    FROM calc_yearly_data
+),
+filtered_data AS (
+    -- 3단계: 불량 종목(5% 미만 or NULL 이력) 싹 다 제거!
+    SELECT 
+        code,
+        year,
+        ROUND(min_roe_ever, 2) AS min_roe_ever,
+        ROUND(avg_roe_ever, 2) AS avg_roe_ever,
+        ROUND(max_roe_ever, 2) AS max_roe_ever,
+        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, -- 💡 [추가] 다음 단계로 전달
+        ROUND(avg_roe, 2) AS avg_roe
+    FROM find_min_roe
+    WHERE min_roe_ever >= 5
+      AND has_null_roe = false
+),
+pivot_data AS (
+    -- 4단계: 2015-1Q부터 2026-1Q까지 45분기 절대 시간 피벗 전개!
+    SELECT 
+        code,
+        MAX(min_roe_ever) AS min_roe_ever,
+        MAX(avg_roe_ever) AS avg_roe_ever,
+        MAX(max_roe_ever) AS max_roe_ever,
+        MAX(hist_avg_pbr) AS hist_avg_pbr, -- 💡 [추가] 최종 계산을 위해 메인 쿼리로 전달
+        -- [2016년]
+        MAX(avg_roe) FILTER (WHERE year = '2016') AS "2016",
+        -- [2017년]
+        MAX(avg_roe) FILTER (WHERE year = '2017') AS "2017",
+        -- [2018년]
+        MAX(avg_roe) FILTER (WHERE year = '2018') AS "2018",
+        -- [2019년]
+        MAX(avg_roe) FILTER (WHERE year = '2019') AS "2019",
+        -- [2020년]
+        MAX(avg_roe) FILTER (WHERE year = '2020') AS "2020",
+        -- [2021년]
+        MAX(avg_roe) FILTER (WHERE year = '2021') AS "2021",
+        -- [2022년]
+        MAX(avg_roe) FILTER (WHERE year = '2022') AS "2022",
+        -- [2023년]
+        MAX(avg_roe) FILTER (WHERE year = '2023') AS "2023",
+        -- [2024년]
+        MAX(avg_roe) FILTER (WHERE year = '2024') AS "2024",
+        -- [2025년]
+        MAX(avg_roe) FILTER (WHERE year = '2025') AS "2025",
+        -- [2026년]
+        MAX(avg_roe) FILTER (WHERE year = '2026') AS "2026"
+    FROM filtered_data
+    GROUP BY code
+),
+last_data AS (
+select 
+    -- 💡 1. 10년 후 예상 BPS (장부 가치)
+    ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
+    
+    -- 💡 2. 10년 후 예상 주가 (미래 BPS * 역대 평균 PBR)
+    ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
+    
+    -- 💡 3. 10년 후 투자 승수 = (미래 예상 주가 / 현재 주가) [0 나누기 방어 추가]
+    ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
+    
+    -- 💡 4. 최종 예상 연평균 복리 수익률 (CAGR)
+    ROUND(
+        (POWER(
+            ((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0),  
+            1.0 / 10.0                                                  
+        ) - 1) * 100, 
+    2) AS expected_cagr,
+    
+    * -- USING(code)로 합쳐진 a와 b의 모든 컬럼 (code는 단 1번만 출력됨)
+from stockfdt_pbr_v a join pivot_data b USING (code)
+where a.trade_date = (select max(trade_date) from stockfdt_pbr_v)
+AND a.bps > 0           -- 💡 [방어코드] 자본잠식 기업 에러 방지
+AND a.close_price > 0   -- 💡 [방어코드] 거래정지(0원) 에러 방지
+)
+select  --c.trade_status, c.trade_expected_cagr, remark,
+        --(b.trade_value::numeric / 100000000)::int AS trade_value_uk,
+        --(b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
+        --b.sector,
+        --a.*
+        a.code,'bond1','1',a.expected_cagr,a.name || ': ' || a.close_price
+from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code and a.expected_cagr >= 10.0
+full outer join (select * from mytrade where trade_div = 'bond1') c on b.code = c.code
+where a.code in ('192400','023910')
+order by a.expected_cagr desc;
+EEOFF
+
+
+
+cat > bond2_pbr_to_avg_insert.sql <<'EEOFF'
+insert into mytrade
+WITH calc_yearly_data AS (
+    -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
+    SELECT 
+        code,
+        to_char(trade_date, 'YYYY') AS year,
+        AVG(roe) AS avg_roe,
+        AVG(pbr) AS avg_pbr  -- 💡 [추가] 과거 시장 평가(권리금)를 추적하기 위한 PBR 평균
+    FROM stockfdt_pbr_v
+    WHERE trade_date >= '20160101'
+    GROUP BY code, to_char(trade_date, 'YYYY')
+),
+find_min_roe AS (
+    -- 2단계: 최악의 ROE 찾기, NULL 이력 추적 및 '역대 평균 PBR' 산출
+    SELECT 
+        code,
+        year,
+        avg_roe,
+        MIN(avg_roe) OVER (PARTITION BY code) AS min_roe_ever,
+        AVG(avg_roe) OVER (PARTITION BY code) AS avg_roe_ever,
+        MAX(avg_roe) OVER (PARTITION BY code) AS max_roe_ever,
+        BOOL_OR(avg_roe IS NULL) OVER (PARTITION BY code) AS has_null_roe,
+        AVG(avg_pbr) OVER (PARTITION BY code) AS hist_avg_pbr -- 💡 [추가] 10년 평균 PBR 산출
+    FROM calc_yearly_data
+),
+filtered_data AS (
+    -- 3단계: 불량 종목(5% 미만 or NULL 이력) 싹 다 제거!
+    SELECT 
+        code,
+        year,
+        ROUND(min_roe_ever, 2) AS min_roe_ever,
+        ROUND(avg_roe_ever, 2) AS avg_roe_ever,
+        ROUND(max_roe_ever, 2) AS max_roe_ever,
+        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, -- 💡 [추가] 다음 단계로 전달
+        ROUND(avg_roe, 2) AS avg_roe
+    FROM find_min_roe
+    WHERE min_roe_ever >= 5
+      AND has_null_roe = false
+),
+pivot_data AS (
+    -- 4단계: 45분기 절대 시간 피벗 전개 및 종목별 메타데이터 집계
+    SELECT 
+        code,
+        MAX(min_roe_ever) AS min_roe_ever,
+        MAX(avg_roe_ever) AS avg_roe_ever,
+        MAX(max_roe_ever) AS max_roe_ever,
+        MAX(hist_avg_pbr) AS hist_avg_pbr, -- 💡 [추가] 최종 계산을 위해 메인 쿼리로 전달
+        -- [2016년]
+        MAX(avg_roe) FILTER (WHERE year = '2016') AS "2016",
+        -- [2017년]
+        MAX(avg_roe) FILTER (WHERE year = '2017') AS "2017",
+        -- [2018년]
+        MAX(avg_roe) FILTER (WHERE year = '2018') AS "2018",
+        -- [2019년]
+        MAX(avg_roe) FILTER (WHERE year = '2019') AS "2019",
+        -- [2020년]
+        MAX(avg_roe) FILTER (WHERE year = '2020') AS "2020",
+        -- [2021년]
+        MAX(avg_roe) FILTER (WHERE year = '2021') AS "2021",
+        -- [2022년]
+        MAX(avg_roe) FILTER (WHERE year = '2022') AS "2022",
+        -- [2023년]
+        MAX(avg_roe) FILTER (WHERE year = '2023') AS "2023",
+        -- [2024년]
+        MAX(avg_roe) FILTER (WHERE year = '2024') AS "2024",
+        -- [2025년]
+        MAX(avg_roe) FILTER (WHERE year = '2025') AS "2025",
+        -- [2026년]
+        MAX(avg_roe) FILTER (WHERE year = '2026') AS "2026"
+    FROM filtered_data
+    GROUP BY code
+),
+last_data AS (
+    -- 5단계: 재무 가치평가 (Valuation) 및 미래 주가 산출
+    SELECT 
+        -- 💡 1. 10년 후 예상 BPS (장부 가치)
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
+        
+        -- 💡 2. 10년 후 예상 주가 (미래 BPS * 역대 평균 PBR)
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
+        
+        -- 💡 3. 10년 후 투자 승수 = (미래 예상 주가 / 현재 주가) [0 나누기 방어 추가]
+        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS return_multiple,
+        
+        -- 💡 4. 최종 예상 연평균 복리 수익률 (CAGR)
+        ROUND(
+            (POWER(
+                ((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0),  
+                1.0 / 10.0                                                  
+            ) - 1) * 100, 
+        2) AS expected_cagr,
+        
+        * -- USING(code)로 합쳐진 a와 b의 모든 컬럼 (code는 단 1번만 출력됨)
+    FROM stockfdt_pbr_v a 
+    JOIN pivot_data b USING (code)
+    WHERE a.trade_date = (SELECT MAX(trade_date) FROM stockfdt_pbr_v)
+      AND a.bps > 0           -- 💡 [방어코드] 자본잠식 기업 에러 방지
+      AND a.close_price > 0   -- 💡 [방어코드] 거래정지(0원) 에러 방지
+)
+-- 6단계: 거래대금/시가총액 조인 및 최종 결과 추출
+SELECT  
+    --c.trade_status, c.trade_expected_cagr, remark,
+    --(b.trade_value::numeric / 100000000)::int AS trade_value_uk,
+    --(b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
+    --b.sector,
+    --a.*
+    a.code,'bond2','1',a.expected_cagr,a.name || ': ' || a.close_price
+from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code and a.expected_cagr >= 10.0
+full outer join (select * from mytrade where trade_div = 'bond2') c on b.code = c.code
+where a.code in ('049720','092130','092730','067280','030190','030000')
+ORDER BY a.expected_cagr DESC;
+EEOFF
+
+
