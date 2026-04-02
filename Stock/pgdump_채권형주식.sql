@@ -45,7 +45,7 @@ COMMENT ON COLUMN public.mytrade.trade_status IS '0:예정, 1:매수, 2:매도';
 select code,to_char(trade_date, 'YYYY') as year,avg(roe)::int roe,max(per) per,max(pbr) pbr
 from stockfdt_pbr_v
 where code='105560'
-and trade_date >= '20150101'
+and trade_date >= '20160101'
 GROUP BY code, to_char(trade_date, 'YYYY')
 order by year;
 
