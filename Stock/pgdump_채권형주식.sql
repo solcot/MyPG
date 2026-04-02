@@ -1,3 +1,4 @@
+"
 drop view stockfdt_pbr_v;
 CREATE VIEW public.stockfdt_pbr_v AS
  SELECT trade_date,
@@ -14,10 +15,10 @@ CREATE VIEW public.stockfdt_pbr_v AS
     (close_price/pbr)::int bps,
     bps::int krx_bps
    FROM stockfdt;
+"
 
 
-
-
+"
 drop table mytrade;
 create table mytrade
 (
@@ -35,7 +36,7 @@ ALTER TABLE ONLY mytrade
 
 COMMENT ON COLUMN public.mytrade.trade_div IS 'bond1:bpb_1, bond2:bpr_avg';
 COMMENT ON COLUMN public.mytrade.trade_status IS '0:예정, 1:매수, 2:매도';
-
+"
 
 
 
@@ -43,14 +44,14 @@ COMMENT ON COLUMN public.mytrade.trade_status IS '0:예정, 1:매수, 2:매도';
 "
 select code,to_char(trade_date, 'YYYY') as year,avg(roe)::int roe,max(per) per,max(pbr) pbr
 from stockfdt_pbr_v
-where code='316140'
+where code='105560'
 and trade_date >= '20150101'
 GROUP BY code, to_char(trade_date, 'YYYY')
 order by year;
 
 select code,trade_date,roe,per,pbr
 from stockfdt_pbr_v
-where code='316140' 
+where code='105560' 
 order by trade_date;
 "
 
