@@ -13,7 +13,7 @@ CREATE VIEW public.stockfdt_pbr_v AS
     (pbr / forward_per * 100::numeric)::numeric(10,2) AS forward_roe,
     close_price,
     (close_price/pbr)::int bps,
-    bps::int krx_bps
+    (close_price/per)::int eps
    FROM stockfdt;
 "
 
@@ -114,7 +114,7 @@ from basic_number a
 
 
 
-cat > bond1_pbr_to_1.sql <<'EEOFF'
+cat > bond_1_2.sql <<'EEOFF'
 WITH calc_yearly_data AS (
     -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
     SELECT 
@@ -191,9 +191,6 @@ select
     -- 💡 1. 10년 후 예상 BPS (장부 가치)
     ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
     
-    -- 💡 2. 10년 후 예상 주가 (미래 BPS * 역대 평균 PBR)
-    ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
-    
     -- 💡 3. 10년 후 투자 승수 = (미래 예상 주가 / 현재 주가) [0 나누기 방어 추가]
     ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
     
@@ -204,6 +201,20 @@ select
             1.0 / 10.0                                                  
         ) - 1) * 100, 
     2) AS expected_cagr,
+
+    -- 💡 2. 10년 후 예상 주가 (미래 BPS * 역대 평균 PBR)
+    ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
+    
+    -- 💡 3. 10년 후 투자 승수 = (미래 예상 주가 / 현재 주가) [0 나누기 방어 추가]
+    ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
+    
+    -- 💡 4. 최종 예상 연평균 복리 수익률 (CAGR)
+    ROUND(
+        (POWER(
+            ((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0),  
+            1.0 / 10.0                                                  
+        ) - 1) * 100, 
+    2) AS fep_expected_cagr,
     
     * -- USING(code)로 합쳐진 a와 b의 모든 컬럼 (code는 단 1번만 출력됨)
 from stockfdt_pbr_v a join pivot_data b USING (code)
@@ -211,23 +222,19 @@ where a.trade_date = (select max(trade_date) from stockfdt_pbr_v)
 AND a.bps > 0           -- 💡 [방어코드] 자본잠식 기업 에러 방지
 AND a.close_price > 0   -- 💡 [방어코드] 거래정지(0원) 에러 방지
 )
-select  c.trade_status, c.trade_expected_cagr, c.trade_dividend, remark,
+select  c.trade_div, c.trade_status, c.trade_expected_cagr, c.trade_dividend, remark,
         (b.trade_value::numeric / 100000000)::int AS trade_value_uk,
         (b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
         b.sector,
         a.*
-from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code and a.expected_cagr >= 8.0
-full outer join (select * from mytrade where trade_div = 'bond1') c on b.code = c.code
+from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code and (a.expected_cagr >= 8.0 or a.fep_expected_cagr >= 10) 
+full outer join (select * from mytrade where trade_status = 1) c on b.code = c.code
 order by a.expected_cagr desc;
 EEOFF
 
 
 
-
-
-
-
-# 위 쿼리에 담긴 진짜 속마음(전제조건)은 이겁니다.
+# bond_1 쿼리에 담긴 진짜 속마음(전제조건)은 이겁니다.
 #     "이 회사는 역대 최악의 시절에도 ROE를 10%나 냈어. 
 #     앞으로 10년 동안 장사를 기가 막히게 잘해서 내 자산(BPS)을 엄청 불려주겠지? 
 #     정상적이라면 10년 뒤에 사람들이 권리금(PBR 1.5)을 얹어서 비싸게 사줘야 해.
@@ -245,13 +252,7 @@ EEOFF
 
 
 
-
-
-
-
-
-
-# 아래 쿼리는 벤저민 그레이엄의 '전통적 가치투자(PBR 1.0 회귀)'의 한계를 부수고, 
+# bond_2 쿼리는 벤저민 그레이엄의 '전통적 가치투자(PBR 1.0 회귀)'의 한계를 부수고, 
 # 피터 린치나 필립 피셔 같은 대가들이 쓰는 
 # **'성장주(Growth Stock) 프리미엄 모델'**로 진화하는 완벽한 질문입니다!
 # 
@@ -266,138 +267,10 @@ EEOFF
 # '미래의 진짜 예상 주가'를 산출해 주면 완벽하게 해결됩니다!"
 
 
-cat > bond2_pbr_to_avg.sql <<'EEOFF'
-WITH calc_yearly_data AS (
-    -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
-    SELECT 
-        code,
-        to_char(trade_date, 'YYYY') AS year,
-        AVG(roe) AS avg_roe,
-        AVG(pbr) AS avg_pbr  -- 💡 [추가] 과거 시장 평가(권리금)를 추적하기 위한 PBR 평균
-    FROM stockfdt_pbr_v
-    WHERE trade_date >= '20160101'
-    GROUP BY code, to_char(trade_date, 'YYYY')
-),
-find_min_roe AS (
-    -- 2단계: 최악의 ROE 찾기, NULL 이력 추적 및 '역대 평균 PBR' 산출
-    SELECT 
-        code,
-        year,
-        avg_roe,
-        MIN(avg_roe) OVER (PARTITION BY code) AS min_roe_ever,
-        AVG(avg_roe) OVER (PARTITION BY code) AS avg_roe_ever,
-        MAX(avg_roe) OVER (PARTITION BY code) AS max_roe_ever,
-        BOOL_OR(avg_roe IS NULL) OVER (PARTITION BY code) AS has_null_roe,
-        AVG(avg_pbr) OVER (PARTITION BY code) AS hist_avg_pbr -- 💡 [추가] 10년 평균 PBR 산출
-    FROM calc_yearly_data
-),
-filtered_data AS (
-    -- 3단계: 불량 종목(5% 미만 or NULL 이력) 싹 다 제거!
-    SELECT 
-        code,
-        year,
-        ROUND(min_roe_ever, 2) AS min_roe_ever,
-        ROUND(avg_roe_ever, 2) AS avg_roe_ever,
-        ROUND(max_roe_ever, 2) AS max_roe_ever,
-        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, -- 💡 [추가] 다음 단계로 전달
-        ROUND(avg_roe, 2) AS avg_roe
-    FROM find_min_roe
-    WHERE min_roe_ever >= 5
-      --AND has_null_roe = false
-),
-pivot_data AS (
-    -- 4단계: 45분기 절대 시간 피벗 전개 및 종목별 메타데이터 집계
-    SELECT 
-        code,
-        MAX(min_roe_ever) AS min_roe_ever,
-        MAX(avg_roe_ever) AS avg_roe_ever,
-        MAX(max_roe_ever) AS max_roe_ever,
-        MAX(hist_avg_pbr) AS hist_avg_pbr, -- 💡 [추가] 최종 계산을 위해 메인 쿼리로 전달
-        -- [2016년]
-        MAX(avg_roe) FILTER (WHERE year = '2016') AS "2016",
-        -- [2017년]
-        MAX(avg_roe) FILTER (WHERE year = '2017') AS "2017",
-        -- [2018년]
-        MAX(avg_roe) FILTER (WHERE year = '2018') AS "2018",
-        -- [2019년]
-        MAX(avg_roe) FILTER (WHERE year = '2019') AS "2019",
-        -- [2020년]
-        MAX(avg_roe) FILTER (WHERE year = '2020') AS "2020",
-        -- [2021년]
-        MAX(avg_roe) FILTER (WHERE year = '2021') AS "2021",
-        -- [2022년]
-        MAX(avg_roe) FILTER (WHERE year = '2022') AS "2022",
-        -- [2023년]
-        MAX(avg_roe) FILTER (WHERE year = '2023') AS "2023",
-        -- [2024년]
-        MAX(avg_roe) FILTER (WHERE year = '2024') AS "2024",
-        -- [2025년]
-        MAX(avg_roe) FILTER (WHERE year = '2025') AS "2025",
-        -- [2026년]
-        MAX(avg_roe) FILTER (WHERE year = '2026') AS "2026"
-    FROM filtered_data
-    GROUP BY code
-),
-last_data AS (
-    -- 5단계: 재무 가치평가 (Valuation) 및 미래 주가 산출
-    SELECT 
-        -- 💡 1. 10년 후 예상 BPS (장부 가치)
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
-        
-        -- 💡 2. 10년 후 예상 주가 (미래 BPS * 역대 평균 PBR)
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
-        
-        -- 💡 3. 10년 후 투자 승수 = (미래 예상 주가 / 현재 주가) [0 나누기 방어 추가]
-        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS return_multiple,
-        
-        -- 💡 4. 최종 예상 연평균 복리 수익률 (CAGR)
-        ROUND(
-            (POWER(
-                ((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0),  
-                1.0 / 10.0                                                  
-            ) - 1) * 100, 
-        2) AS expected_cagr,
-        
-        * -- USING(code)로 합쳐진 a와 b의 모든 컬럼 (code는 단 1번만 출력됨)
-    FROM stockfdt_pbr_v a 
-    JOIN pivot_data b USING (code)
-    WHERE a.trade_date = (SELECT MAX(trade_date) FROM stockfdt_pbr_v)
-      AND a.bps > 0           -- 💡 [방어코드] 자본잠식 기업 에러 방지
-      AND a.close_price > 0   -- 💡 [방어코드] 거래정지(0원) 에러 방지
-)
--- 6단계: 거래대금/시가총액 조인 및 최종 결과 추출
-SELECT  
-    c.trade_status, c.trade_expected_cagr, c.trade_dividend, remark,
-    (b.trade_value::numeric / 100000000)::int AS trade_value_uk,
-    (b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
-    b.sector,
-    a.*
-from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code and a.expected_cagr >= 8.0
-full outer join (select * from mytrade where trade_div = 'bond2') c on b.code = c.code
-ORDER BY a.expected_cagr DESC;
-EEOFF
 
+#===============================================================================> bond_1 / bond_2 insert
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#===============================================================================> insert
-
-cat > bond1_pbr_to_1_insert.sql <<'EEOFF'
+cat > bond_1_insert.sql <<'EEOFF'
 insert into mytrade
 WITH calc_yearly_data AS (
     -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
@@ -503,13 +376,13 @@ select  --c.trade_status, c.trade_expected_cagr, c.trade_dividend, remark,
         a.code,'bond1','1',a.expected_cagr,a. dividend_yield,a.name || ': ' || a.close_price
 from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code and a.expected_cagr >= 8.0
 full outer join (select * from mytrade where trade_div = 'bond1') c on b.code = c.code
-where a.code in ('192400','023910')
+where a.code in ('009900')
 order by a.expected_cagr desc;
 EEOFF
 
 
 
-cat > bond2_pbr_to_avg_insert.sql <<'EEOFF'
+cat > bond_2_insert.sql <<'EEOFF'
 insert into mytrade
 WITH calc_yearly_data AS (
     -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
