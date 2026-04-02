@@ -44,14 +44,14 @@ COMMENT ON COLUMN public.mytrade.trade_status IS '0:예정, 1:매수, 2:매도';
 "
 select code,to_char(trade_date, 'YYYY') as year,avg(roe)::int roe,max(per) per,max(pbr) pbr,max(name)
 from stockfdt_pbr_v
-where code='105560'
+where code='316140'
 and trade_date >= '20160101'
 GROUP BY code, to_char(trade_date, 'YYYY')
 order by year;
 
 select code,trade_date,roe,per,pbr,name
 from stockfdt_pbr_v
-where code='105560' 
+where code='316140' 
 and trade_date >= '20160101'
 order by trade_date;
 "
@@ -151,7 +151,7 @@ filtered_data AS (
         ROUND(avg_roe, 2) AS avg_roe
     FROM find_min_roe
     WHERE min_roe_ever >= 5
-      AND has_null_roe = false
+      --AND has_null_roe = false
 ),
 pivot_data AS (
     -- 4단계: 2015-1Q부터 2026-1Q까지 45분기 절대 시간 피벗 전개!
@@ -211,7 +211,7 @@ where a.trade_date = (select max(trade_date) from stockfdt_pbr_v)
 AND a.bps > 0           -- 💡 [방어코드] 자본잠식 기업 에러 방지
 AND a.close_price > 0   -- 💡 [방어코드] 거래정지(0원) 에러 방지
 )
-select  c.trade_status, c.trade_expected_cagr, remark,
+select  c.trade_status, c.trade_expected_cagr, c.trade_dividend, remark,
         (b.trade_value::numeric / 100000000)::int AS trade_value_uk,
         (b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
         b.sector,
@@ -303,7 +303,7 @@ filtered_data AS (
         ROUND(avg_roe, 2) AS avg_roe
     FROM find_min_roe
     WHERE min_roe_ever >= 5
-      AND has_null_roe = false
+      --AND has_null_roe = false
 ),
 pivot_data AS (
     -- 4단계: 45분기 절대 시간 피벗 전개 및 종목별 메타데이터 집계
@@ -367,7 +367,7 @@ last_data AS (
 )
 -- 6단계: 거래대금/시가총액 조인 및 최종 결과 추출
 SELECT  
-    c.trade_status, c.trade_expected_cagr, remark,
+    c.trade_status, c.trade_expected_cagr, c.trade_dividend, remark,
     (b.trade_value::numeric / 100000000)::int AS trade_value_uk,
     (b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
     b.sector,
@@ -435,7 +435,7 @@ filtered_data AS (
         ROUND(avg_roe, 2) AS avg_roe
     FROM find_min_roe
     WHERE min_roe_ever >= 5
-      AND has_null_roe = false
+      --AND has_null_roe = false
 ),
 pivot_data AS (
     -- 4단계: 2015-1Q부터 2026-1Q까지 45분기 절대 시간 피벗 전개!
@@ -495,7 +495,7 @@ where a.trade_date = (select max(trade_date) from stockfdt_pbr_v)
 AND a.bps > 0           -- 💡 [방어코드] 자본잠식 기업 에러 방지
 AND a.close_price > 0   -- 💡 [방어코드] 거래정지(0원) 에러 방지
 )
-select  --c.trade_status, c.trade_expected_cagr, remark,
+select  --c.trade_status, c.trade_expected_cagr, c.trade_dividend, remark,
         --(b.trade_value::numeric / 100000000)::int AS trade_value_uk,
         --(b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
         --b.sector,
@@ -547,7 +547,7 @@ filtered_data AS (
         ROUND(avg_roe, 2) AS avg_roe
     FROM find_min_roe
     WHERE min_roe_ever >= 5
-      AND has_null_roe = false
+      --AND has_null_roe = false
 ),
 pivot_data AS (
     -- 4단계: 45분기 절대 시간 피벗 전개 및 종목별 메타데이터 집계
@@ -611,7 +611,7 @@ last_data AS (
 )
 -- 6단계: 거래대금/시가총액 조인 및 최종 결과 추출
 SELECT  
-    --c.trade_status, c.trade_expected_cagr, remark,
+    --c.trade_status, c.trade_expected_cagr, c.trade_dividend, remark,
     --(b.trade_value::numeric / 100000000)::int AS trade_value_uk,
     --(b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
     --b.sector,
