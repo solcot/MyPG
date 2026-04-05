@@ -118,13 +118,14 @@ cat > bond_1_2.sql <<'EEOFF'
 WITH calc_yearly_data AS (
     -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
     SELECT 
-        code,
-        to_char(trade_date, 'YYYY') AS year,
-        AVG(roe) AS avg_roe,
-        AVG(pbr) AS avg_pbr  -- 💡 [추가] 과거 시장 평가(권리금)를 추적하기 위한 PBR 평균
-    FROM stockfdt_pbr_v
-    WHERE trade_date >= '20160101'
-    GROUP BY code, to_char(trade_date, 'YYYY')
+        a.code,
+        to_char(a.trade_date, 'YYYY') AS year,
+        AVG(a.roe) AS avg_roe,
+        AVG(a.pbr) AS avg_pbr,  -- 💡 [추가] 과거 시장 평가(권리금)를 추적하기 위한 PBR 평균
+        avg(b.market_cap) AS avg_market_cap
+    FROM stockfdt_pbr_v a join stockmain b on a.trade_date = b.trade_date and a.code = b.code
+    WHERE a.trade_date >= '20160101'
+    GROUP BY a.code, to_char(a.trade_date, 'YYYY')
 ),
 find_min_roe AS (
     -- 2단계: 최악의 ROE 찾기 및 NULL 빵꾸 이력 추적
@@ -132,6 +133,7 @@ find_min_roe AS (
         code,
         year,
         avg_roe,
+        avg_market_cap,
         MIN(avg_roe) OVER (PARTITION BY code) AS min_roe_ever,
         AVG(avg_roe) OVER (PARTITION BY code) AS avg_roe_ever,
         MAX(avg_roe) OVER (PARTITION BY code) AS max_roe_ever,
@@ -148,7 +150,8 @@ filtered_data AS (
         ROUND(avg_roe_ever, 2) AS avg_roe_ever,
         ROUND(max_roe_ever, 2) AS max_roe_ever,
         ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, -- 💡 [추가] 다음 단계로 전달
-        ROUND(avg_roe, 2) AS avg_roe
+        ROUND(avg_roe, 2) AS avg_roe,
+        (avg_market_cap/10000000000)::int AS avg_market_cap_bakuk
     FROM find_min_roe
     WHERE min_roe_ever >= 5
       --AND has_null_roe = false
@@ -182,7 +185,32 @@ pivot_data AS (
         -- [2025년]
         MAX(avg_roe) FILTER (WHERE year = '2025') AS "2025",
         -- [2026년]
-        MAX(avg_roe) FILTER (WHERE year = '2026') AS "2026"
+        MAX(avg_roe) FILTER (WHERE year = '2026') AS "2026",
+        
+        '***' AS ddiivv,
+        
+        -- [2016년]
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2016') AS "2016_cap",
+        -- [2017년]
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2017') AS "2017_cap",
+        -- [2018년]
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2018') AS "2018_cap",
+        -- [2019년]
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2019') AS "2019_cap",
+        -- [2020년]
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2020') AS "2020_cap",
+        -- [2021년]
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2021') AS "2021_cap",
+        -- [2022년]
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2022') AS "2022_cap",
+        -- [2023년]
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2023') AS "2023_cap",
+        -- [2024년]
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2024') AS "2024_cap",
+        -- [2025년]
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2025') AS "2025_cap",
+        -- [2026년]
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2026') AS "2026_cap"
     FROM filtered_data
     GROUP BY code
 ),
@@ -229,6 +257,7 @@ select  c.trade_div, c.trade_status, c.trade_expected_cagr, c.trade_dividend, re
         a.*
 from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code and (a.expected_cagr >= 8.0 or a.fep_expected_cagr >= 10) 
 full outer join (select * from mytrade where trade_status = 1) c on b.code = c.code
+where b.market_cap > 100000000000
 order by a.expected_cagr desc;
 EEOFF
 
