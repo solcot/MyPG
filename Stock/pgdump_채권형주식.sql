@@ -113,16 +113,31 @@ from basic_number a
 
 
 
-
 cat > bond_1_2.sql <<'EEOFF'
-WITH calc_yearly_data AS (
+WITH max_date_cte AS (
+    -- 💡 [추가] 쿼리 수행일 기준 가장 최신(현재) 날짜를 한 번만 추출하여 성능 최적화
+    SELECT MAX(trade_date) AS max_date FROM stockfdt_pbr_v
+),
+past_eps_cte AS (
+    -- 💡 [추가] 1년 전 기준 앞뒤 3일(총 1주일) 동안의 평균 EPS 계산 (휴장일 및 데이터 누락 방어)
+    SELECT 
+        code,
+        AVG(eps) AS past_eps
+    FROM stockfdt_pbr_v
+    CROSS JOIN max_date_cte
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days' 
+                         AND max_date - INTERVAL '1 year' + INTERVAL '3 days'
+    GROUP BY code
+),
+calc_yearly_data AS (
     -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
     SELECT 
         a.code,
         to_char(a.trade_date, 'YYYY') AS year,
         AVG(a.roe) AS avg_roe,
-        AVG(a.pbr) AS avg_pbr,  -- 💡 [추가] 과거 시장 평가(권리금)를 추적하기 위한 PBR 평균
-        avg(b.market_cap) AS avg_market_cap
+        AVG(a.pbr) AS avg_pbr,  
+        avg(b.market_cap/a.pbr)::bigint AS avg_market_cap,
+        avg(a.dividend_yield) as avg_dividend
     FROM stockfdt_pbr_v a join stockmain b on a.trade_date = b.trade_date and a.code = b.code
     WHERE a.trade_date >= '20160101'
     GROUP BY a.code, to_char(a.trade_date, 'YYYY')
@@ -134,11 +149,12 @@ find_min_roe AS (
         year,
         avg_roe,
         avg_market_cap,
+        avg_dividend,
         MIN(avg_roe) OVER (PARTITION BY code) AS min_roe_ever,
         AVG(avg_roe) OVER (PARTITION BY code) AS avg_roe_ever,
         MAX(avg_roe) OVER (PARTITION BY code) AS max_roe_ever,
         BOOL_OR(avg_roe IS NULL) OVER (PARTITION BY code) AS has_null_roe,
-        AVG(avg_pbr) OVER (PARTITION BY code) AS hist_avg_pbr -- 💡 [추가] 10년 평균 PBR 산출
+        AVG(avg_pbr) OVER (PARTITION BY code) AS hist_avg_pbr
     FROM calc_yearly_data
 ),
 filtered_data AS (
@@ -149,11 +165,12 @@ filtered_data AS (
         ROUND(min_roe_ever, 2) AS min_roe_ever,
         ROUND(avg_roe_ever, 2) AS avg_roe_ever,
         ROUND(max_roe_ever, 2) AS max_roe_ever,
-        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, -- 💡 [추가] 다음 단계로 전달
+        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, 
         ROUND(avg_roe, 2) AS avg_roe,
-        (avg_market_cap/10000000000)::int AS avg_market_cap_bakuk
+        (avg_market_cap/10000000000)::bigint AS avg_market_cap_bakuk,
+        round(avg_dividend, 2) as avg_dividend
     FROM find_min_roe
-    WHERE min_roe_ever >= 5
+    WHERE min_roe_ever >= 5   -- 1. 꾸준히 수익 창출하는 기업
       --AND has_null_roe = false
 ),
 pivot_data AS (
@@ -163,102 +180,109 @@ pivot_data AS (
         MAX(min_roe_ever) AS min_roe_ever,
         MAX(avg_roe_ever) AS avg_roe_ever,
         MAX(max_roe_ever) AS max_roe_ever,
-        MAX(hist_avg_pbr) AS hist_avg_pbr, -- 💡 [추가] 최종 계산을 위해 메인 쿼리로 전달
-        -- [2016년]
+        MAX(hist_avg_pbr) AS hist_avg_pbr,
+        -- [ROE 피벗 생략 없이 그대로 유지]
         MAX(avg_roe) FILTER (WHERE year = '2016') AS "2016",
-        -- [2017년]
         MAX(avg_roe) FILTER (WHERE year = '2017') AS "2017",
-        -- [2018년]
         MAX(avg_roe) FILTER (WHERE year = '2018') AS "2018",
-        -- [2019년]
         MAX(avg_roe) FILTER (WHERE year = '2019') AS "2019",
-        -- [2020년]
         MAX(avg_roe) FILTER (WHERE year = '2020') AS "2020",
-        -- [2021년]
         MAX(avg_roe) FILTER (WHERE year = '2021') AS "2021",
-        -- [2022년]
         MAX(avg_roe) FILTER (WHERE year = '2022') AS "2022",
-        -- [2023년]
         MAX(avg_roe) FILTER (WHERE year = '2023') AS "2023",
-        -- [2024년]
         MAX(avg_roe) FILTER (WHERE year = '2024') AS "2024",
-        -- [2025년]
         MAX(avg_roe) FILTER (WHERE year = '2025') AS "2025",
-        -- [2026년]
         MAX(avg_roe) FILTER (WHERE year = '2026') AS "2026",
         
         '***' AS ddiivv,
         
-        -- [2016년]
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2016') AS "2016_cap",
-        -- [2017년]
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2017') AS "2017_cap",
-        -- [2018년]
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2018') AS "2018_cap",
-        -- [2019년]
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2019') AS "2019_cap",
-        -- [2020년]
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2020') AS "2020_cap",
-        -- [2021년]
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2021') AS "2021_cap",
-        -- [2022년]
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2022') AS "2022_cap",
-        -- [2023년]
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2023') AS "2023_cap",
-        -- [2024년]
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2024') AS "2024_cap",
-        -- [2025년]
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2025') AS "2025_cap",
-        -- [2026년]
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2026') AS "2026_cap"
+        -- [Market Cap 피벗]
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2016') AS "2016_purecap",
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2017') AS "2017_purecap",
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2018') AS "2018_purecap",
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2019') AS "2019_purecap",
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2020') AS "2020_purecap",
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2021') AS "2021_purecap",
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2022') AS "2022_purecap",
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2023') AS "2023_purecap",
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2024') AS "2024_purecap",
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2025') AS "2025_purecap",
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2026') AS "2026_purecap",
+        
+        '***' AS dddiiivvv,
+        
+        -- [dividend 피벗]
+        MAX(avg_dividend) FILTER (WHERE year = '2016') AS "2016_dividend",
+        MAX(avg_dividend) FILTER (WHERE year = '2017') AS "2017_dividend",
+        MAX(avg_dividend) FILTER (WHERE year = '2018') AS "2018_dividend",
+        MAX(avg_dividend) FILTER (WHERE year = '2019') AS "2019_dividend",
+        MAX(avg_dividend) FILTER (WHERE year = '2020') AS "2020_dividend",
+        MAX(avg_dividend) FILTER (WHERE year = '2021') AS "2021_dividend",
+        MAX(avg_dividend) FILTER (WHERE year = '2022') AS "2022_dividend",
+        MAX(avg_dividend) FILTER (WHERE year = '2023') AS "2023_dividend",
+        MAX(avg_dividend) FILTER (WHERE year = '2024') AS "2024_dividend",
+        MAX(avg_dividend) FILTER (WHERE year = '2025') AS "2025_dividend",
+        MAX(avg_dividend) FILTER (WHERE year = '2026') AS "2026_dividend"
     FROM filtered_data
     GROUP BY code
 ),
 last_data AS (
-select 
-    -- 💡 1. 10년 후 예상 BPS (장부 가치)
-    ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
-    
-    -- 💡 3. 10년 후 투자 승수 = (미래 예상 주가 / 현재 주가) [0 나누기 방어 추가]
-    ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
-    
-    -- 💡 4. 최종 예상 연평균 복리 수익률 (CAGR)
-    ROUND(
-        (POWER(
-            ((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0),  
-            1.0 / 10.0                                                  
-        ) - 1) * 100, 
-    2) AS expected_cagr,
+    SELECT 
+        -- 💡 [추가] 1년 전 대비 EPS 증가율 계산 (%)
+        -- (현재 EPS - 1년전 EPS) / |1년전 EPS| * 100
+        -- NULLIF 방어코드로 분모가 0일 때의 에러(ZeroDivision) 방지
+        ROUND(((a.eps - p.past_eps) / NULLIF(ABS(p.past_eps), 0)) * 100, 2) AS eps_ratio,
 
-    -- 💡 2. 10년 후 예상 주가 (미래 BPS * 역대 평균 PBR)
-    ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
-    
-    -- 💡 3. 10년 후 투자 승수 = (미래 예상 주가 / 현재 주가) [0 나누기 방어 추가]
-    ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
-    
-    -- 💡 4. 최종 예상 연평균 복리 수익률 (CAGR)
-    ROUND(
-        (POWER(
-            ((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0),  
-            1.0 / 10.0                                                  
-        ) - 1) * 100, 
-    2) AS fep_expected_cagr,
-    
-    * -- USING(code)로 합쳐진 a와 b의 모든 컬럼 (code는 단 1번만 출력됨)
-from stockfdt_pbr_v a join pivot_data b USING (code)
-where a.trade_date = (select max(trade_date) from stockfdt_pbr_v)
-AND a.bps > 0           -- 💡 [방어코드] 자본잠식 기업 에러 방지
-AND a.close_price > 0   -- 💡 [방어코드] 거래정지(0원) 에러 방지
+        -- 💡 1. 10년 후 예상 BPS (장부 가치)
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
+        
+        -- 💡 3. 10년 후 투자 승수 = (미래 예상 주가 / 현재 주가) [0 나누기 방어 추가]
+        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
+        
+        -- 💡 4. 최종 예상 연평균 복리 수익률 (CAGR)
+        ROUND(
+            (POWER(
+                ((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0),  
+                1.0 / 10.0                                                  
+            ) - 1) * 100, 
+        2) AS expected_cagr,
+
+        -- 💡 2. 10년 후 예상 주가 (미래 BPS * 역대 평균 PBR)
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
+        
+        -- 💡 3. 10년 후 투자 승수 = (미래 예상 주가 / 현재 주가)
+        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
+        
+        -- 💡 4. 최종 예상 연평균 복리 수익률 (CAGR)
+        ROUND(
+            (POWER(
+                ((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0),  
+                1.0 / 10.0                                                  
+            ) - 1) * 100, 
+        2) AS fep_expected_cagr,
+        
+        * -- USING(code)로 합쳐진 a, b, p의 모든 컬럼 (code는 단 1번만 출력됨)
+    FROM stockfdt_pbr_v a 
+    JOIN pivot_data b USING (code)
+    LEFT JOIN past_eps_cte p USING (code)  -- 💡 [추가] 1년 전 EPS 데이터 조인
+    CROSS JOIN max_date_cte
+    WHERE a.trade_date = max_date_cte.max_date
+    AND a.bps > 0           
+    AND a.close_price > 0   
 )
-select  c.trade_div, c.trade_status, c.trade_expected_cagr, c.trade_dividend, remark,
+SELECT  c.trade_div, c.trade_status, c.trade_expected_cagr, c.trade_dividend, remark,
         (b.trade_value::numeric / 100000000)::int AS trade_value_uk,
         (b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
         b.sector,
-        a.*
-from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code and (a.expected_cagr >= 8.0 or a.fep_expected_cagr >= 10) 
-full outer join (select * from mytrade where trade_status = 1) c on b.code = c.code
-where b.market_cap > 100000000000
-order by a.expected_cagr desc;
+        a.* -- 이 자리에 기존 eps 컬럼과 함께 앞에서 정의한 eps_ratio가 포함되어 출력됩니다.
+FROM last_data a 
+JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code AND (a.expected_cagr >= 8.0 OR a.fep_expected_cagr >= 10)   -- 2. 저평가 종목 
+FULL OUTER JOIN (SELECT * FROM mytrade WHERE trade_status = 1) c ON b.code = c.code
+WHERE b.market_cap > 50000000000   -- 3. 시총이 너무 작은 종목 제외
+    and a.eps_ratio > a.per   -- 4. 성장성 저평가 종목
+    AND a.eps_ratio < 100            -- 💡 [방어코드 추가] 1년 만에 이익이 100% 이상 폭증한 것은 일회성 기저효과일 확률이 높으므로 제외
+    AND a.per > 0                    -- 💡 [방어코드 추가] 적자 기업(PER N/A 처리 등) 방지
+ORDER BY a.expected_cagr DESC;
 EEOFF
 
 
@@ -336,7 +360,7 @@ filtered_data AS (
         ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, -- 💡 [추가] 다음 단계로 전달
         ROUND(avg_roe, 2) AS avg_roe
     FROM find_min_roe
-    WHERE min_roe_ever >= 5
+    --WHERE min_roe_ever >= 5
       --AND has_null_roe = false
 ),
 pivot_data AS (
@@ -403,9 +427,15 @@ select  --c.trade_status, c.trade_expected_cagr, c.trade_dividend, remark,
         --b.sector,
         --a.*
         a.code,'bond1','1',a.expected_cagr,a. dividend_yield,a.name || ': ' || a.close_price
-from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code and a.expected_cagr >= 8.0
+from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code
 full outer join (select * from mytrade where trade_div = 'bond1') c on b.code = c.code
-where a.code in ('009900')
+where a.code in (
+'036670' 
+,'263690' 
+,'004590'
+,''
+,''
+)
 order by a.expected_cagr desc;
 EEOFF
 
@@ -448,7 +478,7 @@ filtered_data AS (
         ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, -- 💡 [추가] 다음 단계로 전달
         ROUND(avg_roe, 2) AS avg_roe
     FROM find_min_roe
-    WHERE min_roe_ever >= 5
+    --WHERE min_roe_ever >= 5
       --AND has_null_roe = false
 ),
 pivot_data AS (
@@ -519,9 +549,15 @@ SELECT
     --b.sector,
     --a.*
     a.code,'bond2','1',a.expected_cagr,a. dividend_yield,a.name || ': ' || a.close_price
-from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code and a.expected_cagr >= 8.0
+from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code --and a.expected_cagr >= 8.0
 full outer join (select * from mytrade where trade_div = 'bond2') c on b.code = c.code
-where a.code in ('049720','092130','092730','067280','030190','030000')
+where a.code in (
+'130580' 
+,'036800' 
+,'192080' 
+,''
+,''
+)
 ORDER BY a.expected_cagr DESC;
 EEOFF
 
