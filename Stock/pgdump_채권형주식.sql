@@ -278,9 +278,10 @@ SELECT  c.trade_div, c.trade_status, c.trade_expected_cagr, c.trade_dividend, re
 FROM last_data a 
 JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code AND (a.expected_cagr >= 8.0 OR a.fep_expected_cagr >= 10)   -- 2. 저평가 종목 
 FULL OUTER JOIN (SELECT * FROM mytrade WHERE trade_status = 1) c ON b.code = c.code
-WHERE b.market_cap > 50000000000   -- 3. 시총이 너무 작은 종목 제외
-    and a.eps_ratio > a.per   -- 4. 성장성 저평가 종목
-    AND a.eps_ratio < 100            -- 💡 [방어코드 추가] 1년 만에 이익이 100% 이상 폭증한 것은 일회성 기저효과일 확률이 높으므로 제외
+WHERE b.market_cap > 30000000000   -- 3. 소형주도 대상에 포함
+    and b.trade_value > 50000000   -- 4. 소형주라도 최소 거래량 충족해야 함
+    and a.eps_ratio > a.per   -- 5. 성장성 저평가 종목
+    --AND a.eps_ratio < 100            -- 💡 [방어코드 추가] 1년 만에 이익이 100% 이상 폭증한 것은 일회성 기저효과일 확률이 높으므로 제외
     AND a.per > 0                    -- 💡 [방어코드 추가] 적자 기업(PER N/A 처리 등) 방지
 ORDER BY a.expected_cagr DESC;
 EEOFF
@@ -552,9 +553,9 @@ SELECT
 from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code --and a.expected_cagr >= 8.0
 full outer join (select * from mytrade where trade_div = 'bond2') c on b.code = c.code
 where a.code in (
-'130580' 
-,'036800' 
-,'192080' 
+'214180' 
+,'148150' 
+,'234080' 
 ,''
 ,''
 )
