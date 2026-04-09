@@ -279,7 +279,7 @@ FROM last_data a
 JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code AND (a.expected_cagr >= 8.0 OR a.fep_expected_cagr >= 10)   -- 2. 저평가 종목 
 FULL OUTER JOIN (SELECT * FROM mytrade WHERE trade_status = 1) c ON b.code = c.code
 WHERE b.market_cap > 30000000000   -- 3. 소형주도 대상에 포함
-    and b.trade_value > 50000000   -- 4. 소형주라도 최소 거래량 충족해야 함
+    and b.trade_value > 100000000   -- 4. 소형주라도 최소 거래량 충족해야 함
     and a.eps_ratio > a.per   -- 5. 성장성 저평가 종목
     --AND a.eps_ratio < 100            -- 💡 [방어코드 추가] 1년 만에 이익이 100% 이상 폭증한 것은 일회성 기저효과일 확률이 높으므로 제외
     AND a.per > 0                    -- 💡 [방어코드 추가] 적자 기업(PER N/A 처리 등) 방지
