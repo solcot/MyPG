@@ -1483,9 +1483,16 @@ try:
         while True:
             t_now = datetime.now()
 
-            can_buy_flag = can_additional_buy()
-            #if not can_buy_flag:
-            #    time.sleep(300)            
+            # ✨ 수정된 로직: 설정된 t_9 (예: 9시 정각) 이전에는 API 조회를 생략
+            if t_now < t_9:
+                can_buy_flag = False  # 장 시작 전에는 매수 불가 상태로 유지
+            else:
+                try:
+                    can_buy_flag = can_additional_buy()
+                except Exception as e:
+                    # 500 에러 등 통신 장애 발생 시 10초 대기 후 다음 루프로 넘김
+                    time.sleep(10) 
+                    continue          
 
             # 10분마다 heartbeat 출력
             if (t_now - last_heartbeat).total_seconds() >= 600:
