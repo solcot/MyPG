@@ -17,6 +17,14 @@ CREATE VIEW public.stockfdt_pbr_v AS
    FROM stockfdt;
 "
 
+"
+CREATE TABLE public.stock_debt (
+    code character varying(20) NOT NULL primary key,
+    name character varying(100),
+    net_debt numeric(15,2),
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+"
 
 "
 drop table mytrade;
