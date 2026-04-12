@@ -454,11 +454,11 @@ select  --c.trade_status, c.trade_expected_cagr, c.trade_dividend, remark,
 from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code
 full outer join (select * from mytrade where trade_div = 'bond1') c on b.code = c.code
 where a.code in (
-'069510' 
-,'' 
-,''
-,''
-,''
+'003800' 
+,'012790' 
+,'002810'
+,'023910'
+,'004590'
 )
 order by a.expected_cagr desc;
 EEOFF
@@ -576,11 +576,12 @@ SELECT
 from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code --and a.expected_cagr >= 8.0
 full outer join (select * from mytrade where trade_div = 'bond2') c on b.code = c.code
 where a.code in (
-'214180' 
-,'148150' 
-,'234080' 
-,''
-,''
+'337930' 
+,'376180' 
+,'036800' 
+,'108320'
+,'049720'
+,'030000'
 )
 ORDER BY a.expected_cagr DESC;
 EEOFF
