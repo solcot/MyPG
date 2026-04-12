@@ -112,7 +112,14 @@ from basic_number a
 
 
 
-
+#-- 1. 꾸준히 수익 창출하는 기업
+#-- 2. 저평가 종목 
+#-- 3. 소형주도 대상에 포함
+#-- 4. 소형주라도 최소 거래량 충족해야 함
+#-- 5. 성장성 저평가 종목
+#-- 6. 순부채가 없는 종목 
+#-- 7. 순자산이 계속적으로 증가하는 기업
+#-- 8. 최소 배당 조건 만족 
 cat > bond_1_2.sql <<'EEOFF'
 WITH max_date_cte AS (
     -- 💡 [추가] 쿼리 수행일 기준 가장 최신(현재) 날짜를 한 번만 추출하여 성능 최적화
@@ -170,7 +177,7 @@ filtered_data AS (
         (avg_market_cap/10000000000)::bigint AS avg_market_cap_bakuk,
         round(avg_dividend, 2) as avg_dividend
     FROM find_min_roe
-    WHERE min_roe_ever >= 5   -- 1. 꾸준히 수익 창출하는 기업
+    WHERE min_roe_ever >= 5.0   -- 1. 꾸준히 수익 창출하는 기업
       --AND has_null_roe = false
 ),
 pivot_data AS (
@@ -181,48 +188,50 @@ pivot_data AS (
         MAX(avg_roe_ever) AS avg_roe_ever,
         MAX(max_roe_ever) AS max_roe_ever,
         MAX(hist_avg_pbr) AS hist_avg_pbr,
-        -- [ROE 피벗 생략 없이 그대로 유지]
-        MAX(avg_roe) FILTER (WHERE year = '2016') AS "2016",
-        MAX(avg_roe) FILTER (WHERE year = '2017') AS "2017",
-        MAX(avg_roe) FILTER (WHERE year = '2018') AS "2018",
-        MAX(avg_roe) FILTER (WHERE year = '2019') AS "2019",
-        MAX(avg_roe) FILTER (WHERE year = '2020') AS "2020",
-        MAX(avg_roe) FILTER (WHERE year = '2021') AS "2021",
-        MAX(avg_roe) FILTER (WHERE year = '2022') AS "2022",
-        MAX(avg_roe) FILTER (WHERE year = '2023') AS "2023",
-        MAX(avg_roe) FILTER (WHERE year = '2024') AS "2024",
-        MAX(avg_roe) FILTER (WHERE year = '2025') AS "2025",
-        MAX(avg_roe) FILTER (WHERE year = '2026') AS "2026",
+
+-- [ROE 피벗]
+        MAX(avg_roe) FILTER (WHERE year = '2016') AS aaa_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2017') AS bbb_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2018') AS ccc_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2019') AS ddd_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2020') AS eee_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2021') AS fff_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2022') AS ggg_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2023') AS hhh_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2024') AS iii_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2025') AS jjj_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2026') AS kkk_roe,
         
         '***' AS ddiivv,
         
         -- [Market Cap 피벗]
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2016') AS "2016_purecap",
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2017') AS "2017_purecap",
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2018') AS "2018_purecap",
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2019') AS "2019_purecap",
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2020') AS "2020_purecap",
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2021') AS "2021_purecap",
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2022') AS "2022_purecap",
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2023') AS "2023_purecap",
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2024') AS "2024_purecap",
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2025') AS "2025_purecap",
-        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2026') AS "2026_purecap",
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2016') AS aaa_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2017') AS bbb_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2018') AS ccc_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2019') AS ddd_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2020') AS eee_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2021') AS fff_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2022') AS ggg_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2023') AS hhh_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2024') AS iii_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2025') AS jjj_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2026') AS kkk_pcap_bakuk,
         
         '***' AS dddiiivvv,
         
         -- [dividend 피벗]
-        MAX(avg_dividend) FILTER (WHERE year = '2016') AS "2016_dividend",
-        MAX(avg_dividend) FILTER (WHERE year = '2017') AS "2017_dividend",
-        MAX(avg_dividend) FILTER (WHERE year = '2018') AS "2018_dividend",
-        MAX(avg_dividend) FILTER (WHERE year = '2019') AS "2019_dividend",
-        MAX(avg_dividend) FILTER (WHERE year = '2020') AS "2020_dividend",
-        MAX(avg_dividend) FILTER (WHERE year = '2021') AS "2021_dividend",
-        MAX(avg_dividend) FILTER (WHERE year = '2022') AS "2022_dividend",
-        MAX(avg_dividend) FILTER (WHERE year = '2023') AS "2023_dividend",
-        MAX(avg_dividend) FILTER (WHERE year = '2024') AS "2024_dividend",
-        MAX(avg_dividend) FILTER (WHERE year = '2025') AS "2025_dividend",
-        MAX(avg_dividend) FILTER (WHERE year = '2026') AS "2026_dividend"
+        MAX(avg_dividend) FILTER (WHERE year = '2016') AS aaa_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2017') AS bbb_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2018') AS ccc_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2019') AS ddd_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2020') AS eee_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2021') AS fff_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2022') AS ggg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2023') AS hhh_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2024') AS iii_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2025') AS jjj_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2026') AS kkk_dividend
+        
     FROM filtered_data
     GROUP BY code
 ),
@@ -274,13 +283,19 @@ SELECT  c.trade_div, c.trade_status, c.trade_expected_cagr, c.trade_dividend, re
         (b.trade_value::numeric / 100000000)::int AS trade_value_uk,
         (b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
         b.sector,
+        z.net_debt,
         a.* -- 이 자리에 기존 eps 컬럼과 함께 앞에서 정의한 eps_ratio가 포함되어 출력됩니다.
 FROM last_data a 
-JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code AND (a.expected_cagr >= 8.0 OR a.fep_expected_cagr >= 10)   -- 2. 저평가 종목 
+JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code 
+    AND ((a.expected_cagr >= 12.0 and a.fep_expected_cagr >= 10) OR (a.expected_cagr >= 8.0 and a.fep_expected_cagr >= 15))   -- 2. 저평가 종목 
+join stock_debt z on a.code = z.code
 FULL OUTER JOIN (SELECT * FROM mytrade WHERE trade_status = 1) c ON b.code = c.code
 WHERE b.market_cap > 30000000000   -- 3. 소형주도 대상에 포함
     and b.trade_value > 100000000   -- 4. 소형주라도 최소 거래량 충족해야 함
     and a.eps_ratio > a.per   -- 5. 성장성 저평가 종목
+    and (z.net_debt < 0.0 or z.net_debt = 'NaN')   -- 6. 순부채가 없는 종목 
+    AND ggg_pcap_bakuk <= iii_pcap_bakuk and iii_pcap_bakuk <= kkk_pcap_bakuk    -- 7. 순자산이 증가하는 기업
+    and a.dividend_yield >= 3.0   -- 8. 최소 배당 조건 만족 
     --AND a.eps_ratio < 100            -- 💡 [방어코드 추가] 1년 만에 이익이 100% 이상 폭증한 것은 일회성 기저효과일 확률이 높으므로 제외
     AND a.per > 0                    -- 💡 [방어코드 추가] 적자 기업(PER N/A 처리 등) 방지
 ORDER BY a.expected_cagr DESC;
@@ -431,9 +446,9 @@ select  --c.trade_status, c.trade_expected_cagr, c.trade_dividend, remark,
 from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code
 full outer join (select * from mytrade where trade_div = 'bond1') c on b.code = c.code
 where a.code in (
-'036670' 
-,'263690' 
-,'004590'
+'069510' 
+,'' 
+,''
 ,''
 ,''
 )
