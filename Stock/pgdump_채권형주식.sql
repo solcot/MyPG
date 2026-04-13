@@ -185,7 +185,7 @@ filtered_data AS (
         (avg_market_cap/10000000000)::bigint AS avg_market_cap_bakuk,
         round(avg_dividend, 2) as avg_dividend
     FROM find_min_roe
-    WHERE min_roe_ever >= 5.0   -- 1. 꾸준히 수익 창출하는 기업
+    WHERE min_roe_ever >= 5.0 and avg_roe_ever >= 8.0   -- 1. 꾸준히 수익 창출하는 기업
       --AND has_null_roe = false
 ),
 pivot_data AS (
@@ -527,8 +527,13 @@ SELECT  a.trade_date,a.code,a.name
    ,a.min_roe_ever
    ,a.avg_roe_ever
    ,a.max_roe_ever
+   ,z.net_debt
+   ,(y.trade_value::numeric / 10000000)::int AS trade_value_chun
+   ,(y.market_cap::numeric / 10000000000)::int AS market_cap_bakuk
 FROM last_data a join mytrade b on a.code = b.code
-where trade_status = 1
+join stock_debt z on a.code = z.code
+join stockmain y on a.trade_date = y.trade_date and a.code = y.code
+where b.trade_status = 1
 order by b.trade_div,a.code
 EEOFF
 
