@@ -119,7 +119,6 @@ from basic_number a
 
 
 
-
 #-- 1. 꾸준히 수익 창출하는 기업
 #-- 2. 저평가 종목 
 #-- 3. 소형주도 대상에 포함
@@ -648,8 +647,8 @@ select  --c.trade_status, c.trade_expected_cagr, c.trade_dividend, remark,
 from last_data a join stockmain b on a.trade_date = b.trade_date and a.code = b.code
 full outer join (select * from mytrade where trade_div = 'bond1') c on b.code = c.code
 where a.code in (
-'023590' 
-,'' 
+'036670' 
+,'036190' 
 ,''
 ,''
 ,''
