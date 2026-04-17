@@ -35,6 +35,8 @@ trade_div varchar(10),
 trade_status smallint,
 trade_expected_cagr numeric(10,2),
 trade_dividend numeric(10,2)
+,trade_per numeric(10,2)
+,trade_eps_ratio numeric(10,2)
 ,trade_roe numeric(10,2)
 ,trade_min_roe_ever numeric(10,2)
 ,trade_pbr numeric(10,2)
@@ -291,8 +293,8 @@ last_data AS (
     AND a.bps > 0           
     AND a.close_price > 0   
 )
-SELECT  (b.trade_value::numeric / 100000000)::int AS trade_value_uk,
-        (b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
+SELECT  (b.trade_value::numeric / 10000000)::int AS trade_value_chunman,
+        (b.market_cap::numeric / 10000000000)::int AS market_cap_bakuk,      
         b.sector,
         z.net_debt,
         a.* -- 이 자리에 기존 eps 컬럼과 함께 앞에서 정의한 eps_ratio가 포함되어 출력됩니다.
@@ -511,13 +513,15 @@ SELECT  a.trade_date,a.code,a.name
    ,b.trade_div
    ,trade_expected_cagr
    ,trade_dividend
+   ,trade_per
+   ,trade_eps_ratio
    ,trade_roe
    ,trade_min_roe_ever
    ,trade_pbr
    ,trade_hist_avg_pbr
    ,trade_close_price
-   ,trade_name
    ,remark
+   ,((1- y.close_price / b.trade_close_price) * 100)::numeric(10,2) first_profit_ratio
    ,':::' div
    ,case when b.trade_div = 'bond1' then a.expected_cagr - trade_expected_cagr end bond1_diff
    ,case when b.trade_div = 'bond1' then a.expected_cagr - 10 end bond1_sell
@@ -542,7 +546,7 @@ SELECT  a.trade_date,a.code,a.name
    ,a.max_roe_ever
    ,a.hist_avg_pbr
    ,z.net_debt
-   ,(y.trade_value::numeric / 10000000)::int AS trade_value_chun
+   ,(y.trade_value::numeric / 10000000)::int AS trade_value_chunman
    ,(y.market_cap::numeric / 10000000000)::int AS market_cap_bakuk
 FROM last_data a join mytrade b on a.code = b.code
 join stock_debt z on a.code = z.code
@@ -557,16 +561,33 @@ EEOFF
 
 cat > bond_insert.sql <<'EEOFF'
 insert into mytrade
-WITH calc_yearly_data AS (
-    -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
+WITH max_date_cte AS (
+    -- 💡 [추가] 쿼리 수행일 기준 가장 최신(현재) 날짜를 한 번만 추출하여 성능 최적화
+    SELECT MAX(trade_date) AS max_date FROM stockfdt_pbr_v
+),
+past_eps_cte AS (
+    -- 💡 [추가] 1년 전 기준 앞뒤 3일(총 1주일) 동안의 평균 EPS 계산 (휴장일 및 데이터 누락 방어)
     SELECT 
         code,
-        to_char(trade_date, 'YYYY') AS year,
-        AVG(roe) AS avg_roe,
-        AVG(pbr) AS avg_pbr  -- 💡 [추가] 과거 시장 평가(권리금)를 추적하기 위한 PBR 평균
+        AVG(eps) AS past_eps
     FROM stockfdt_pbr_v
-    WHERE trade_date >= '20160101'
-    GROUP BY code, to_char(trade_date, 'YYYY')
+    CROSS JOIN max_date_cte
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days' 
+                         AND max_date - INTERVAL '1 year' + INTERVAL '3 days'
+    GROUP BY code
+),
+calc_yearly_data AS (
+    -- 1단계: 종목(code)별, 3개월 단위 평균 ROE 및 평균 PBR 계산
+    SELECT 
+        a.code,
+        to_char(a.trade_date, 'YYYY') AS year,
+        AVG(a.roe) AS avg_roe,
+        AVG(a.pbr) AS avg_pbr,  
+        avg(b.market_cap/a.pbr)::bigint AS avg_market_cap,
+        avg(a.dividend_yield) as avg_dividend
+    FROM stockfdt_pbr_v a join stockmain b on a.trade_date = b.trade_date and a.code = b.code
+    WHERE a.trade_date >= '20160101'
+    GROUP BY a.code, to_char(a.trade_date, 'YYYY')
 ),
 find_min_roe AS (
     -- 2단계: 최악의 ROE 찾기 및 NULL 빵꾸 이력 추적
@@ -574,11 +595,13 @@ find_min_roe AS (
         code,
         year,
         avg_roe,
+        avg_market_cap,
+        avg_dividend,
         MIN(avg_roe) OVER (PARTITION BY code) AS min_roe_ever,
         AVG(avg_roe) OVER (PARTITION BY code) AS avg_roe_ever,
         MAX(avg_roe) OVER (PARTITION BY code) AS max_roe_ever,
         BOOL_OR(avg_roe IS NULL) OVER (PARTITION BY code) AS has_null_roe,
-        AVG(avg_pbr) OVER (PARTITION BY code) AS hist_avg_pbr -- 💡 [추가] 10년 평균 PBR 산출
+        AVG(avg_pbr) OVER (PARTITION BY code) AS hist_avg_pbr
     FROM calc_yearly_data
 ),
 filtered_data AS (
@@ -589,9 +612,13 @@ filtered_data AS (
         ROUND(min_roe_ever, 2) AS min_roe_ever,
         ROUND(avg_roe_ever, 2) AS avg_roe_ever,
         ROUND(max_roe_ever, 2) AS max_roe_ever,
-        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, -- 💡 [추가] 다음 단계로 전달
-        ROUND(avg_roe, 2) AS avg_roe
+        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, 
+        ROUND(avg_roe, 2) AS avg_roe,
+        (avg_market_cap/10000000000)::bigint AS avg_market_cap_bakuk,
+        round(avg_dividend, 2) as avg_dividend
     FROM find_min_roe
+    WHERE min_roe_ever >= 5.0 and avg_roe_ever >= 8.0   -- 1. 꾸준히 수익 창출하는 기업
+      --AND has_null_roe = false
 ),
 pivot_data AS (
     -- 4단계: 2015-1Q부터 2026-1Q까지 45분기 절대 시간 피벗 전개!
@@ -600,35 +627,59 @@ pivot_data AS (
         MAX(min_roe_ever) AS min_roe_ever,
         MAX(avg_roe_ever) AS avg_roe_ever,
         MAX(max_roe_ever) AS max_roe_ever,
-        MAX(hist_avg_pbr) AS hist_avg_pbr, -- 💡 [추가] 최종 계산을 위해 메인 쿼리로 전달
-        -- [2016년]
-        MAX(avg_roe) FILTER (WHERE year = '2016') AS "2016",
-        -- [2017년]
-        MAX(avg_roe) FILTER (WHERE year = '2017') AS "2017",
-        -- [2018년]
-        MAX(avg_roe) FILTER (WHERE year = '2018') AS "2018",
-        -- [2019년]
-        MAX(avg_roe) FILTER (WHERE year = '2019') AS "2019",
-        -- [2020년]
-        MAX(avg_roe) FILTER (WHERE year = '2020') AS "2020",
-        -- [2021년]
-        MAX(avg_roe) FILTER (WHERE year = '2021') AS "2021",
-        -- [2022년]
-        MAX(avg_roe) FILTER (WHERE year = '2022') AS "2022",
-        -- [2023년]
-        MAX(avg_roe) FILTER (WHERE year = '2023') AS "2023",
-        -- [2024년]
-        MAX(avg_roe) FILTER (WHERE year = '2024') AS "2024",
-        -- [2025년]
-        MAX(avg_roe) FILTER (WHERE year = '2025') AS "2025",
-        -- [2026년]
-        MAX(avg_roe) FILTER (WHERE year = '2026') AS "2026"
+        MAX(hist_avg_pbr) AS hist_avg_pbr,
+
+-- [ROE 피벗]
+        MAX(avg_roe) FILTER (WHERE year = '2016') AS aaa_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2017') AS bbb_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2018') AS ccc_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2019') AS ddd_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2020') AS eee_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2021') AS fff_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2022') AS ggg_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2023') AS hhh_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2024') AS iii_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2025') AS jjj_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2026') AS kkk_roe,
+        
+        '***' AS ddiivv,
+        
+        -- [Market Cap 피벗]
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2016') AS aaa_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2017') AS bbb_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2018') AS ccc_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2019') AS ddd_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2020') AS eee_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2021') AS fff_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2022') AS ggg_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2023') AS hhh_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2024') AS iii_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2025') AS jjj_pcap_bakuk,
+        MAX(avg_market_cap_bakuk) FILTER (WHERE year = '2026') AS kkk_pcap_bakuk,
+        
+        '***' AS dddiiivvv,
+        
+        -- [dividend 피벗]
+        MAX(avg_dividend) FILTER (WHERE year = '2016') AS aaa_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2017') AS bbb_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2018') AS ccc_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2019') AS ddd_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2020') AS eee_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2021') AS fff_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2022') AS ggg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2023') AS hhh_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2024') AS iii_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2025') AS jjj_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2026') AS kkk_dividend
+        
     FROM filtered_data
     GROUP BY code
 ),
 last_data AS (
 select 
-    -- 💡 4. 최종 예상 연평균 복리 수익률 (CAGR)
+    -- 1년간 eps 상승률
+    ROUND(((a.eps - p.past_eps) / NULLIF(ABS(p.past_eps), 0)) * 100, 2) AS eps_ratio,
+    -- 최종 예상 연평균 복리 수익률 (CAGR)
     ROUND(
         (POWER(
             ((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0),  
@@ -642,10 +693,14 @@ select
         ) - 1) * 100, 
     2) AS fep_expected_cagr,    
     * -- USING(code)로 합쳐진 a와 b의 모든 컬럼 (code는 단 1번만 출력됨)
-from stockfdt_pbr_v a join pivot_data b USING (code)
-where a.trade_date = (select max(trade_date) from stockfdt_pbr_v)
+FROM stockfdt_pbr_v a 
+JOIN pivot_data b USING (code)
+LEFT JOIN past_eps_cte p USING (code)  -- 💡 [추가] 1년 전 EPS 데이터 조인
+CROSS JOIN max_date_cte
+WHERE a.trade_date = max_date_cte.max_date
+AND a.bps > 0           
+AND a.close_price > 0  
 )
---insert_data as (
 select  a.code,
         CASE 
             WHEN a.expected_cagr >= 15.0 THEN 'bond1' 
@@ -659,6 +714,8 @@ select  a.code,
             WHEN a.expected_cagr >= 12.0 THEN a.expected_cagr
         END,
         a.dividend_yield,
+        a.per,
+        a.eps_ratio,
         a.roe,
         a.min_roe_ever,
         a.pbr,
