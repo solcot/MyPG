@@ -331,7 +331,8 @@ def get_current_price(code="005930"):
         "fid_input_iscd": code,
     }
 
-    time.sleep(0.05)
+    #time.sleep(0.05)
+    time.sleep(1)
     for i in range(3):  # 최대 3회 재시도
         try:
             res = requests.get(URL, headers=headers, params=params, timeout=5)
