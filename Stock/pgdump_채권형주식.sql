@@ -34,8 +34,14 @@ code varchar(20) not null,
 trade_div varchar(10),
 trade_status smallint,
 trade_expected_cagr numeric(10,2),
-trade_dividend numeric(10,2),
-remark varchar(100),
+trade_dividend numeric(10,2)
+,trade_roe numeric(10,2)
+,trade_min_roe_ever numeric(10,2)
+,trade_pbr numeric(10,2)
+,trade_hist_avg_pbr numeric(10,2)
+,trade_close_price integer
+,trade_name varchar(100)
+,remark varchar(100),
 created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -45,7 +51,6 @@ ALTER TABLE ONLY mytrade
 COMMENT ON COLUMN public.mytrade.trade_div IS 'bond1:bpb_1, bond2:bpr_avg';
 COMMENT ON COLUMN public.mytrade.trade_status IS '0:예정, 1:매수, 2:매도';
 "
-
 
 
 
@@ -286,8 +291,7 @@ last_data AS (
     AND a.bps > 0           
     AND a.close_price > 0   
 )
-SELECT  c.trade_div, c.trade_status, c.trade_expected_cagr, c.trade_dividend, remark,
-        (b.trade_value::numeric / 100000000)::int AS trade_value_uk,
+SELECT  (b.trade_value::numeric / 100000000)::int AS trade_value_uk,
         (b.market_cap::numeric / 100000000000)::int AS market_cap_chunuk,
         b.sector,
         z.net_debt,
@@ -296,15 +300,15 @@ FROM last_data a
 JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code 
     AND ((a.expected_cagr >= 12.0 and a.fep_expected_cagr >= 10) OR (a.expected_cagr >= 8.0 and a.fep_expected_cagr >= 15))   -- 2. 저평가 종목 
 join stock_debt z on a.code = z.code
-FULL OUTER JOIN (SELECT * FROM mytrade WHERE trade_status = 1) c ON b.code = c.code
 WHERE b.market_cap > 30000000000   -- 3. 소형주도 대상에 포함
     and b.trade_value > 100000000   -- 4. 소형주라도 최소 거래량 충족해야 함
     and a.eps_ratio > a.per   -- 5. 성장성 저평가 종목
     and (z.net_debt < 0.0 or z.net_debt = 'NaN')   -- 6. 순부채가 없는 종목 
     AND ggg_pcap_bakuk <= iii_pcap_bakuk and iii_pcap_bakuk <= kkk_pcap_bakuk    -- 7. 순자산이 증가하는 기업
     and a.dividend_yield >= 3.0   -- 8. 최소 배당 조건 만족 
-    --AND a.eps_ratio < 100            -- 💡 [방어코드 추가] 1년 만에 이익이 100% 이상 폭증한 것은 일회성 기저효과일 확률이 높으므로 제외
-    AND a.per > 0                    -- 💡 [방어코드 추가] 적자 기업(PER N/A 처리 등) 방지
+    --AND a.eps_ratio < 100            -- [방어코드 추가] 1년 만에 이익이 100% 이상 폭증한 것은 일회성 기저효과일 확률이 높으므로 제외
+    AND a.per > 0                    -- [방어코드 추가] 적자 기업(PER N/A 처리 등) 방지
+    and a.code not in (SELECT code FROM mytrade WHERE trade_status = 1) -- 이미 매수한 종목 제외
 ORDER BY a.expected_cagr DESC;
 EEOFF
 
@@ -507,6 +511,12 @@ SELECT  a.trade_date,a.code,a.name
    ,b.trade_div
    ,trade_expected_cagr
    ,trade_dividend
+   ,trade_roe
+   ,trade_min_roe_ever
+   ,trade_pbr
+   ,trade_hist_avg_pbr
+   ,trade_close_price
+   ,trade_name
    ,remark
    ,':::' div
    ,case when b.trade_div = 'bond1' then a.expected_cagr - trade_expected_cagr end bond1_diff
@@ -530,6 +540,7 @@ SELECT  a.trade_date,a.code,a.name
    ,a.min_roe_ever
    ,a.avg_roe_ever
    ,a.max_roe_ever
+   ,a.hist_avg_pbr
    ,z.net_debt
    ,(y.trade_value::numeric / 10000000)::int AS trade_value_chun
    ,(y.market_cap::numeric / 10000000000)::int AS market_cap_bakuk
@@ -648,14 +659,24 @@ select  a.code,
             WHEN a.expected_cagr >= 12.0 THEN a.expected_cagr
         END,
         a.dividend_yield,
-        a.name || ': ' || a.close_price
+        a.roe,
+        a.min_roe_ever,
+        a.pbr,
+        a.hist_avg_pbr,
+        a.close_price,
+        a.name,
+        ' ' remark,
+        current_timestamp
 from last_data a
 where a.code in (
-'130580' 
-,'' 
-,'' 
-,''
-,''
+'023910' 
+,'004590' 
+,'002810' 
+,'108320' 
+,'049720' 
+,'337930' 
+,'376180' 
+,'030000' 
 )
 EEOFF
 
