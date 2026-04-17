@@ -256,7 +256,7 @@ last_data AS (
         -- NULLIF 방어코드로 분모가 0일 때의 에러(ZeroDivision) 방지
         ROUND(((a.eps - p.past_eps) / NULLIF(ABS(p.past_eps), 0)) * 100, 2) AS eps_ratio,
 
-        -- 💡 1. 10년 후 예상 BPS (장부 가치)
+        -- 💡 1. 현재 bps 기준 10년 후 예상 BPS (장부 가치)
         ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
         
         -- 💡 3. 10년 후 투자 승수 = (미래 예상 주가 / 현재 주가) [0 나누기 방어 추가]
@@ -270,7 +270,7 @@ last_data AS (
             ) - 1) * 100, 
         2) AS expected_cagr,
 
-        -- 💡 2. 10년 후 예상 주가 (미래 BPS * 역대 평균 PBR)
+        -- 💡 2. 현재 bps 기준 10년 후 예상 주가 (미래 BPS * 역대 평균 PBR)
         ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
         
         -- 💡 3. 10년 후 투자 승수 = (미래 예상 주가 / 현재 주가)
