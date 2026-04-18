@@ -617,7 +617,7 @@ filtered_data AS (
         (avg_market_cap/10000000000)::bigint AS avg_market_cap_bakuk,
         round(avg_dividend, 2) as avg_dividend
     FROM find_min_roe
-    WHERE min_roe_ever >= 5.0 and avg_roe_ever >= 8.0   -- 1. 꾸준히 수익 창출하는 기업
+    --WHERE min_roe_ever >= 5.0 and avg_roe_ever >= 8.0   -- 1. 꾸준히 수익 창출하는 기업
       --AND has_null_roe = false
 ),
 pivot_data AS (
