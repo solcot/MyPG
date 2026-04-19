@@ -101,7 +101,7 @@ def get_wisereport_recent_net_debt(driver, stock_code):
                     return None
                     
                 try:
-                    return float(val_val) if 'val_val' in locals() else float(val_str) # 안전 변환
+                    return float(val_str)
                 except ValueError:
                     return None
                     
