@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict p5t3ZMZrWysY6imkm8J2OCF9EIzh9Rnk2sHfavLsdxnyIePIUEOZcHdbpHKgTcg
+\restrict H7qGYqKsxn413YnolylC85h3vRIcoTr6xamBUCHV62pfzXC9appudPpv9i45QaD
 
 -- Dumped from database version 13.23
 -- Dumped by pg_dump version 13.23
@@ -5267,6 +5267,26 @@ COMMENT ON COLUMN public.mytrade.trade_status IS '0:예정, 1:매수, 2:매도';
 
 
 --
+-- Name: mytradeus; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.mytradeus (
+    code character varying(20) NOT NULL,
+    trade_status smallint,
+    trade_dividend numeric(10,2),
+    trade_per numeric(10,2),
+    trade_roe numeric(10,2),
+    trade_pbr numeric(10,2),
+    trade_close_price numeric(15,2),
+    trade_name character varying(100),
+    remark character varying(100),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+ALTER TABLE public.mytradeus OWNER TO postgres;
+
+--
 -- Name: stock_debt; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -5354,159 +5374,6 @@ CREATE TABLE public.stock_ma (
 
 
 ALTER TABLE public.stock_ma OWNER TO postgres;
-
---
--- Name: stock_ma_v10; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.stock_ma_v10 (
-    trade_date date NOT NULL,
-    code character varying(20) NOT NULL,
-    ma5 numeric(15,2),
-    ma10 numeric(15,2),
-    ma20 numeric(15,2),
-    ma40 numeric(15,2),
-    ma60 numeric(15,2),
-    ma90 numeric(15,2),
-    ma120 numeric(15,2),
-    created_at timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.stock_ma_v10 OWNER TO postgres;
-
---
--- Name: stocketf; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.stocketf (
-    trade_date date NOT NULL,
-    code character varying(20) NOT NULL,
-    name character varying(100),
-    close_price numeric(15,2),
-    change_price numeric(15,2),
-    change_rate numeric(7,4),
-    open_price numeric(15,2),
-    high_price numeric(15,2),
-    low_price numeric(15,2),
-    volume bigint,
-    trade_value bigint,
-    created_at timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.stocketf OWNER TO postgres;
-
---
--- Name: TABLE stocketf; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON TABLE public.stocketf IS '일별 ETF(상장지수펀드) 시세 데이터 테이블';
-
-
---
--- Name: COLUMN stocketf.trade_date; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.stocketf.trade_date IS '거래일 (YYYY-MM-DD 형식)';
-
-
---
--- Name: COLUMN stocketf.code; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.stocketf.code IS 'ETF 종목 코드 (KRX 기준)';
-
-
---
--- Name: COLUMN stocketf.name; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.stocketf.name IS 'ETF 명칭 (예: KODEX 200, TIGER 미국나스닥100 등)';
-
-
---
--- Name: COLUMN stocketf.close_price; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.stocketf.close_price IS '종가 (해당 거래일 장 마감 시 최종 가격)';
-
-
---
--- Name: COLUMN stocketf.change_price; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.stocketf.change_price IS '전일 대비 가격 변화 (종가 - 전일 종가)';
-
-
---
--- Name: COLUMN stocketf.change_rate; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.stocketf.change_rate IS '전일 대비 등락률 ((종가 - 전일 종가) / 전일 종가 * 100)';
-
-
---
--- Name: COLUMN stocketf.open_price; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.stocketf.open_price IS '시가 (장 시작 시 첫 거래 가격)';
-
-
---
--- Name: COLUMN stocketf.high_price; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.stocketf.high_price IS '고가 (장중 최고 거래 가격)';
-
-
---
--- Name: COLUMN stocketf.low_price; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.stocketf.low_price IS '저가 (장중 최저 거래 가격)';
-
-
---
--- Name: COLUMN stocketf.volume; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.stocketf.volume IS '거래량 (해당 거래일 동안의 총 거래 수량)';
-
-
---
--- Name: COLUMN stocketf.trade_value; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.stocketf.trade_value IS '거래대금 (해당 거래일 동안의 총 거래 금액, 단위: 원)';
-
-
---
--- Name: COLUMN stocketf.created_at; Type: COMMENT; Schema: public; Owner: postgres
---
-
-COMMENT ON COLUMN public.stocketf.created_at IS '데이터 생성 시각 (레코드 입력 시 자동 등록)';
-
-
---
--- Name: stocketf_ma; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.stocketf_ma (
-    trade_date date NOT NULL,
-    code character varying(20) NOT NULL,
-    ma5 numeric(15,2),
-    ma10 numeric(15,2),
-    ma20 numeric(15,2),
-    ma40 numeric(15,2),
-    ma60 numeric(15,2),
-    ma90 numeric(15,2),
-    ma120 numeric(15,2),
-    created_at timestamp without time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.stocketf_ma OWNER TO postgres;
 
 --
 -- Name: stockfdt; Type: TABLE; Schema: public; Owner: postgres
@@ -6111,6 +5978,14 @@ ALTER TABLE ONLY public.mytrade
 
 
 --
+-- Name: mytradeus mytradeus_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.mytradeus
+    ADD CONSTRAINT mytradeus_pkey PRIMARY KEY (code, created_at);
+
+
+--
 -- Name: stock_debt stock_debt_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -6132,30 +6007,6 @@ ALTER TABLE ONLY public.stock_debtus
 
 ALTER TABLE ONLY public.stock_ma
     ADD CONSTRAINT stock_ma_new_pkey PRIMARY KEY (trade_date, code);
-
-
---
--- Name: stock_ma_v10 stock_ma_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.stock_ma_v10
-    ADD CONSTRAINT stock_ma_pkey PRIMARY KEY (trade_date, code);
-
-
---
--- Name: stocketf_ma stocketf_ma_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.stocketf_ma
-    ADD CONSTRAINT stocketf_ma_pkey PRIMARY KEY (trade_date, code);
-
-
---
--- Name: stocketf stocketf_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.stocketf
-    ADD CONSTRAINT stocketf_pkey PRIMARY KEY (trade_date, code);
 
 
 --
@@ -6194,4 +6045,4 @@ ALTER TABLE ONLY public.stockmainus
 -- PostgreSQL database dump complete
 --
 
-\unrestrict p5t3ZMZrWysY6imkm8J2OCF9EIzh9Rnk2sHfavLsdxnyIePIUEOZcHdbpHKgTcg
+\unrestrict H7qGYqKsxn413YnolylC85h3vRIcoTr6xamBUCHV62pfzXC9appudPpv9i45QaD
