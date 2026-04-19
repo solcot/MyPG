@@ -742,35 +742,7 @@ EEOFF
 
 #=========================================================================================> US
 
-"
-SELECT 
-    v.trade_date,
-    v.code,
-    v.name,
-    v.close_price,
-    v.change_rate,
-    v.pbr,
-    v.per,
-    v.roe,
-    v.dividend_yield,
-    TRUNC(m.market_cap::numeric / 10000000) AS market_cap_bakuk,
-    TRUNC(m.trade_value::numeric / 100000) AS trade_value_uk,
-    m.sector
-FROM public.stockfdtus_pbr_v v
-JOIN public.stockmainus m ON v.trade_date = m.trade_date AND v.code = m.code
-WHERE v.trade_date = (SELECT MAX(trade_date) FROM public.stockmainus)
-  -- 1. 유동성 및 체급 필터 (미국 시장 하단 기준)
-  AND m.market_cap >= 50000000    -- 시가총액 5천만 달러 이상 (잡주 제외)
-  AND m.trade_value >= 500000     -- 일 거래대금 50만 달러 이상 (매매 원활)
-  -- 2. 주주님의 가치 투자 필터
-  AND v.pbr < 1.0                 -- 자산가치 대비 저평가
-  AND v.per < 10.0                -- 이익 대비 저평가
-  AND v.roe > 5.0                 -- 자기자본이익률 5% 이상 (성장성 확인)
-  AND v.dividend_yield > 5.0      -- 배당수익률 5% 이상 (고배당)
-  and v.trade_date = '20260417'
-ORDER BY v.dividend_yield DESC;    -- 배당률 높은 순으로 정렬
-"
-"
+cat > bondus.sql <<'EEOFF'
 SELECT 
     v.trade_date,
     v.code,
@@ -815,5 +787,87 @@ WHERE v.trade_date = (SELECT MAX(trade_date) FROM public.stockmainus)
         OR d.net_debt < m.market_cap
       )
 
-ORDER BY v.dividend_yield DESC;
-"
+ORDER BY v.dividend_yield DESC
+EEOFF
+
+
+
+cat > bondus_mytrade.sql <<'EEOFF'
+SELECT z.trade_dividend, z.trade_per, z.trade_roe, z.trade_pbr, z.trade_close_price, z.remark,
+    v.trade_date,
+    v.code,
+    v.name,
+    v.close_price,
+    v.change_rate,
+    v.pbr,
+    v.per,
+    v.forward_per,
+    v.roe,
+    v.dividend_yield,
+    TRUNC(m.market_cap::numeric / 10000000) AS market_cap_bakuk, 
+    TRUNC(m.trade_value::numeric / 100000) AS trade_value_uk,    
+    TRUNC(d.net_debt::numeric / 10000000) AS net_debt_bakuk,     
+    m.sector
+FROM public.stockfdtus_pbr_v v
+JOIN public.stockmainus m ON v.trade_date = m.trade_date AND v.code = m.code
+LEFT JOIN public.stock_debtus d ON v.code = d.code 
+join mytradeus z on v.code = z.code and z.trade_status = 1
+WHERE v.trade_date = (SELECT MAX(trade_date) FROM public.stockmainus)
+
+  -- 1. 유동성 및 체급 필터
+  AND m.market_cap >= 100000000
+  AND m.trade_value >= 1000000
+
+  -- 2. 가치 투자 필터
+  AND v.pbr BETWEEN 0.1 AND 1.2
+  AND v.per BETWEEN 1.0 AND 12.0
+  AND v.roe > 8.0
+  AND v.dividend_yield >= 4.0
+
+  -- 3. 가치 함정 회피 로직 (NULL 허용 버전으로 유연하게 변경)
+  AND (
+        v.forward_per IS NULL  -- 💡 월가의 커버리지가 없는 '소외된 가치주'는 일단 통과!
+        OR 
+        (v.forward_per > 0 AND v.forward_per <= v.per * 1.5) -- 💡 커버리지가 있다면 이익 훼손 여부 엄격히 검사
+      )
+  
+  -- 🚀 [수정됨] 금융/리츠 섹터는 특수성을 감안해 순부채 필터에서 면제해 줍니다!
+  AND (
+        m.sector IN ('Financial Services', 'Real Estate') 
+        OR d.net_debt = 'NaN' 
+        OR d.net_debt < m.market_cap
+      )
+
+ORDER BY v.dividend_yield DESC
+EEOFF
+
+
+
+cat > bondus_insert.sql <<'EEOFF'
+insert into mytradeus
+SELECT 
+    v.code,
+    1,
+    v.dividend_yield,
+    v.per,    
+    v.roe,    
+    v.pbr,
+    v.close_price,
+    v.name,
+    ' ',
+    current_timestamp
+FROM public.stockfdtus_pbr_v v
+JOIN public.stockmainus m ON v.trade_date = m.trade_date AND v.code = m.code
+LEFT JOIN public.stock_debtus d ON v.code = d.code 
+WHERE v.trade_date = (SELECT MAX(trade_date) FROM public.stockmainus)
+and v.code in (
+'VICI' 
+,'ARCC' 
+,'CMCSA' 
+,'PRU' 
+,'' 
+,'' 
+,'' 
+,'' 
+)
+EEOFF
