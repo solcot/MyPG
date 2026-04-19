@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict TlkPEXDoiuYSJTo1WEXD0bHLidzx59HqeSA0azfZZy3ch6Zgoz0l6qh80LtwnjU
+\restrict p5t3ZMZrWysY6imkm8J2OCF9EIzh9Rnk2sHfavLsdxnyIePIUEOZcHdbpHKgTcg
 
 -- Dumped from database version 13.23
 -- Dumped by pg_dump version 13.23
@@ -5237,6 +5237,14 @@ CREATE TABLE public.mytrade (
     trade_status smallint,
     trade_expected_cagr numeric(10,2),
     trade_dividend numeric(10,2),
+    trade_per numeric(10,2),
+    trade_eps_ratio numeric(10,2),
+    trade_roe numeric(10,2),
+    trade_min_roe_ever numeric(10,2),
+    trade_pbr numeric(10,2),
+    trade_hist_avg_pbr numeric(10,2),
+    trade_close_price integer,
+    trade_name character varying(100),
     remark character varying(100),
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -5271,6 +5279,55 @@ CREATE TABLE public.stock_debt (
 
 
 ALTER TABLE public.stock_debt OWNER TO postgres;
+
+--
+-- Name: stock_debtus; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.stock_debtus (
+    code character varying(20) NOT NULL,
+    name character varying(100),
+    net_debt numeric(20,2),
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.stock_debtus OWNER TO postgres;
+
+--
+-- Name: TABLE stock_debtus; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.stock_debtus IS '미국 주식 순부채(Net Debt) 데이터';
+
+
+--
+-- Name: COLUMN stock_debtus.code; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stock_debtus.code IS '티커 (예: AAPL)';
+
+
+--
+-- Name: COLUMN stock_debtus.name; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stock_debtus.name IS '종목명';
+
+
+--
+-- Name: COLUMN stock_debtus.net_debt; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stock_debtus.net_debt IS '순부채 ($) (총부채 - 총현금)';
+
+
+--
+-- Name: COLUMN stock_debtus.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stock_debtus.created_at IS '데이터 생성 시각';
+
 
 --
 -- Name: stock_ma; Type: TABLE; Schema: public; Owner: postgres
@@ -5612,6 +5669,166 @@ CREATE VIEW public.stockfdt_pbr_v AS
 ALTER TABLE public.stockfdt_pbr_v OWNER TO postgres;
 
 --
+-- Name: stockfdtus; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.stockfdtus (
+    trade_date date NOT NULL,
+    code character varying(20) NOT NULL,
+    name character varying(100),
+    close_price numeric(15,2),
+    change_price numeric(15,2),
+    change_rate numeric(10,2),
+    eps numeric(15,2),
+    per numeric(10,2),
+    forward_eps numeric(15,2),
+    forward_per numeric(10,2),
+    bps numeric(15,2),
+    pbr numeric(10,2),
+    dividend_per_share numeric(10,4),
+    dividend_yield numeric(10,2),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE public.stockfdtus OWNER TO postgres;
+
+--
+-- Name: TABLE stockfdtus; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.stockfdtus IS '미국 주식 일별 재무/가치 지표';
+
+
+--
+-- Name: COLUMN stockfdtus.trade_date; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockfdtus.trade_date IS '거래일자';
+
+
+--
+-- Name: COLUMN stockfdtus.code; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockfdtus.code IS '티커 (예: AAPL)';
+
+
+--
+-- Name: COLUMN stockfdtus.name; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockfdtus.name IS '종목명';
+
+
+--
+-- Name: COLUMN stockfdtus.close_price; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockfdtus.close_price IS '종가 ($)';
+
+
+--
+-- Name: COLUMN stockfdtus.change_price; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockfdtus.change_price IS '전일 대비 가격 변동 ($)';
+
+
+--
+-- Name: COLUMN stockfdtus.change_rate; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockfdtus.change_rate IS '등락률 (%)';
+
+
+--
+-- Name: COLUMN stockfdtus.eps; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockfdtus.eps IS 'EPS ($)';
+
+
+--
+-- Name: COLUMN stockfdtus.per; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockfdtus.per IS 'PER';
+
+
+--
+-- Name: COLUMN stockfdtus.forward_eps; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockfdtus.forward_eps IS '선행 EPS ($)';
+
+
+--
+-- Name: COLUMN stockfdtus.forward_per; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockfdtus.forward_per IS '선행 PER';
+
+
+--
+-- Name: COLUMN stockfdtus.bps; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockfdtus.bps IS 'BPS ($)';
+
+
+--
+-- Name: COLUMN stockfdtus.pbr; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockfdtus.pbr IS 'PBR';
+
+
+--
+-- Name: COLUMN stockfdtus.dividend_per_share; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockfdtus.dividend_per_share IS '주당배당금 ($)';
+
+
+--
+-- Name: COLUMN stockfdtus.dividend_yield; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockfdtus.dividend_yield IS '배당수익률 (%)';
+
+
+--
+-- Name: COLUMN stockfdtus.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockfdtus.created_at IS '데이터 최초 생성 시각';
+
+
+--
+-- Name: stockfdtus_pbr_v; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.stockfdtus_pbr_v AS
+ SELECT stockfdtus.trade_date,
+    stockfdtus.code,
+    stockfdtus.name,
+    stockfdtus.change_rate,
+    stockfdtus.dividend_yield,
+    stockfdtus.pbr,
+    stockfdtus.per,
+    (((stockfdtus.pbr / NULLIF(stockfdtus.per, (0)::numeric)) * (100)::numeric))::numeric(10,2) AS roe,
+    stockfdtus.forward_per,
+    (((stockfdtus.pbr / NULLIF(stockfdtus.forward_per, (0)::numeric)) * (100)::numeric))::numeric(10,2) AS forward_roe,
+    stockfdtus.close_price,
+    (((stockfdtus.close_price)::numeric / NULLIF(stockfdtus.pbr, (0)::numeric)))::numeric(15,2) AS bps,
+    (((stockfdtus.close_price)::numeric / NULLIF(stockfdtus.per, (0)::numeric)))::numeric(15,2) AS eps
+   FROM public.stockfdtus;
+
+
+ALTER TABLE public.stockfdtus_pbr_v OWNER TO postgres;
+
+--
 -- Name: stockmain; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -5749,6 +5966,143 @@ COMMENT ON COLUMN public.stockmain.created_at IS '데이터 생성 시각 (레�
 
 
 --
+-- Name: stockmainus; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.stockmainus (
+    trade_date date NOT NULL,
+    code character varying(20) NOT NULL,
+    name character varying(100),
+    close_price numeric(15,2),
+    change_price numeric(15,2),
+    change_rate numeric(15,4),
+    open_price numeric(15,2),
+    high_price numeric(15,2),
+    low_price numeric(15,2),
+    volume bigint,
+    trade_value bigint,
+    market_cap bigint,
+    shares_out bigint,
+    sector character varying(50),
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.stockmainus OWNER TO postgres;
+
+--
+-- Name: TABLE stockmainus; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.stockmainus IS '미국 주식 일별 시세 데이터';
+
+
+--
+-- Name: COLUMN stockmainus.trade_date; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockmainus.trade_date IS '거래일 (YYYY-MM-DD 형식)';
+
+
+--
+-- Name: COLUMN stockmainus.code; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockmainus.code IS '티커 (미국 종목코드, 예: AAPL)';
+
+
+--
+-- Name: COLUMN stockmainus.name; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockmainus.name IS '종목명';
+
+
+--
+-- Name: COLUMN stockmainus.close_price; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockmainus.close_price IS '종가 ($)';
+
+
+--
+-- Name: COLUMN stockmainus.change_price; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockmainus.change_price IS '전일 대비 가격 변화 ($)';
+
+
+--
+-- Name: COLUMN stockmainus.change_rate; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockmainus.change_rate IS '전일 대비 등락률 (%)';
+
+
+--
+-- Name: COLUMN stockmainus.open_price; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockmainus.open_price IS '시가 ($)';
+
+
+--
+-- Name: COLUMN stockmainus.high_price; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockmainus.high_price IS '고가 ($)';
+
+
+--
+-- Name: COLUMN stockmainus.low_price; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockmainus.low_price IS '저가 ($)';
+
+
+--
+-- Name: COLUMN stockmainus.volume; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockmainus.volume IS '거래량';
+
+
+--
+-- Name: COLUMN stockmainus.trade_value; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockmainus.trade_value IS '거래대금 ($)';
+
+
+--
+-- Name: COLUMN stockmainus.market_cap; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockmainus.market_cap IS '시가총액 ($)';
+
+
+--
+-- Name: COLUMN stockmainus.shares_out; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockmainus.shares_out IS '상장주식수';
+
+
+--
+-- Name: COLUMN stockmainus.sector; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockmainus.sector IS '섹터 (예: Technology)';
+
+
+--
+-- Name: COLUMN stockmainus.created_at; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.stockmainus.created_at IS '데이터 생성 시각';
+
+
+--
 -- Name: mytrade mytrade_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -5762,6 +6116,14 @@ ALTER TABLE ONLY public.mytrade
 
 ALTER TABLE ONLY public.stock_debt
     ADD CONSTRAINT stock_debt_pkey PRIMARY KEY (code);
+
+
+--
+-- Name: stock_debtus stock_debtus_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.stock_debtus
+    ADD CONSTRAINT stock_debtus_pkey PRIMARY KEY (code);
 
 
 --
@@ -5805,6 +6167,14 @@ ALTER TABLE ONLY public.stockfdt
 
 
 --
+-- Name: stockfdtus stockfdtus_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.stockfdtus
+    ADD CONSTRAINT stockfdtus_pkey PRIMARY KEY (trade_date, code);
+
+
+--
 -- Name: stockmain stockmain_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -5813,7 +6183,15 @@ ALTER TABLE ONLY public.stockmain
 
 
 --
+-- Name: stockmainus stockmainus_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.stockmainus
+    ADD CONSTRAINT stockmainus_pkey PRIMARY KEY (trade_date, code);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict TlkPEXDoiuYSJTo1WEXD0bHLidzx59HqeSA0azfZZy3ch6Zgoz0l6qh80LtwnjU
+\unrestrict p5t3ZMZrWysY6imkm8J2OCF9EIzh9Rnk2sHfavLsdxnyIePIUEOZcHdbpHKgTcg
