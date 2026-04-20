@@ -786,6 +786,9 @@ WHERE v.trade_date = (SELECT MAX(trade_date) FROM public.stockmainus)
         OR d.net_debt = 'NaN' 
         OR d.net_debt < m.market_cap
       )
+      
+  -- 이미 매수한 종목은 제외
+  AND v.code not in (select code from mytradeus where trade_status = 1)
 
 ORDER BY v.dividend_yield DESC
 EEOFF
