@@ -743,54 +743,147 @@ EEOFF
 #=========================================================================================> US
 
 cat > bondus.sql <<'EEOFF'
+WITH LatestDate AS (
+    SELECT MAX(trade_date) AS max_date 
+    FROM public.stockmainus
+)
+
 SELECT 
     v.trade_date,
     v.code,
     v.name,
     v.close_price,
     v.change_rate,
+
+    -- 밸류
     v.pbr,
     v.per,
     v.forward_per,
+
+    -- 수익성
     v.roe,
+    v.forward_roe,
+
+    -- 배당
     v.dividend_yield,
-    TRUNC(m.market_cap::numeric / 10000000) AS market_cap_bakuk, 
-    TRUNC(m.trade_value::numeric / 100000) AS trade_value_uk,    
-    TRUNC(d.net_debt::numeric / 10000000) AS net_debt_bakuk,     
-    m.sector
+
+    -- 규모 / 유동성
+    TRUNC(m.market_cap::numeric / 10000000) AS market_cap_bakuk,
+    TRUNC(m.trade_value::numeric / 100000) AS trade_value_uk,
+
+    -- 부채
+    CASE 
+        WHEN d.net_debt IS NULL OR d.net_debt = 'NaN' THEN NULL 
+        ELSE TRUNC(d.net_debt::numeric / 10000000) 
+    END AS net_debt_bakuk,
+
+    m.sector,
+
+    -- 💡 어떤 트랙으로 뽑혔는지 표시
+    CASE 
+        WHEN v.dividend_yield >= 3 THEN 'DIVIDEND'
+        ELSE 'GROWTH'
+    END AS strategy_type
+
 FROM public.stockfdtus_pbr_v v
-JOIN public.stockmainus m ON v.trade_date = m.trade_date AND v.code = m.code
-LEFT JOIN public.stock_debtus d ON v.code = d.code 
-WHERE v.trade_date = (SELECT MAX(trade_date) FROM public.stockmainus)
+JOIN public.stockmainus m 
+    ON v.trade_date = m.trade_date 
+   AND v.code = m.code
+LEFT JOIN public.stock_debtus d 
+    ON v.code = d.code
 
-  -- 1. 유동성 및 체급 필터
-  AND m.market_cap >= 100000000
-  AND m.trade_value >= 1000000
+WHERE v.trade_date = (SELECT max_date FROM LatestDate)
 
-  -- 2. 가치 투자 필터
-  AND v.pbr BETWEEN 0.1 AND 1.2
-  AND v.per BETWEEN 1.0 AND 12.0
-  AND v.roe > 8.0
-  AND v.dividend_yield >= 4.0
+-- ✅ 1. 체급 (초우량주/대형주 위주)
+AND m.market_cap >= 3000000000
+AND m.trade_value >= 3000000
 
-  -- 3. 가치 함정 회피 로직 (NULL 허용 버전으로 유연하게 변경)
-  AND (
-        v.forward_per IS NULL  -- 💡 월가의 커버리지가 없는 '소외된 가치주'는 일단 통과!
-        OR 
-        (v.forward_per > 0 AND v.forward_per <= v.per * 1.5) -- 💡 커버리지가 있다면 이익 훼손 여부 엄격히 검사
-      )
-  
-  -- 🚀 [수정됨] 금융/리츠 섹터는 특수성을 감안해 순부채 필터에서 면제해 줍니다!
-  AND (
-        m.sector IN ('Financial Services', 'Real Estate') 
-        OR d.net_debt = 'NaN' 
-        OR d.net_debt < m.market_cap
-      )
-      
-  -- 이미 매수한 종목은 제외
-  AND v.code not in (select code from mytradeus where trade_status = 1)
+-- ✅ 2. 공통 저평가 기본 (극단적 수치/쓰레기 주식 배제)
+AND v.pbr BETWEEN 0.5 AND 2.0
+AND v.per BETWEEN 5 AND 20
+AND v.eps > 0
 
-ORDER BY v.dividend_yield DESC
+-- ✅ 3. 공통 성장 필터
+AND v.forward_per > 0
+AND v.forward_roe >= 10
+
+-- 💥 4. 핵심: 2-Track 조건 분기
+AND (
+    
+    -- 🔵 [Track A] 배당 안정주 (흔들리지 않는 현금흐름)
+    (
+        v.dividend_yield BETWEEN 3 AND 5.5
+        AND v.forward_per < v.per
+        AND v.roe >= 10
+        
+        -- 배당 지속성 (번 돈의 60% 이하만 배당으로 지급 = 배당컷 위험 제로)
+        AND (v.dividend_yield * v.per) <= 60
+        
+        -- 금융 섹터는 건전성 확인을 위해 PER을 더 엄격하게 제한
+        AND (
+            m.sector != 'Financial Services'
+            OR v.per <= 9
+        )
+    )
+
+    OR
+
+    -- 🟢 [Track B] 성장 가치주 (자본 복리 증식)
+    (
+        v.dividend_yield >= 2   -- 배당은 방어력 제공용
+        AND v.forward_roe >= 15 -- 폭발적인 내년 자본 수익률
+        AND v.forward_per < v.per
+        
+        -- 성장주는 프리미엄 허용
+        AND v.per <= 20
+    )
+)
+
+-- ✅ 5. 부채 리스크 방어 (금융주 특수성 반영)
+AND (
+    m.sector IN ('Financial Services') 
+    OR d.net_debt IS NULL
+    OR d.net_debt = 'NaN'
+    OR d.net_debt::numeric < m.market_cap * 0.6
+)
+
+-- ✅ 6. 섹터 필터 (핵심 우량 산업)
+AND m.sector IN (
+    'Technology',
+    'Healthcare',
+    'Consumer Defensive',
+    'Industrials',
+    'Financial Services'
+)
+
+-- 👉 경기 민감 산업 완전 제거 (Buy & Sleep 확보)
+AND m.sector NOT IN ('Energy', 'Basic Materials')
+
+-- ✅ 7. 국가/지정학적 리스크 완벽 제거 (ADR 및 VIE 지주사 필터 추가)
+AND v.name NOT ILIKE ANY (ARRAY[
+    '%China%', '%Hong Kong%', 
+    '%Holdings Ltd%', '%Group Ltd%', '%Holdings Limited%', '%Group Limited%', 
+    '%ADR%'
+])
+
+-- ✅ 8. 쓰레기 주식 및 껍데기(우선주/펀드) 제거
+AND v.name NOT ILIKE ANY (ARRAY[
+    '%Fund%', '%Trust%', '%ETF%', '%SPAC%', '%Acquisition%',
+    '%Depositary%', '%Depository%', '%Dep Shs%',
+    '%Preferred%', '%Pref%', '%Series%'
+])
+AND v.code NOT LIKE '%-%P%'
+
+-- ✅ 9. 기존 보유 종목(마이 포트폴리오) 제외
+AND v.code NOT IN (
+    SELECT code FROM mytradeus WHERE trade_status = 1
+)
+
+ORDER BY 
+    strategy_type,              -- 💡 배당(DIVIDEND) / 성장(GROWTH) 그룹별 정렬
+    v.dividend_yield DESC,      -- 1순위: 배당 높은 순
+    v.forward_per ASC,          -- 2순위: 내년 이익 대비 싼 순 (성장 폭이 큰 순)
+    v.forward_roe DESC;         -- 3순위: 자본을 잘 굴리는 순
 EEOFF
 
 
@@ -802,46 +895,45 @@ SELECT z.trade_dividend, z.trade_per, z.trade_roe, z.trade_pbr, z.trade_close_pr
     v.name,
     v.close_price,
     v.change_rate,
+
+    -- 밸류
     v.pbr,
     v.per,
     v.forward_per,
+
+    -- 수익성
     v.roe,
+    v.forward_roe,
+
+    -- 배당
     v.dividend_yield,
-    TRUNC(m.market_cap::numeric / 10000000) AS market_cap_bakuk, 
-    TRUNC(m.trade_value::numeric / 100000) AS trade_value_uk,    
-    TRUNC(d.net_debt::numeric / 10000000) AS net_debt_bakuk,     
-    m.sector
+
+    -- 규모 / 유동성
+    TRUNC(m.market_cap::numeric / 10000000) AS market_cap_bakuk,
+    TRUNC(m.trade_value::numeric / 100000) AS trade_value_uk,
+
+    -- 부채
+    CASE 
+        WHEN d.net_debt IS NULL OR d.net_debt = 'NaN' THEN NULL 
+        ELSE TRUNC(d.net_debt::numeric / 10000000) 
+    END AS net_debt_bakuk,
+
+    m.sector,
+
+    -- 💡 어떤 트랙으로 뽑혔는지 표시
+    CASE 
+        WHEN v.dividend_yield >= 3 THEN 'DIVIDEND'
+        ELSE 'GROWTH'
+    END AS strategy_type
 FROM public.stockfdtus_pbr_v v
 JOIN public.stockmainus m ON v.trade_date = m.trade_date AND v.code = m.code
 LEFT JOIN public.stock_debtus d ON v.code = d.code 
 join mytradeus z on v.code = z.code and z.trade_status = 1
 WHERE v.trade_date = (SELECT MAX(trade_date) FROM public.stockmainus)
-
-  -- 1. 유동성 및 체급 필터
-  AND m.market_cap >= 100000000
-  AND m.trade_value >= 1000000
-
-  -- 2. 가치 투자 필터
-  AND v.pbr BETWEEN 0.1 AND 1.2
-  AND v.per BETWEEN 1.0 AND 12.0
-  AND v.roe > 8.0
-  AND v.dividend_yield >= 4.0
-
-  -- 3. 가치 함정 회피 로직 (NULL 허용 버전으로 유연하게 변경)
-  AND (
-        v.forward_per IS NULL  -- 💡 월가의 커버리지가 없는 '소외된 가치주'는 일단 통과!
-        OR 
-        (v.forward_per > 0 AND v.forward_per <= v.per * 1.5) -- 💡 커버리지가 있다면 이익 훼손 여부 엄격히 검사
-      )
-  
-  -- 🚀 [수정됨] 금융/리츠 섹터는 특수성을 감안해 순부채 필터에서 면제해 줍니다!
-  AND (
-        m.sector IN ('Financial Services', 'Real Estate') 
-        OR d.net_debt = 'NaN' 
-        OR d.net_debt < m.market_cap
-      )
-
-ORDER BY v.dividend_yield DESC
+ORDER BY 
+    v.dividend_yield DESC,     -- 1순위: 최고 배당률
+    v.pbr ASC,                 -- 2순위: 가장 저평가
+    v.roe DESC;                -- 3순위: 최고 수익성
 EEOFF
 
 
@@ -864,10 +956,9 @@ JOIN public.stockmainus m ON v.trade_date = m.trade_date AND v.code = m.code
 LEFT JOIN public.stock_debtus d ON v.code = d.code 
 WHERE v.trade_date = (SELECT MAX(trade_date) FROM public.stockmainus)
 and v.code in (
-'VICI' 
-,'ARCC' 
-,'CMCSA' 
-,'PRU' 
+'TROW'  
+,'INGR' 
+,'' 
 ,'' 
 ,'' 
 ,'' 
