@@ -965,3 +965,227 @@ and v.code in (
 ,'' 
 )
 EEOFF
+
+
+
+
+
+---------------> US 기업 AI 질문
+WITH LatestDate AS (
+    SELECT MAX(trade_date) AS max_date 
+    FROM public.stockmainus
+)
+
+SELECT 
+    v.trade_date,
+    v.code,
+    v.name,
+    v.close_price,
+    v.change_rate,
+
+    -- 밸류
+    v.pbr,
+    v.per,
+    v.forward_per,
+
+    -- 수익성
+    v.roe,
+    v.forward_roe,
+
+    -- 배당
+    v.dividend_yield,
+
+    -- 규모 / 유동성
+    TRUNC(m.market_cap::numeric / 10000000) AS market_cap_bakuk,
+    TRUNC(m.trade_value::numeric / 100000) AS trade_value_uk,
+
+    -- 부채
+    CASE 
+        WHEN d.net_debt IS NULL OR d.net_debt = 'NaN' THEN NULL 
+        ELSE TRUNC(d.net_debt::numeric / 10000000) 
+    END AS net_debt_bakuk,
+
+    m.sector,
+
+    -- 💡 어떤 트랙으로 뽑혔는지 표시
+    CASE 
+        WHEN v.dividend_yield >= 3 THEN 'DIVIDEND'
+        ELSE 'GROWTH'
+    END AS strategy_type
+
+FROM public.stockfdtus_pbr_v v
+JOIN public.stockmainus m 
+    ON v.trade_date = m.trade_date 
+   AND v.code = m.code
+LEFT JOIN public.stock_debtus d 
+    ON v.code = d.code
+
+WHERE v.trade_date = (SELECT max_date FROM LatestDate)
+
+-- ✅ 1. 체급 (초우량주/대형주 위주)
+AND m.market_cap >= 3000000000
+AND m.trade_value >= 3000000
+
+-- ✅ 2. 공통 저평가 기본 (극단적 수치/쓰레기 주식 배제)
+AND v.pbr BETWEEN 0.5 AND 2.0
+AND v.per BETWEEN 5 AND 20
+AND v.eps > 0
+
+-- ✅ 3. 공통 성장 필터
+AND v.forward_per > 0
+AND v.forward_roe >= 10
+
+-- 💥 4. 핵심: 2-Track 조건 분기
+AND (
+    
+    -- 🔵 [Track A] 배당 안정주 (흔들리지 않는 현금흐름)
+    (
+        v.dividend_yield BETWEEN 3 AND 5.5
+        AND v.forward_per < v.per
+        AND v.roe >= 10
+        
+        -- 배당 지속성 (번 돈의 60% 이하만 배당으로 지급 = 배당컷 위험 제로)
+        AND (v.dividend_yield * v.per) <= 60
+        
+        -- 금융 섹터는 건전성 확인을 위해 PER을 더 엄격하게 제한
+        AND (
+            m.sector != 'Financial Services'
+            OR v.per <= 9
+        )
+    )
+
+    OR
+
+    -- 🟢 [Track B] 성장 가치주 (자본 복리 증식)
+    (
+        v.dividend_yield >= 2   -- 배당은 방어력 제공용
+        AND v.forward_roe >= 15 -- 폭발적인 내년 자본 수익률
+        AND v.forward_per < v.per
+        
+        -- 성장주는 프리미엄 허용
+        AND v.per <= 20
+    )
+)
+
+-- ✅ 5. 부채 리스크 방어 (금융주 특수성 반영)
+AND (
+    m.sector IN ('Financial Services') 
+    OR d.net_debt IS NULL
+    OR d.net_debt = 'NaN'
+    OR d.net_debt::numeric < m.market_cap * 0.6
+)
+
+-- ✅ 6. 섹터 필터 (핵심 우량 산업)
+AND m.sector IN (
+    'Technology',
+    'Healthcare',
+    'Consumer Defensive',
+    'Industrials',
+    'Financial Services'
+)
+
+-- 👉 경기 민감 산업 완전 제거 (Buy & Sleep 확보)
+AND m.sector NOT IN ('Energy', 'Basic Materials')
+
+-- ✅ 7. 국가/지정학적 리스크 완벽 제거 (ADR 및 VIE 지주사 필터 추가)
+AND v.name NOT ILIKE ANY (ARRAY[
+    '%China%', '%Hong Kong%', 
+    '%Holdings Ltd%', '%Group Ltd%', '%Holdings Limited%', '%Group Limited%', 
+    '%ADR%'
+])
+
+-- ✅ 8. 쓰레기 주식 및 껍데기(우선주/펀드) 제거
+AND v.name NOT ILIKE ANY (ARRAY[
+    '%Fund%', '%Trust%', '%ETF%', '%SPAC%', '%Acquisition%',
+    '%Depositary%', '%Depository%', '%Dep Shs%',
+    '%Preferred%', '%Pref%', '%Series%'
+])
+AND v.code NOT LIKE '%-%P%'
+
+-- ✅ 9. 기존 보유 종목(마이 포트폴리오) 제외
+AND v.code NOT IN (
+    SELECT code FROM mytradeus WHERE trade_status = 1
+)
+
+ORDER BY 
+    strategy_type,              -- 💡 배당(DIVIDEND) / 성장(GROWTH) 그룹별 정렬
+    v.dividend_yield DESC,      -- 1순위: 배당 높은 순
+    v.forward_per ASC,          -- 2순위: 내년 이익 대비 싼 순 (성장 폭이 큰 순)
+    v.forward_roe DESC;         -- 3순위: 자본을 잘 굴리는 순
+
+
+
+위 쿼리는 미국에 상장된 기업중 저평가된 가치주를 선별하기 위해 만든 쿼리인데...
+위 쿼리 수행 결과가 아래와 같거든...
+여기서 다른 기업 정보 
+즉 roe나 배당이 꾸준히 증가하는지? 기업에 해자가 있는지?
+등도 추가로 파악해서...
+안정적으로 배당을 받으면서 주가도 우상향할 수 있는 오래 보유할 가치주 TOP3 선별해줘...
+만약 리스트된 종목 모두 장기 보유에 적합한 가치주가 아니라면 솔직하게 모두 적당하지 않다고 답변해줘...
+
+
+
+ trade_date | code |              name               | close_price | change_rate | pbr  |  per  | forward_per |  roe  | forward_roe | dividend_yield | market_cap_bakuk | trade_value_uk | net_debt_bakuk |       sector       | strategy_type
+------------+------+---------------------------------+-------------+-------------+------+-------+-------------+-------+-------------+----------------+------------------+----------------+----------------+--------------------+---------------
+ 2026-04-20 | PAGS | PagSeguro Digital Ltd.          |       11.32 |        0.53 | 1.08 |  7.97 |        5.83 | 13.55 |       18.52 |           9.19 |              316 |            327 |             19 | Technology         | DIVIDEND
+ 2026-04-20 | AEG  | Aegon Ltd. New York Registry Sh |        8.06 |       -0.62 | 1.37 | 11.35 |        8.70 | 12.07 |       15.75 |           5.83 |             1220 |            443 |            480 | Financial Services | DIVIDEND
+ 2026-04-20 | CPA  | Copa Holdings, S.A.             |      125.30 |       -0.22 | 1.86 |  7.70 |        6.45 | 24.16 |       28.84 |           5.46 |              515 |            391 |             96 | Industrials        | DIVIDEND
+ 2026-04-20 | NWG  | NatWest Group plc               |       16.53 |       -2.19 | 1.29 |  9.03 |        7.71 | 14.29 |       16.73 |           5.32 |             6588 |            965 |          -7259 | Financial Services | DIVIDEND
+ 2026-04-20 | TROW | T. Rowe Price Group, Inc.       |       98.10 |        1.15 | 1.97 | 10.62 |       10.26 | 18.55 |       19.20 |           5.30 |             2139 |           1590 |           -290 | Financial Services | DIVIDEND
+ 2026-04-20 | BBD  | Banco Bradesco Sa               |        4.19 |       -0.48 | 1.24 |  9.74 |        7.87 | 12.73 |       15.76 |           5.01 |             4429 |           1034 |          54581 | Financial Services | DIVIDEND
+ 2026-04-20 | LNC  | Lincoln National Corporation    |       37.13 |        0.65 | 0.71 |  6.37 |        4.40 | 11.15 |       16.14 |           4.85 |              709 |            463 |          -3800 | Financial Services | DIVIDEND
+ 2026-04-20 | BBVA | Banco Bilbao Vizcaya Argentaria |       23.20 |       -2.73 | 1.95 | 11.15 |       10.35 | 17.49 |       18.84 |           4.66 |            13070 |            519 |            424 | Financial Services | DIVIDEND
+ 2026-04-20 | SFD  | Smithfield Foods, Inc.          |       28.56 |       -1.52 | 1.65 | 11.38 |       10.92 | 14.50 |       15.11 |           4.38 |             1123 |            596 |             85 | Consumer Defensive | DIVIDEND
+ 2026-04-20 | OZK  | Bank OZK                        |       49.24 |        1.05 | 0.94 |  7.97 |        7.65 | 11.79 |       12.29 |           3.70 |              550 |            789 |           -219 | Financial Services | DIVIDEND
+ 2026-04-20 | FG   | F&G Annuities & Life, Inc.      |       27.07 |       -0.15 | 0.76 | 14.40 |        4.47 |  5.28 |       17.00 |           3.69 |              367 |            101 |            -34 | Financial Services | DIVIDEND
+ 2026-04-20 | IFS  | Intercorp Financial Services In |       48.99 |       -0.41 | 1.52 | 10.00 |        8.34 | 15.20 |       18.23 |           3.67 |              544 |            169 |            860 | Financial Services | DIVIDEND
+ 2026-04-20 | USB  | U.S. Bancorp                    |       57.00 |        0.12 | 1.52 | 11.95 |       10.12 | 12.72 |       15.02 |           3.61 |             8863 |           4723 |           3079 | Financial Services | DIVIDEND
+ 2026-04-20 | FBP  | First BanCorp. New              |       23.53 |        1.29 | 1.86 | 10.94 |       10.05 | 17.00 |       18.51 |           3.40 |              368 |            189 |            -29 | Financial Services | DIVIDEND
+ 2026-04-20 | MFC  | Manulife Financial Corporation  |       38.56 |       -0.64 | 1.83 | 17.21 |       10.73 | 10.63 |       17.05 |           3.40 |             6448 |            569 |           -673 | Financial Services | DIVIDEND
+ 2026-04-20 | KFY  | Korn Ferry                      |       66.63 |        1.32 | 1.71 | 13.22 |       11.56 | 12.93 |       14.79 |           3.30 |              347 |            162 |            -39 | Industrials        | DIVIDEND
+ 2026-04-20 | PFG  | Principal Financial Group Inc   |       96.19 |        0.02 | 1.76 | 18.32 |        9.45 |  9.61 |       18.62 |           3.25 |             2085 |           1145 |           -136 | Financial Services | DIVIDEND
+ 2026-04-20 | IX   | ORIX Corporation                |       31.87 |       -1.12 | 1.22 | 12.16 |        2.71 | 10.03 |       45.02 |           3.14 |             3500 |             79 |         540635 | Financial Services | DIVIDEND
+ 2026-04-20 | FITB | Fifth Third Bancorp             |       50.98 |        1.27 | 1.69 | 17.16 |       10.39 |  9.85 |       16.27 |           3.14 |             4617 |           3500 |           1083 | Financial Services | DIVIDEND
+ 2026-04-20 | MET  | MetLife, Inc.                   |       77.70 |       -0.49 | 1.79 | 16.50 |        7.10 | 10.85 |       25.21 |           2.92 |             5119 |           1443 |           3972 | Financial Services | GROWTH
+ 2026-04-20 | RDN  | Radian Group Inc.               |       35.25 |       -0.34 | 1.00 |  8.03 |        6.55 | 12.45 |       15.27 |           2.89 |              480 |            142 |            -43 | Financial Services | GROWTH
+ 2026-04-20 | INGR | Ingredion Incorporated          |      114.21 |       -0.90 | 1.68 | 10.22 |        9.55 | 16.44 |       17.59 |           2.87 |              720 |            462 |             93 | Consumer Defensive | GROWTH
+ 2026-04-20 | EWBC | East West Bancorp, Inc.         |      119.09 |        0.91 | 1.84 | 12.51 |       10.80 | 14.71 |       17.04 |           2.69 |             1638 |           1131 |           -132 | Financial Services | GROWTH
+ 2026-04-20 | VCTR | Victory Capital Holdings, Inc.  |       74.53 |        0.89 | 1.97 | 18.27 |       10.00 | 10.78 |       19.70 |           2.63 |              477 |            352 |             85 | Financial Services | GROWTH
+ 2026-04-20 | ALLY | Ally Financial Inc.             |       46.30 |        2.07 | 1.08 | 19.54 |        7.18 |  5.53 |       15.04 |           2.59 |             1431 |           1578 |           1185 | Financial Services | GROWTH
+ 2026-04-20 | VOYA | Voya Financial, Inc.            |       75.50 |        1.41 | 1.43 | 12.00 |        6.79 | 11.92 |       21.06 |           2.44 |              700 |            673 |            329 | Financial Services | GROWTH
+ 2026-04-20 | EG   | Everest Group, Ltd.             |      350.64 |       -0.24 | 0.92 |  9.28 |        5.75 |  9.91 |       16.00 |           2.28 |             1416 |           1091 |            -52 | Financial Services | GROWTH
+ 2026-04-20 | STT  | State Street Corporation        |      150.18 |        3.27 | 1.73 | 15.25 |       10.99 | 11.34 |       15.74 |           2.24 |             4185 |           4575 |                | Financial Services | GROWTH
+ 2026-04-20 | CI   | The Cigna Group                 |      279.92 |        0.46 | 1.77 | 12.62 |        8.37 | 14.03 |       21.15 |           2.23 |             7477 |           2928 |           2273 | Healthcare         | GROWTH
+ 2026-04-20 | SAN  | Banco Santander, S.A. Sponsored |       12.68 |       -1.55 | 1.56 | 12.81 |        9.65 | 12.18 |       16.17 |           2.21 |            18388 |            762 |          -3098 | Financial Services | GROWTH
+ 2026-04-20 | CTSH | Cognizant Technology Solutions  |       60.26 |       -1.70 | 1.92 | 13.21 |        9.83 | 14.53 |       19.53 |           2.19 |             2908 |           4581 |            -74 | Technology         | GROWTH
+ 2026-04-20 | CBSH | Commerce Bancshares, Inc.       |       51.40 |        0.53 | 1.87 | 12.72 |       11.93 | 14.70 |       15.67 |           2.14 |              757 |            729 |           -143 | Financial Services | GROWTH
+ 2026-04-20 | WAL  | Western Alliance Bancorporation |       79.45 |        0.08 | 1.17 |  9.10 |        6.76 | 12.86 |       17.31 |           2.11 |              874 |            656 |            242 | Financial Services | GROWTH
+ 2026-04-20 | THG  | Hanover Insurance Group Inc     |      179.99 |       -1.02 | 1.78 |  9.94 |        9.91 | 17.91 |       17.96 |           2.11 |              633 |            288 |              9 | Financial Services | GROWTH
+ 2026-04-20 | BPOP | Popular, Inc.                   |      148.07 |        0.80 | 1.56 | 12.04 |        9.19 | 12.96 |       16.97 |           2.03 |              963 |            679 |           -348 | Financial Services | GROWTH
+(35 rows)
+
+
+-- grok
+1. TROW - T. Rowe Price Group, Inc. (Financial Services, market_cap ≈ $21.39B, DIVIDEND track)
+2. INGR - Ingredion Incorporated (Consumer Defensive, market_cap ≈ $7.2B, GROWTH track)
+3. CI - The Cigna Group (Healthcare, market_cap ≈ $74.77B, GROWTH track)
+
+-- claud
+
+
+-- qwen
+🥇 1위: **U.S. Bancorp **(USB) - 미국 지역 은행
+🥈 2위: **T. Rowe Price **(TROW) - 자산운용사
+🥉 3위: **Ingredion **(INGR) - 식품 소재 기업
+
+-- chatgpt
+TROW → 40% (핵심)
+CTSH → 30% (성장)
+INGR → 30% (방어)
+
+-- gemini
+🥇 1. 티 로우 프라이스 그룹 (TROW - T. Rowe Price Group)
+🥈 2. 더 시그나 그룹 (CI - The Cigna Group)
+🥉 3. 뱅크 오즈케이 (OZK - Bank OZK)
+
+| grep -Ee 'trade_date|VICI|CMCSA|PRU|TROW|INGR'
