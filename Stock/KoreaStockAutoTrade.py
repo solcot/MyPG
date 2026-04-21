@@ -597,6 +597,7 @@ def get_balance(pdno="005930", ord_unpr="65500"):
     res = requests.get(URL, headers=headers, params=params)
     if res.status_code != 200:
         send_message(f"최대주문가능금액 조회 실패(HTTP {res.status_code})")
+        time.sleep(10)
         return 0
     
     j = res.json()
@@ -611,6 +612,8 @@ def get_balance(pdno="005930", ord_unpr="65500"):
         send_message("최대주문가능금액 응답에 값 없음")
         return 0
     
+    #send_message(f"쵀대주문가능금액 조회 성공: ({max_ord_psbl_amt})")
+        
     try:
         return int(max_ord_psbl_amt)
     except:
