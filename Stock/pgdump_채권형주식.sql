@@ -726,14 +726,15 @@ select  a.code,
         current_timestamp
 from last_data a
 where a.code in (
-'023910' 
-,'004590' 
-,'002810' 
-,'108320' 
-,'049720' 
-,'337930' 
-,'376180' 
-,'030000' 
+ '023910'
+,'004590'
+,'003800'
+,'002810'
+,'108320'
+,'049720'
+,'337930'
+,'376180'
+,'030000'
 )
 EEOFF
 
@@ -746,194 +747,146 @@ cat > bondus.sql <<'EEOFF'
 WITH LatestDate AS (
     SELECT MAX(trade_date) AS max_date 
     FROM public.stockmainus
-)
+),
+-- 💡 섹터별 특성을 반영하여 필터링된 유니버스를 임시 테이블로 만듭니다.
+FilteredStocks AS (
+    SELECT 
+        v.trade_date,
+        v.code,
+        v.name,
+        v.close_price,
+        v.change_rate,
+        v.pbr,
+        v.per,
+        v.forward_per,
+        v.roe,
+        v.forward_roe,
+        v.dividend_yield,
+        TRUNC(m.market_cap::numeric / 10000000) AS market_cap_bakuk,
+        TRUNC(m.trade_value::numeric / 100000) AS trade_value_uk,
+        CASE 
+            WHEN d.net_debt IS NULL OR d.net_debt = 'NaN' THEN NULL 
+            ELSE TRUNC(d.net_debt::numeric / 10000000) 
+        END AS net_debt_bakuk,
+        m.sector,
+        
+        -- 💡 13개 섹터를 3개의 거대한 전략 그룹으로 재분류합니다.
+        CASE 
+            WHEN m.sector IN ('Technology', 'Healthcare', 'Communication Services') THEN 'INNOVATION (혁신성장)'
+            WHEN m.sector IN ('Financial Services', 'Real Estate', 'Utilities') THEN 'HIGH_YIELD (고배당가치)'
+            ELSE 'CORE_COMPOUNDER (전통복리)' -- Industrials, Consumer, Energy, Materials
+        END AS strategy_type
 
-SELECT 
-    v.trade_date,
-    v.code,
-    v.name,
-    v.close_price,
-    v.change_rate,
+    FROM public.stockfdtus_pbr_v v
+    JOIN public.stockmainus m 
+        ON v.trade_date = m.trade_date 
+       AND v.code = m.code
+    LEFT JOIN public.stock_debtus d 
+        ON v.code = d.code
+    WHERE v.trade_date = (SELECT max_date FROM LatestDate)
 
-    -- 밸류
-    v.pbr,
-    v.per,
-    v.forward_per,
-
-    -- 수익성
-    v.roe,
-    v.forward_roe,
-
-    -- 배당
-    v.dividend_yield,
-
-    -- 규모 / 유동성
-    TRUNC(m.market_cap::numeric / 10000000) AS market_cap_bakuk,
-    TRUNC(m.trade_value::numeric / 100000) AS trade_value_uk,
-
-    -- 부채
-    CASE 
-        WHEN d.net_debt IS NULL OR d.net_debt = 'NaN' THEN NULL 
-        ELSE TRUNC(d.net_debt::numeric / 10000000) 
-    END AS net_debt_bakuk,
-
-    m.sector,
-
-    -- 💡 어떤 트랙으로 뽑혔는지 표시
-    CASE 
-        WHEN v.dividend_yield >= 3 THEN 'DIVIDEND'
-        ELSE 'GROWTH'
-    END AS strategy_type
-
-FROM public.stockfdtus_pbr_v v
-JOIN public.stockmainus m 
-    ON v.trade_date = m.trade_date 
-   AND v.code = m.code
-LEFT JOIN public.stock_debtus d 
-    ON v.code = d.code
-
-WHERE v.trade_date = (SELECT max_date FROM LatestDate)
-
--- ✅ 1. 체급 (초우량주/대형주 위주)
-AND m.market_cap >= 3000000000
-AND m.trade_value >= 3000000
-
--- ✅ 2. 공통 저평가 기본 (극단적 수치/쓰레기 주식 배제)
-AND v.pbr BETWEEN 0.5 AND 2.0
-AND v.per BETWEEN 5 AND 20
-AND v.eps > 0
-
--- ✅ 3. 공통 성장 필터
-AND v.forward_per > 0
-AND v.forward_roe >= 10
-
--- 💥 4. 핵심: 2-Track 조건 분기
-AND (
+    -- ✅ 1. 공통 체급 및 기본 방어막 (잡주, 적자기업 배제)
+    AND m.market_cap >= 3000000000
+    AND m.trade_value >= 3000000
+    AND v.eps > 0
+    AND v.forward_per > 0
+    AND v.forward_per < v.per  -- 🌟 공통 진리: 내년 이익이 무조건 성장해야 함!
     
-    -- 🔵 [Track A] 배당 안정주 (흔들리지 않는 현금흐름)
-    (
-        v.dividend_yield BETWEEN 3 AND 5.5
-        AND v.forward_per < v.per
-        AND v.roe >= 10
-        
-        -- 배당 지속성 (번 돈의 60% 이하만 배당으로 지급 = 배당컷 위험 제로)
-        AND (v.dividend_yield * v.per) <= 60
-        
-        -- 금융 섹터는 건전성 확인을 위해 PER을 더 엄격하게 제한
-        AND (
-            m.sector != 'Financial Services'
-            OR v.per <= 9
+    -- ✅ 2. 쓰레기 주식 및 리스크 국가 배제 (기존 철벽 유지)
+    AND m.sector NOT IN ('Unknown', '')
+    AND v.name NOT ILIKE ANY (ARRAY[
+        '%China%', '%Hong Kong%', '%Holdings Ltd%', '%Group Ltd%', '%Holdings Limited%', '%Group Limited%', '%ADR%'
+    ])
+    AND v.name NOT ILIKE ANY (ARRAY[
+        '%Fund%', '%Trust%', '%ETF%', '%SPAC%', '%Acquisition%',
+        '%Depositary%', '%Depository%', '%Dep Shs%', '%Preferred%', '%Pref%', '%Series%'
+    ])
+    AND v.code NOT LIKE '%-%P%'
+    AND v.code NOT IN (SELECT code FROM mytradeus WHERE trade_status = 1)
+
+    -- 💥 3. 핵심: 섹터별 맞춤형(Tailored) 펀더멘탈 필터
+    AND (
+        -- 🔵 [그룹 1] 고배당 가치 (금융, 리츠, 유틸리티)
+        -- 평가 기준: PBR이 낮고 배당이 높아야 함. ROE 허들은 낮춤(리츠 특성 반영).
+        (
+            m.sector IN ('Financial Services', 'Real Estate', 'Utilities')
+            AND v.pbr BETWEEN 0.3 AND 2.5
+            AND v.per BETWEEN 5 AND 18
+            AND v.roe >= 5.0                 -- 리츠 평균(4.4%)을 감안해 5%로 하향
+            AND v.dividend_yield >= 3.5      -- 대신 배당은 3.5% 이상 강력히 요구
+            AND (v.dividend_yield * v.per) <= 85 -- 배당 성향 85% 이하 (유틸/리츠 감안)
+        )
+        OR
+        -- 🟢 [그룹 2] 혁신 성장 (테크, 헬스케어, 커뮤니케이션)
+        -- 평가 기준: 무형자산(기술/특허) 가치를 인정하여 PBR/PER 상한을 대폭 열어줌.
+        (
+            m.sector IN ('Technology', 'Healthcare', 'Communication Services')
+            AND v.pbr BETWEEN 1.0 AND 12.0   -- 테크주는 PBR 10배도 흔함
+            AND v.per BETWEEN 10 AND 35      -- PER 35배까지 성장 프리미엄 허용
+            AND v.forward_roe >= 15.0        -- 대신 내년 자본수익률(ROE)이 15% 이상으로 압도적일 것
+            AND v.dividend_yield >= 0.1      -- 밈주식 방지용 (아주 적더라도 배당을 주는 근본 기업만)
+            AND (d.net_debt IS NULL OR d.net_debt = 'NaN' OR d.net_debt::numeric < m.market_cap * 0.3) -- 부채 비율 엄격
+        )
+        OR
+        -- 🟠 [그룹 3] 전통 복리 (산업재, 필수/경기소비재, 에너지, 소재)
+        -- 평가 기준: 성장과 배당의 중간 밸런스 유지.
+        (
+            m.sector IN ('Industrials', 'Consumer Cyclical', 'Consumer Defensive', 'Basic Materials', 'Energy')
+            AND v.pbr BETWEEN 0.5 AND 5.0
+            AND v.per BETWEEN 8 AND 25
+            AND v.forward_roe >= 12.0
+            AND v.dividend_yield >= 1.5      -- 인플레 방어 이상의 배당 요구
+            AND (d.net_debt IS NULL OR d.net_debt = 'NaN' OR d.net_debt::numeric < m.market_cap * 0.6)
         )
     )
-
-    OR
-
-    -- 🟢 [Track B] 성장 가치주 (자본 복리 증식)
-    (
-        v.dividend_yield >= 2   -- 배당은 방어력 제공용
-        AND v.forward_roe >= 15 -- 폭발적인 내년 자본 수익률
-        AND v.forward_per < v.per
-        
-        -- 성장주는 프리미엄 허용
-        AND v.per <= 20
-    )
 )
 
--- ✅ 5. 부채 리스크 방어 (금융주 특수성 반영)
-AND (
-    m.sector IN ('Financial Services') 
-    OR d.net_debt IS NULL
-    OR d.net_debt = 'NaN'
-    OR d.net_debt::numeric < m.market_cap * 0.6
-)
-
--- ✅ 6. 섹터 필터 (핵심 우량 산업)
-AND m.sector IN (
-    'Technology',
-    'Healthcare',
-    'Consumer Defensive',
-    'Industrials',
-    'Financial Services'
-)
-
--- 👉 경기 민감 산업 완전 제거 (Buy & Sleep 확보)
-AND m.sector NOT IN ('Energy', 'Basic Materials')
-
--- ✅ 7. 국가/지정학적 리스크 완벽 제거 (ADR 및 VIE 지주사 필터 추가)
-AND v.name NOT ILIKE ANY (ARRAY[
-    '%China%', '%Hong Kong%', 
-    '%Holdings Ltd%', '%Group Ltd%', '%Holdings Limited%', '%Group Limited%', 
-    '%ADR%'
-])
-
--- ✅ 8. 쓰레기 주식 및 껍데기(우선주/펀드) 제거
-AND v.name NOT ILIKE ANY (ARRAY[
-    '%Fund%', '%Trust%', '%ETF%', '%SPAC%', '%Acquisition%',
-    '%Depositary%', '%Depository%', '%Dep Shs%',
-    '%Preferred%', '%Pref%', '%Series%'
-])
-AND v.code NOT LIKE '%-%P%'
-
--- ✅ 9. 기존 보유 종목(마이 포트폴리오) 제외
-AND v.code NOT IN (
-    SELECT code FROM mytradeus WHERE trade_status = 1
-)
-
+-- ✅ 4. 최종 정렬 출력
+SELECT * FROM FilteredStocks
 ORDER BY 
-    strategy_type,              -- 💡 배당(DIVIDEND) / 성장(GROWTH) 그룹별 정렬
-    v.dividend_yield DESC,      -- 1순위: 배당 높은 순
-    v.forward_per ASC,          -- 2순위: 내년 이익 대비 싼 순 (성장 폭이 큰 순)
-    v.forward_roe DESC;         -- 3순위: 자본을 잘 굴리는 순
+    strategy_type,              -- 1순위: 그룹별로 묶어서 보기
+    dividend_yield DESC,        -- 2순위: 배당 높은 순
+    forward_per ASC;            -- 3순위: 내년 이익 대비 저평가 순
 EEOFF
 
 
 
 cat > bondus_mytrade.sql <<'EEOFF'
 SELECT z.trade_dividend, z.trade_per, z.trade_roe, z.trade_pbr, z.trade_close_price, z.remark,
-    v.trade_date,
-    v.code,
-    v.name,
-    v.close_price,
-    v.change_rate,
-
-    -- 밸류
-    v.pbr,
-    v.per,
-    v.forward_per,
-
-    -- 수익성
-    v.roe,
-    v.forward_roe,
-
-    -- 배당
-    v.dividend_yield,
-
-    -- 규모 / 유동성
-    TRUNC(m.market_cap::numeric / 10000000) AS market_cap_bakuk,
-    TRUNC(m.trade_value::numeric / 100000) AS trade_value_uk,
-
-    -- 부채
-    CASE 
-        WHEN d.net_debt IS NULL OR d.net_debt = 'NaN' THEN NULL 
-        ELSE TRUNC(d.net_debt::numeric / 10000000) 
-    END AS net_debt_bakuk,
-
-    m.sector,
-
-    -- 💡 어떤 트랙으로 뽑혔는지 표시
-    CASE 
-        WHEN v.dividend_yield >= 3 THEN 'DIVIDEND'
-        ELSE 'GROWTH'
-    END AS strategy_type
+        v.trade_date,
+        v.code,
+        v.name,
+        v.close_price,
+        v.change_rate,
+        v.pbr,
+        v.per,
+        v.forward_per,
+        v.roe,
+        v.forward_roe,
+        v.dividend_yield,
+        TRUNC(m.market_cap::numeric / 10000000) AS market_cap_bakuk,
+        TRUNC(m.trade_value::numeric / 100000) AS trade_value_uk,
+        CASE 
+            WHEN d.net_debt IS NULL OR d.net_debt = 'NaN' THEN NULL 
+            ELSE TRUNC(d.net_debt::numeric / 10000000) 
+        END AS net_debt_bakuk,
+        m.sector,
+        
+        -- 💡 13개 섹터를 3개의 거대한 전략 그룹으로 재분류합니다.
+        CASE 
+            WHEN m.sector IN ('Technology', 'Healthcare', 'Communication Services') THEN 'INNOVATION (혁신성장)'
+            WHEN m.sector IN ('Financial Services', 'Real Estate', 'Utilities') THEN 'HIGH_YIELD (고배당가치)'
+            ELSE 'CORE_COMPOUNDER (전통복리)' -- Industrials, Consumer, Energy, Materials
+        END AS strategy_type
 FROM public.stockfdtus_pbr_v v
 JOIN public.stockmainus m ON v.trade_date = m.trade_date AND v.code = m.code
 LEFT JOIN public.stock_debtus d ON v.code = d.code 
 join mytradeus z on v.code = z.code and z.trade_status = 1
 WHERE v.trade_date = (SELECT MAX(trade_date) FROM public.stockmainus)
 ORDER BY 
-    v.dividend_yield DESC,     -- 1순위: 최고 배당률
-    v.pbr ASC,                 -- 2순위: 가장 저평가
-    v.roe DESC;                -- 3순위: 최고 수익성
+    strategy_type,              -- 1순위: 그룹별로 묶어서 보기
+    dividend_yield DESC,        -- 2순위: 배당 높은 순
+    forward_per ASC;            -- 3순위: 내년 이익 대비 저평가 순
 EEOFF
 
 
@@ -956,8 +909,8 @@ JOIN public.stockmainus m ON v.trade_date = m.trade_date AND v.code = m.code
 LEFT JOIN public.stock_debtus d ON v.code = d.code 
 WHERE v.trade_date = (SELECT MAX(trade_date) FROM public.stockmainus)
 and v.code in (
-'TROW'  
-,'INGR' 
+'OZK'  
+,'CI' 
 ,'' 
 ,'' 
 ,'' 
@@ -970,199 +923,296 @@ EEOFF
 
 
 
----------------> US 기업 AI 질문
+----------------------------------------------------------------------> US 기업 AI 질문
 WITH LatestDate AS (
     SELECT MAX(trade_date) AS max_date 
     FROM public.stockmainus
-)
+),
+-- 💡 섹터별 특성을 반영하여 필터링된 유니버스를 임시 테이블로 만듭니다.
+FilteredStocks AS (
+    SELECT 
+        v.trade_date,
+        v.code,
+        v.name,
+        v.close_price,
+        v.change_rate,
+        v.pbr,
+        v.per,
+        v.forward_per,
+        v.roe,
+        v.forward_roe,
+        v.dividend_yield,
+        TRUNC(m.market_cap::numeric / 10000000) AS market_cap_bakuk,
+        TRUNC(m.trade_value::numeric / 100000) AS trade_value_uk,
+        CASE 
+            WHEN d.net_debt IS NULL OR d.net_debt = 'NaN' THEN NULL 
+            ELSE TRUNC(d.net_debt::numeric / 10000000) 
+        END AS net_debt_bakuk,
+        m.sector,
+        
+        -- 💡 13개 섹터를 3개의 거대한 전략 그룹으로 재분류합니다.
+        CASE 
+            WHEN m.sector IN ('Technology', 'Healthcare', 'Communication Services') THEN 'INNOVATION (혁신성장)'
+            WHEN m.sector IN ('Financial Services', 'Real Estate', 'Utilities') THEN 'HIGH_YIELD (고배당가치)'
+            ELSE 'CORE_COMPOUNDER (전통복리)' -- Industrials, Consumer, Energy, Materials
+        END AS strategy_type
 
-SELECT 
-    v.trade_date,
-    v.code,
-    v.name,
-    v.close_price,
-    v.change_rate,
+    FROM public.stockfdtus_pbr_v v
+    JOIN public.stockmainus m 
+        ON v.trade_date = m.trade_date 
+       AND v.code = m.code
+    LEFT JOIN public.stock_debtus d 
+        ON v.code = d.code
+    WHERE v.trade_date = (SELECT max_date FROM LatestDate)
 
-    -- 밸류
-    v.pbr,
-    v.per,
-    v.forward_per,
-
-    -- 수익성
-    v.roe,
-    v.forward_roe,
-
-    -- 배당
-    v.dividend_yield,
-
-    -- 규모 / 유동성
-    TRUNC(m.market_cap::numeric / 10000000) AS market_cap_bakuk,
-    TRUNC(m.trade_value::numeric / 100000) AS trade_value_uk,
-
-    -- 부채
-    CASE 
-        WHEN d.net_debt IS NULL OR d.net_debt = 'NaN' THEN NULL 
-        ELSE TRUNC(d.net_debt::numeric / 10000000) 
-    END AS net_debt_bakuk,
-
-    m.sector,
-
-    -- 💡 어떤 트랙으로 뽑혔는지 표시
-    CASE 
-        WHEN v.dividend_yield >= 3 THEN 'DIVIDEND'
-        ELSE 'GROWTH'
-    END AS strategy_type
-
-FROM public.stockfdtus_pbr_v v
-JOIN public.stockmainus m 
-    ON v.trade_date = m.trade_date 
-   AND v.code = m.code
-LEFT JOIN public.stock_debtus d 
-    ON v.code = d.code
-
-WHERE v.trade_date = (SELECT max_date FROM LatestDate)
-
--- ✅ 1. 체급 (초우량주/대형주 위주)
-AND m.market_cap >= 3000000000
-AND m.trade_value >= 3000000
-
--- ✅ 2. 공통 저평가 기본 (극단적 수치/쓰레기 주식 배제)
-AND v.pbr BETWEEN 0.5 AND 2.0
-AND v.per BETWEEN 5 AND 20
-AND v.eps > 0
-
--- ✅ 3. 공통 성장 필터
-AND v.forward_per > 0
-AND v.forward_roe >= 10
-
--- 💥 4. 핵심: 2-Track 조건 분기
-AND (
+    -- ✅ 1. 공통 체급 및 기본 방어막 (잡주, 적자기업 배제)
+    AND m.market_cap >= 3000000000
+    AND m.trade_value >= 3000000
+    AND v.eps > 0
+    AND v.forward_per > 0
+    AND v.forward_per < v.per  -- 🌟 공통 진리: 내년 이익이 무조건 성장해야 함!
     
-    -- 🔵 [Track A] 배당 안정주 (흔들리지 않는 현금흐름)
-    (
-        v.dividend_yield BETWEEN 3 AND 5.5
-        AND v.forward_per < v.per
-        AND v.roe >= 10
-        
-        -- 배당 지속성 (번 돈의 60% 이하만 배당으로 지급 = 배당컷 위험 제로)
-        AND (v.dividend_yield * v.per) <= 60
-        
-        -- 금융 섹터는 건전성 확인을 위해 PER을 더 엄격하게 제한
-        AND (
-            m.sector != 'Financial Services'
-            OR v.per <= 9
+    -- ✅ 2. 쓰레기 주식 및 리스크 국가 배제 (기존 철벽 유지)
+    AND m.sector NOT IN ('Unknown', '')
+    AND v.name NOT ILIKE ANY (ARRAY[
+        '%China%', '%Hong Kong%', '%Holdings Ltd%', '%Group Ltd%', '%Holdings Limited%', '%Group Limited%', '%ADR%'
+    ])
+    AND v.name NOT ILIKE ANY (ARRAY[
+        '%Fund%', '%Trust%', '%ETF%', '%SPAC%', '%Acquisition%',
+        '%Depositary%', '%Depository%', '%Dep Shs%', '%Preferred%', '%Pref%', '%Series%'
+    ])
+    AND v.code NOT LIKE '%-%P%'
+    AND v.code NOT IN (SELECT code FROM mytradeus WHERE trade_status = 1)
+
+    -- 💥 3. 핵심: 섹터별 맞춤형(Tailored) 펀더멘탈 필터
+    AND (
+        -- 🔵 [그룹 1] 고배당 가치 (금융, 리츠, 유틸리티)
+        -- 평가 기준: PBR이 낮고 배당이 높아야 함. ROE 허들은 낮춤(리츠 특성 반영).
+        (
+            m.sector IN ('Financial Services', 'Real Estate', 'Utilities')
+            AND v.pbr BETWEEN 0.3 AND 2.5
+            AND v.per BETWEEN 5 AND 18
+            AND v.roe >= 5.0                 -- 리츠 평균(4.4%)을 감안해 5%로 하향
+            AND v.dividend_yield >= 3.5      -- 대신 배당은 3.5% 이상 강력히 요구
+            AND (v.dividend_yield * v.per) <= 85 -- 배당 성향 85% 이하 (유틸/리츠 감안)
+        )
+        OR
+        -- 🟢 [그룹 2] 혁신 성장 (테크, 헬스케어, 커뮤니케이션)
+        -- 평가 기준: 무형자산(기술/특허) 가치를 인정하여 PBR/PER 상한을 대폭 열어줌.
+        (
+            m.sector IN ('Technology', 'Healthcare', 'Communication Services')
+            AND v.pbr BETWEEN 1.0 AND 12.0   -- 테크주는 PBR 10배도 흔함
+            AND v.per BETWEEN 10 AND 35      -- PER 35배까지 성장 프리미엄 허용
+            AND v.forward_roe >= 15.0        -- 대신 내년 자본수익률(ROE)이 15% 이상으로 압도적일 것
+            AND v.dividend_yield >= 0.1      -- 밈주식 방지용 (아주 적더라도 배당을 주는 근본 기업만)
+            AND (d.net_debt IS NULL OR d.net_debt = 'NaN' OR d.net_debt::numeric < m.market_cap * 0.3) -- 부채 비율 엄격
+        )
+        OR
+        -- 🟠 [그룹 3] 전통 복리 (산업재, 필수/경기소비재, 에너지, 소재)
+        -- 평가 기준: 성장과 배당의 중간 밸런스 유지.
+        (
+            m.sector IN ('Industrials', 'Consumer Cyclical', 'Consumer Defensive', 'Basic Materials', 'Energy')
+            AND v.pbr BETWEEN 0.5 AND 5.0
+            AND v.per BETWEEN 8 AND 25
+            AND v.forward_roe >= 12.0
+            AND v.dividend_yield >= 1.5      -- 인플레 방어 이상의 배당 요구
+            AND (d.net_debt IS NULL OR d.net_debt = 'NaN' OR d.net_debt::numeric < m.market_cap * 0.6)
         )
     )
-
-    OR
-
-    -- 🟢 [Track B] 성장 가치주 (자본 복리 증식)
-    (
-        v.dividend_yield >= 2   -- 배당은 방어력 제공용
-        AND v.forward_roe >= 15 -- 폭발적인 내년 자본 수익률
-        AND v.forward_per < v.per
-        
-        -- 성장주는 프리미엄 허용
-        AND v.per <= 20
-    )
 )
 
--- ✅ 5. 부채 리스크 방어 (금융주 특수성 반영)
-AND (
-    m.sector IN ('Financial Services') 
-    OR d.net_debt IS NULL
-    OR d.net_debt = 'NaN'
-    OR d.net_debt::numeric < m.market_cap * 0.6
-)
-
--- ✅ 6. 섹터 필터 (핵심 우량 산업)
-AND m.sector IN (
-    'Technology',
-    'Healthcare',
-    'Consumer Defensive',
-    'Industrials',
-    'Financial Services'
-)
-
--- 👉 경기 민감 산업 완전 제거 (Buy & Sleep 확보)
-AND m.sector NOT IN ('Energy', 'Basic Materials')
-
--- ✅ 7. 국가/지정학적 리스크 완벽 제거 (ADR 및 VIE 지주사 필터 추가)
-AND v.name NOT ILIKE ANY (ARRAY[
-    '%China%', '%Hong Kong%', 
-    '%Holdings Ltd%', '%Group Ltd%', '%Holdings Limited%', '%Group Limited%', 
-    '%ADR%'
-])
-
--- ✅ 8. 쓰레기 주식 및 껍데기(우선주/펀드) 제거
-AND v.name NOT ILIKE ANY (ARRAY[
-    '%Fund%', '%Trust%', '%ETF%', '%SPAC%', '%Acquisition%',
-    '%Depositary%', '%Depository%', '%Dep Shs%',
-    '%Preferred%', '%Pref%', '%Series%'
-])
-AND v.code NOT LIKE '%-%P%'
-
--- ✅ 9. 기존 보유 종목(마이 포트폴리오) 제외
-AND v.code NOT IN (
-    SELECT code FROM mytradeus WHERE trade_status = 1
-)
-
+-- ✅ 4. 최종 정렬 출력
+SELECT * FROM FilteredStocks
 ORDER BY 
-    strategy_type,              -- 💡 배당(DIVIDEND) / 성장(GROWTH) 그룹별 정렬
-    v.dividend_yield DESC,      -- 1순위: 배당 높은 순
-    v.forward_per ASC,          -- 2순위: 내년 이익 대비 싼 순 (성장 폭이 큰 순)
-    v.forward_roe DESC;         -- 3순위: 자본을 잘 굴리는 순
+    strategy_type,              -- 1순위: 그룹별로 묶어서 보기
+    dividend_yield DESC,        -- 2순위: 배당 높은 순
+    forward_per ASC;            -- 3순위: 내년 이익 대비 저평가 순
 
 
 
 위 쿼리는 미국에 상장된 기업중 저평가된 가치주를 선별하기 위해 만든 쿼리인데...
 위 쿼리 수행 결과가 아래와 같거든...
-여기서 다른 기업 정보 
-즉 roe나 배당이 꾸준히 증가하는지? 기업에 해자가 있는지?
+여기서 다른 기업 정보 즉 roe나 배당이 꾸준히 증가하는지? 기업에 해자가 있는지?
 등도 추가로 파악해서...
-안정적으로 배당을 받으면서 주가도 우상향할 수 있는 오래 보유할 가치주 TOP3 선별해줘...
+안정적으로 배당을 받거나 아니면 안정적으로 주가가 우상향할 수 있는 오래 보유할 가치주 TOP3 선별해줘...
 만약 리스트된 종목 모두 장기 보유에 적합한 가치주가 아니라면 솔직하게 모두 적당하지 않다고 답변해줘...
 
 
 
- trade_date | code |              name               | close_price | change_rate | pbr  |  per  | forward_per |  roe  | forward_roe | dividend_yield | market_cap_bakuk | trade_value_uk | net_debt_bakuk |       sector       | strategy_type
-------------+------+---------------------------------+-------------+-------------+------+-------+-------------+-------+-------------+----------------+------------------+----------------+----------------+--------------------+---------------
- 2026-04-20 | PAGS | PagSeguro Digital Ltd.          |       11.32 |        0.53 | 1.08 |  7.97 |        5.83 | 13.55 |       18.52 |           9.19 |              316 |            327 |             19 | Technology         | DIVIDEND
- 2026-04-20 | AEG  | Aegon Ltd. New York Registry Sh |        8.06 |       -0.62 | 1.37 | 11.35 |        8.70 | 12.07 |       15.75 |           5.83 |             1220 |            443 |            480 | Financial Services | DIVIDEND
- 2026-04-20 | CPA  | Copa Holdings, S.A.             |      125.30 |       -0.22 | 1.86 |  7.70 |        6.45 | 24.16 |       28.84 |           5.46 |              515 |            391 |             96 | Industrials        | DIVIDEND
- 2026-04-20 | NWG  | NatWest Group plc               |       16.53 |       -2.19 | 1.29 |  9.03 |        7.71 | 14.29 |       16.73 |           5.32 |             6588 |            965 |          -7259 | Financial Services | DIVIDEND
- 2026-04-20 | TROW | T. Rowe Price Group, Inc.       |       98.10 |        1.15 | 1.97 | 10.62 |       10.26 | 18.55 |       19.20 |           5.30 |             2139 |           1590 |           -290 | Financial Services | DIVIDEND
- 2026-04-20 | BBD  | Banco Bradesco Sa               |        4.19 |       -0.48 | 1.24 |  9.74 |        7.87 | 12.73 |       15.76 |           5.01 |             4429 |           1034 |          54581 | Financial Services | DIVIDEND
- 2026-04-20 | LNC  | Lincoln National Corporation    |       37.13 |        0.65 | 0.71 |  6.37 |        4.40 | 11.15 |       16.14 |           4.85 |              709 |            463 |          -3800 | Financial Services | DIVIDEND
- 2026-04-20 | BBVA | Banco Bilbao Vizcaya Argentaria |       23.20 |       -2.73 | 1.95 | 11.15 |       10.35 | 17.49 |       18.84 |           4.66 |            13070 |            519 |            424 | Financial Services | DIVIDEND
- 2026-04-20 | SFD  | Smithfield Foods, Inc.          |       28.56 |       -1.52 | 1.65 | 11.38 |       10.92 | 14.50 |       15.11 |           4.38 |             1123 |            596 |             85 | Consumer Defensive | DIVIDEND
- 2026-04-20 | OZK  | Bank OZK                        |       49.24 |        1.05 | 0.94 |  7.97 |        7.65 | 11.79 |       12.29 |           3.70 |              550 |            789 |           -219 | Financial Services | DIVIDEND
- 2026-04-20 | FG   | F&G Annuities & Life, Inc.      |       27.07 |       -0.15 | 0.76 | 14.40 |        4.47 |  5.28 |       17.00 |           3.69 |              367 |            101 |            -34 | Financial Services | DIVIDEND
- 2026-04-20 | IFS  | Intercorp Financial Services In |       48.99 |       -0.41 | 1.52 | 10.00 |        8.34 | 15.20 |       18.23 |           3.67 |              544 |            169 |            860 | Financial Services | DIVIDEND
- 2026-04-20 | USB  | U.S. Bancorp                    |       57.00 |        0.12 | 1.52 | 11.95 |       10.12 | 12.72 |       15.02 |           3.61 |             8863 |           4723 |           3079 | Financial Services | DIVIDEND
- 2026-04-20 | FBP  | First BanCorp. New              |       23.53 |        1.29 | 1.86 | 10.94 |       10.05 | 17.00 |       18.51 |           3.40 |              368 |            189 |            -29 | Financial Services | DIVIDEND
- 2026-04-20 | MFC  | Manulife Financial Corporation  |       38.56 |       -0.64 | 1.83 | 17.21 |       10.73 | 10.63 |       17.05 |           3.40 |             6448 |            569 |           -673 | Financial Services | DIVIDEND
- 2026-04-20 | KFY  | Korn Ferry                      |       66.63 |        1.32 | 1.71 | 13.22 |       11.56 | 12.93 |       14.79 |           3.30 |              347 |            162 |            -39 | Industrials        | DIVIDEND
- 2026-04-20 | PFG  | Principal Financial Group Inc   |       96.19 |        0.02 | 1.76 | 18.32 |        9.45 |  9.61 |       18.62 |           3.25 |             2085 |           1145 |           -136 | Financial Services | DIVIDEND
- 2026-04-20 | IX   | ORIX Corporation                |       31.87 |       -1.12 | 1.22 | 12.16 |        2.71 | 10.03 |       45.02 |           3.14 |             3500 |             79 |         540635 | Financial Services | DIVIDEND
- 2026-04-20 | FITB | Fifth Third Bancorp             |       50.98 |        1.27 | 1.69 | 17.16 |       10.39 |  9.85 |       16.27 |           3.14 |             4617 |           3500 |           1083 | Financial Services | DIVIDEND
- 2026-04-20 | MET  | MetLife, Inc.                   |       77.70 |       -0.49 | 1.79 | 16.50 |        7.10 | 10.85 |       25.21 |           2.92 |             5119 |           1443 |           3972 | Financial Services | GROWTH
- 2026-04-20 | RDN  | Radian Group Inc.               |       35.25 |       -0.34 | 1.00 |  8.03 |        6.55 | 12.45 |       15.27 |           2.89 |              480 |            142 |            -43 | Financial Services | GROWTH
- 2026-04-20 | INGR | Ingredion Incorporated          |      114.21 |       -0.90 | 1.68 | 10.22 |        9.55 | 16.44 |       17.59 |           2.87 |              720 |            462 |             93 | Consumer Defensive | GROWTH
- 2026-04-20 | EWBC | East West Bancorp, Inc.         |      119.09 |        0.91 | 1.84 | 12.51 |       10.80 | 14.71 |       17.04 |           2.69 |             1638 |           1131 |           -132 | Financial Services | GROWTH
- 2026-04-20 | VCTR | Victory Capital Holdings, Inc.  |       74.53 |        0.89 | 1.97 | 18.27 |       10.00 | 10.78 |       19.70 |           2.63 |              477 |            352 |             85 | Financial Services | GROWTH
- 2026-04-20 | ALLY | Ally Financial Inc.             |       46.30 |        2.07 | 1.08 | 19.54 |        7.18 |  5.53 |       15.04 |           2.59 |             1431 |           1578 |           1185 | Financial Services | GROWTH
- 2026-04-20 | VOYA | Voya Financial, Inc.            |       75.50 |        1.41 | 1.43 | 12.00 |        6.79 | 11.92 |       21.06 |           2.44 |              700 |            673 |            329 | Financial Services | GROWTH
- 2026-04-20 | EG   | Everest Group, Ltd.             |      350.64 |       -0.24 | 0.92 |  9.28 |        5.75 |  9.91 |       16.00 |           2.28 |             1416 |           1091 |            -52 | Financial Services | GROWTH
- 2026-04-20 | STT  | State Street Corporation        |      150.18 |        3.27 | 1.73 | 15.25 |       10.99 | 11.34 |       15.74 |           2.24 |             4185 |           4575 |                | Financial Services | GROWTH
- 2026-04-20 | CI   | The Cigna Group                 |      279.92 |        0.46 | 1.77 | 12.62 |        8.37 | 14.03 |       21.15 |           2.23 |             7477 |           2928 |           2273 | Healthcare         | GROWTH
- 2026-04-20 | SAN  | Banco Santander, S.A. Sponsored |       12.68 |       -1.55 | 1.56 | 12.81 |        9.65 | 12.18 |       16.17 |           2.21 |            18388 |            762 |          -3098 | Financial Services | GROWTH
- 2026-04-20 | CTSH | Cognizant Technology Solutions  |       60.26 |       -1.70 | 1.92 | 13.21 |        9.83 | 14.53 |       19.53 |           2.19 |             2908 |           4581 |            -74 | Technology         | GROWTH
- 2026-04-20 | CBSH | Commerce Bancshares, Inc.       |       51.40 |        0.53 | 1.87 | 12.72 |       11.93 | 14.70 |       15.67 |           2.14 |              757 |            729 |           -143 | Financial Services | GROWTH
- 2026-04-20 | WAL  | Western Alliance Bancorporation |       79.45 |        0.08 | 1.17 |  9.10 |        6.76 | 12.86 |       17.31 |           2.11 |              874 |            656 |            242 | Financial Services | GROWTH
- 2026-04-20 | THG  | Hanover Insurance Group Inc     |      179.99 |       -1.02 | 1.78 |  9.94 |        9.91 | 17.91 |       17.96 |           2.11 |              633 |            288 |              9 | Financial Services | GROWTH
- 2026-04-20 | BPOP | Popular, Inc.                   |      148.07 |        0.80 | 1.56 | 12.04 |        9.19 | 12.96 |       16.97 |           2.03 |              963 |            679 |           -348 | Financial Services | GROWTH
-(35 rows)
+ trade_date | code  |              name               | close_price | change_rate |  pbr  |  per  | forward_per |  roe  | forward_roe | dividend_yield | market_cap_bakuk | trade_value_uk | net_debt_bakuk |         sector         |       strategy_type
+------------+-------+---------------------------------+-------------+-------------+-------+-------+-------------+-------+-------------+----------------+------------------+----------------+----------------+------------------------+----------------------------
+ 2026-04-21 | ARLP  | Alliance Resource Partners, L.P |       24.79 |        0.81 |  1.73 | 10.33 |        9.09 | 16.75 |       19.03 |          10.08 |              318 |            113 |             39 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | WES   | Western Midstream Partners, LP  |       40.58 |       -0.27 |  4.12 | 13.62 |       10.92 | 30.25 |       37.73 |           9.17 |             1655 |            668 |            799 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | ABEV  | Ambev S.A.                      |        3.07 |        0.00 |  2.73 | 15.35 |       14.64 | 17.79 |       18.65 |           9.12 |             4788 |            921 |          -1693 | Consumer Defensive     | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | MPLX  | MPLX LP                         |       55.47 |       -0.40 |  3.94 | 11.51 |       11.25 | 34.23 |       35.02 |           7.77 |             5641 |           1522 |           2402 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | EPD   | Enterprise Products Partners L. |       37.21 |        0.81 |  2.70 | 13.99 |       11.88 | 19.30 |       22.73 |           5.89 |             8043 |            875 |           3391 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | BBY   | Best Buy Co., Inc.              |       66.59 |       -0.52 |  4.70 | 13.21 |        9.49 | 35.58 |       49.53 |           5.77 |             1395 |           1780 |            224 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | FRO   | Frontline Plc                   |       35.38 |       -4.30 |  3.14 | 20.81 |       12.36 | 15.09 |       25.40 |           4.97 |              787 |           1294 |            281 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | KVUE  | Kenvue Inc.                     |       17.30 |       -1.59 |  3.08 | 22.76 |       14.35 | 13.53 |       21.46 |           4.80 |             3321 |           2552 |            761 | Consumer Defensive     | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | EMN   | Eastman Chemical Company        |       72.46 |       -1.60 |  1.39 | 17.67 |       10.64 |  7.87 |       13.06 |           4.61 |              828 |            599 |            453 | Basic Materials        | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | REYN  | Reynolds Consumer Products Inc. |       20.98 |       -3.01 |  1.96 | 14.67 |       12.53 | 13.36 |       15.64 |           4.39 |              442 |            259 |            155 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | AM    | Antero Midstream Corporation    |       20.61 |       -1.29 |  4.95 | 23.97 |       13.89 | 20.65 |       35.64 |           4.37 |              981 |            450 |            304 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | SFD   | Smithfield Foods, Inc.          |       29.00 |        1.54 |  1.68 | 11.55 |       11.08 | 14.55 |       15.16 |           4.31 |             1141 |            285 |             85 | Consumer Defensive     | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | B     | Barrick Mining Corporation      |       40.45 |       -5.84 |  2.55 | 13.81 |        9.10 | 18.46 |       28.02 |           4.15 |             6793 |           4784 |           -149 | Basic Materials        | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | TTE   | TotalEnergies SE                |       88.37 |        1.21 |  1.65 | 15.29 |        9.62 | 10.79 |       17.15 |           4.14 |            18845 |           1034 |           3220 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | EQNR  | Equinor ASA                     |       37.65 |        4.55 |  4.66 | 19.41 |        9.75 | 24.01 |       47.79 |           4.14 |             9382 |           2045 |           1188 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | RIO   | Rio Tinto Plc                   |       97.72 |       -2.11 |  2.55 | 16.07 |       11.44 | 15.87 |       22.29 |           4.11 |            15890 |           1681 |           1432 | Basic Materials        | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | LKQ   | LKQ Corporation                 |       31.24 |        1.13 |  1.22 | 13.52 |        9.44 |  9.02 |       12.92 |           3.84 |              797 |            806 |            474 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | BVN   | Buenaventura Mining Company Inc |       31.76 |       -9.46 |  1.99 |  9.62 |        9.39 | 20.69 |       21.19 |           3.59 |              806 |            622 |             17 | Basic Materials        | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | KDP   | Keurig Dr Pepper Inc.           |       26.44 |       -0.23 |  1.41 | 17.28 |       10.57 |  8.16 |       13.34 |           3.48 |             3592 |           4315 |           1820 | Consumer Defensive     | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | TGT   | Target Corporation              |      132.10 |        1.47 |  3.70 | 16.23 |       15.51 | 22.80 |       23.86 |           3.45 |             5982 |           7580 |           1480 | Consumer Defensive     | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | BHP   | BHP Group Limited               |       77.69 |       -2.39 |  3.91 | 19.28 |       14.89 | 20.28 |       26.26 |           3.42 |            19735 |           2300 |           1568 | Basic Materials        | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | EXE   | Expand Energy Corporation       |       94.26 |       -1.27 |  1.21 | 12.45 |        9.84 |  9.72 |       12.30 |           3.38 |             2265 |           4345 |            449 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | SHEL  | Shell PLC                       |       88.66 |        0.75 |  1.45 | 14.78 |       10.20 |  9.81 |       14.22 |           3.36 |            24767 |           4189 |           4547 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | IPAR  | Interparfums, Inc.              |       95.20 |       -2.87 |  3.47 | 18.17 |       17.12 | 19.10 |       20.27 |           3.36 |              305 |            159 |             -8 | Consumer Defensive     | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | KFY   | Korn Ferry                      |       66.93 |        0.45 |  1.72 | 13.28 |       11.61 | 12.95 |       14.81 |           3.29 |              349 |            196 |            -39 | Industrials            | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | JD    | JD.com, Inc.                    |       30.52 |       -2.71 |  1.27 | 16.15 |        7.28 |  7.86 |       17.45 |           3.28 |             4518 |           2151 |         -10612 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | MGA   | Magna International, Inc.       |       61.67 |       -0.61 |  1.38 | 21.05 |        8.11 |  6.56 |       17.02 |           3.21 |             1717 |            790 |            507 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | PSX   | Phillips 66                     |      159.38 |        2.33 |  2.20 | 14.77 |       10.60 | 14.90 |       20.75 |           3.19 |             6390 |           2359 |           2046 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | MZTI  | The Marzetti Company            |      127.13 |       -4.59 |  3.38 | 19.47 |       17.29 | 17.36 |       19.55 |           3.15 |              349 |            524 |            -16 | Consumer Defensive     | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | EOG   | EOG Resources, Inc.             |      132.43 |        2.53 |  2.39 | 14.52 |        9.50 | 16.46 |       25.16 |           3.08 |             7104 |           4601 |            573 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | PR    | Permian Resources Corporation   |       19.91 |        1.58 |  1.44 | 15.55 |       10.17 |  9.26 |       14.16 |           3.06 |             1747 |           2517 |            354 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | TGS   | Transportadora de Gas del Sur S |       31.06 |        0.26 |  2.04 | 15.23 |       11.40 | 13.39 |       17.89 |           3.06 |              481 |             60 |         -10256 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | TS    | Tenaris S.A.                    |       60.75 |        1.86 |  3.70 | 16.60 |       15.89 | 22.29 |       23.29 |           2.93 |             3066 |           1086 |           -243 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | ALV   | Autoliv, Inc.                   |      117.69 |       -3.02 |  3.34 | 12.68 |        9.85 | 26.34 |       33.91 |           2.80 |              881 |            946 |            191 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | COP   | ConocoPhillips                  |      120.26 |        3.27 |  2.28 | 18.94 |       14.62 | 12.04 |       15.60 |           2.79 |            14699 |           8438 |           1741 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | SU    | Suncor Energy  Inc.             |       62.55 |        1.44 |  2.30 | 17.77 |       12.04 | 12.94 |       19.10 |           2.78 |             7447 |           2518 |           1121 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | XOM   | Exxon Mobil Corporation         |      148.36 |        0.46 |  2.39 | 22.14 |       14.74 | 10.79 |       16.21 |           2.78 |            61666 |          20590 |           3980 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | CTRA  | Coterra Energy Inc.             |       31.85 |        1.37 |  1.63 | 14.22 |       10.83 | 11.46 |       15.05 |           2.76 |             2418 |           1838 |            389 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | ZTO   | ZTO Express (Cayman) Inc.       |       25.52 |        0.91 |  2.10 | 15.56 |       11.76 | 13.50 |       17.86 |           2.70 |             1957 |            374 |          -1434 | Industrials            | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | GAP   | Gap, Inc. (The)                 |       26.65 |       -2.27 |  2.61 | 12.51 |       10.22 | 20.86 |       25.54 |           2.63 |              991 |           1265 |            260 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | STZ   | Constellation Brands, Inc.      |      156.95 |       -1.80 |  3.53 | 16.33 |       12.59 | 21.62 |       28.04 |           2.63 |             2732 |           1741 |           1046 | Consumer Defensive     | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | AEO   | American Eagle Outfitters, Inc. |       19.31 |       -2.87 |  1.93 | 17.72 |        9.78 | 10.89 |       19.73 |           2.59 |              321 |            958 |            150 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | FBIN  | Fortune Brands Innovations, Inc |       40.40 |       -2.37 |  2.03 | 16.36 |       10.32 | 12.41 |       19.67 |           2.57 |              484 |            442 |            255 | Industrials            | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | PPG   | PPG Industries, Inc.            |      110.92 |       -3.32 |  3.12 | 16.03 |       12.91 | 19.46 |       24.17 |           2.56 |             2482 |           1751 |            568 | Basic Materials        | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | MTDR  | Matador Resources Company       |       58.97 |        4.48 |  1.30 |  9.68 |        7.17 | 13.43 |       18.13 |           2.54 |              732 |           1091 |            353 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | SNA   | Snap-On Incorporated            |      383.58 |       -0.85 |  3.35 | 19.99 |       18.00 | 16.76 |       18.61 |           2.54 |             1996 |           1289 |            -33 | Industrials            | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | CRC   | California Resources Corporatio |       63.92 |        2.80 |  1.54 | 15.40 |       12.74 | 10.00 |       12.09 |           2.53 |              567 |            355 |            122 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | NFG   | National Fuel Gas Company       |       86.26 |       -0.47 |  2.28 | 12.03 |       10.46 | 18.95 |       21.80 |           2.48 |              819 |            587 |            250 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | CCEP  | Coca-Cola Europacific Partners  |       95.88 |       -1.46 |  4.66 | 19.14 |       16.68 | 24.35 |       27.94 |           2.45 |             4271 |           1562 |            982 | Consumer Defensive     | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | LEA   | Lear Corporation                |      128.47 |       -0.33 |  1.29 | 15.76 |        7.60 |  8.19 |       16.97 |           2.40 |              651 |            371 |            246 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | LEVI  | Levi Strauss & Co               |       23.36 |        1.08 |  4.07 | 17.18 |       13.91 | 23.69 |       29.26 |           2.40 |              898 |            721 |            150 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | YUMC  | Yum China Holdings, Inc.        |       48.50 |       -0.39 |  3.19 | 19.32 |       14.95 | 16.51 |       21.34 |           2.39 |             1702 |            574 |             94 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | CNI   | Canadian National Railway Compa |      110.17 |       -0.93 |  4.29 | 20.07 |       17.22 | 21.38 |       24.91 |           2.39 |             6744 |           1198 |           2127 | Industrials            | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | CBT   | Cabot Corporation               |       76.02 |        0.68 |  2.52 | 13.29 |       11.08 | 18.96 |       22.74 |           2.37 |              396 |            198 |             89 | Basic Materials        | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | PKG   | Packaging Corporation of Americ |      210.53 |       -1.35 |  4.06 | 24.54 |       17.64 | 16.54 |       23.02 |           2.37 |             1878 |           1161 |            376 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | AROC  | Archrock, Inc.                  |       35.19 |       -1.90 |  4.13 | 19.23 |       15.36 | 21.48 |       26.89 |           2.36 |              616 |            326 |            242 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | HMY   | Harmony Gold Mining Company Lim |       17.25 |       -5.94 |  3.40 | 10.92 |        5.20 | 31.14 |       65.38 |           2.32 |             1089 |           1353 |            594 | Basic Materials        | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | SLB   | SLB Limited                     |       52.77 |        1.09 |  3.02 | 22.46 |       15.80 | 13.45 |       19.11 |           2.24 |             7921 |           7170 |            824 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | CVE   | Cenovus Energy Inc              |       25.60 |        2.77 |  2.10 | 16.41 |       10.60 | 12.80 |       19.81 |           2.23 |             4811 |           1642 |           1146 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | OVV   | Ovintiv Inc. (DE)               |       54.91 |        2.73 |  1.24 | 11.49 |        7.00 | 10.79 |       17.71 |           2.19 |             1555 |           1002 |            610 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | DKS   | Dick's Sporting Goods Inc       |      228.81 |       -0.78 |  3.67 | 22.97 |       14.18 | 15.98 |       25.88 |           2.19 |             2058 |           1513 |            639 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | AOS   | A.O. Smith Corporation          |       64.99 |       -0.93 |  4.85 | 16.88 |       15.00 | 28.73 |       32.33 |           2.18 |              898 |            423 |              1 | Industrials            | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | LEN-B | Lennar Corporation              |       92.22 |        0.28 |  1.03 | 13.27 |        5.69 |  7.76 |       18.10 |           2.17 |             2271 |             47 |           -346 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | MGY   | Magnolia Oil & Gas Corporation  |       28.71 |        2.65 |  2.68 | 16.60 |       11.27 | 16.14 |       23.78 |           2.16 |              548 |            338 |             15 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | EDU   | New Oriental Education & Techno |       56.36 |       -3.66 |  2.30 | 23.48 |       13.40 |  9.80 |       17.16 |           2.13 |              939 |            344 |           -415 | Consumer Defensive     | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | SUNB  | Sunbelt Rentals Holdings, Inc.  |       70.57 |       -2.45 |  3.85 | 21.65 |       16.46 | 17.78 |       23.39 |           2.13 |             2916 |           1765 |           1042 | Industrials            | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | DVN   | Devon Energy Corporation        |       45.60 |        1.47 |  1.83 | 10.94 |        8.51 | 16.73 |       21.50 |           2.11 |             2833 |           4526 |            730 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | GNTX  | Gentex Corporation              |       22.74 |        0.04 |  1.97 | 13.07 |       10.57 | 15.07 |       18.64 |           2.11 |              489 |            463 |            -13 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | RPM   | RPM International Inc.          |      107.29 |       -2.21 |  4.36 | 20.67 |       18.30 | 21.09 |       23.83 |           2.01 |             1374 |            679 |            260 | Basic Materials        | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | MMS   | Maximus, Inc.                   |       67.92 |       -1.05 |  2.15 | 10.42 |        7.45 | 20.63 |       28.86 |           1.94 |              370 |            234 |            153 | Industrials            | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | DG    | Dollar General Corporation      |      124.11 |       -1.86 |  3.21 | 18.12 |       15.55 | 17.72 |       20.64 |           1.90 |             2733 |           2078 |           1458 | Consumer Defensive     | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | COLM  | Columbia Sportswear Company     |       63.97 |       -0.09 |  2.00 | 19.74 |       16.61 | 10.13 |       12.04 |           1.88 |              344 |            274 |            -31 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | GD    | General Dynamics Corporation    |      325.52 |       -1.99 |  3.43 | 21.08 |       18.11 | 16.27 |       18.94 |           1.87 |             8816 |           4303 |            745 | Industrials            | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | KBR   | KBR, Inc.                       |       36.71 |        0.69 |  3.09 | 10.52 |        8.74 | 29.37 |       35.35 |           1.80 |              465 |            383 |            238 | Industrials            | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | NSC   | Norfolk Southern Corporation    |      302.22 |       -0.63 |  4.36 | 23.72 |       22.57 | 18.38 |       19.32 |           1.79 |             6787 |           2725 |           1630 | Industrials            | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | MPC   | Marathon Petroleum Corporation  |      220.35 |        2.91 |  3.75 | 16.68 |       11.56 | 22.48 |       32.44 |           1.73 |             6494 |           3226 |           3068 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | BTG   | B2Gold Corp                     |        4.72 |       -4.45 |  1.76 | 16.86 |        3.98 | 10.44 |       44.22 |           1.69 |              634 |           2771 |             21 | Basic Materials        | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | GIL   | Gildan Activewear, Inc.         |       60.51 |        1.37 |  3.15 | 23.54 |       11.27 | 13.38 |       27.95 |           1.65 |             1121 |            908 |            435 | Consumer Cyclical      | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | BKR   | Baker Hughes Company            |       60.25 |        1.83 |  3.16 | 23.17 |       21.51 | 13.64 |       14.69 |           1.53 |             5975 |           3292 |            298 | Energy                 | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | OSK   | Oshkosh Corporation (Holding Co |      150.11 |       -1.11 |  2.07 | 14.98 |       10.54 | 13.82 |       19.64 |           1.52 |              940 |            554 |             89 | Industrials            | CORE_COMPOUNDER (전통복리)
+ 2026-04-21 | OMF   | OneMain Holdings, Inc.          |       58.91 |       -1.69 |  2.03 |  8.98 |        6.66 | 22.61 |       30.48 |           7.13 |              693 |            556 |           2190 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | AEG   | Aegon Ltd. New York Registry Sh |        8.02 |       -0.50 |  1.37 | 11.30 |        8.66 | 12.12 |       15.82 |           5.86 |             1214 |            612 |            480 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | NWG   | NatWest Group plc               |       16.11 |       -2.54 |  1.25 |  8.85 |        7.51 | 14.12 |       16.64 |           5.46 |             6420 |            498 |          -7259 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | BBD   | Banco Bradesco Sa               |        4.07 |       -2.86 |  1.21 |  9.47 |        7.65 | 12.78 |       15.82 |           5.16 |             4302 |           1492 |          54581 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | COLB  | Columbia Banking System, Inc.   |       29.09 |       -1.99 |  1.10 | 12.65 |        8.53 |  8.70 |       12.90 |           5.02 |              859 |            533 |            173 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | LNC   | Lincoln National Corporation    |       36.69 |       -1.19 |  0.70 |  6.29 |        4.35 | 11.13 |       16.09 |           4.91 |              701 |            926 |          -3800 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | AVA   | Avista Corporation              |       40.36 |       -2.20 |  1.22 | 16.96 |       14.45 |  7.19 |        8.44 |           4.86 |              333 |            204 |            329 | Utilities              | HIGH_YIELD (고배당가치)
+ 2026-04-21 | BBVA  | Banco Bilbao Vizcaya Argentaria |       22.47 |       -3.15 |  1.89 | 10.86 |       10.02 | 17.40 |       18.86 |           4.81 |            12699 |            485 |            424 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | ES    | Eversource Energy (D/B/A)       |       66.82 |       -2.47 |  1.55 | 14.65 |       13.20 | 10.58 |       11.74 |           4.71 |             2511 |           1091 |           3010 | Utilities              | HIGH_YIELD (고배당가치)
+ 2026-04-21 | ING   | ING Group, N.V.                 |       28.49 |       -1.42 |  1.30 | 11.44 |        9.19 | 11.36 |       14.15 |           4.49 |             8205 |            639 |          10375 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | D     | Dominion Energy, Inc.           |       61.09 |       -1.82 |  1.91 | 17.61 |       16.03 | 10.85 |       11.92 |           4.37 |             5369 |           1613 |           4989 | Utilities              | HIGH_YIELD (고배당가치)
+ 2026-04-21 | WSBC  | WesBanco, Inc.                  |       35.73 |       -1.62 |  0.90 | 16.02 |        8.67 |  5.62 |       10.38 |           4.25 |              343 |            253 |             74 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | BNS   | Bank Nova Scotia Halifax Pfd 3  |       75.87 |       -1.19 |  1.46 | 15.52 |       11.35 |  9.41 |       12.86 |           4.19 |             9387 |           1305 |         -17635 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | UGI   | UGI Corporation                 |       36.52 |       -0.81 |  1.57 | 13.58 |       10.79 | 11.56 |       14.55 |           4.11 |              784 |            260 |            696 | Utilities              | HIGH_YIELD (고배당가치)
+ 2026-04-21 | TFC   | Truist Financial Corporation    |       51.07 |        0.45 |  1.07 | 12.64 |        9.98 |  8.47 |       10.72 |           4.07 |             6362 |           3677 |           2358 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | CNA   | CNA Financial Corporation       |       48.17 |        1.03 |  1.12 | 10.27 |       10.04 | 10.91 |       11.16 |           3.99 |             1303 |            212 |             44 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | WF    | Woori Financial Group Inc.      |       71.60 |       -2.27 |  2.44 |  8.65 |        7.86 | 28.21 |       31.04 |           3.94 |             1744 |             87 |        4522141 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | BSAC  | Banco Santander - Chile         |       34.16 |       -3.69 |  1.40 | 13.83 |       11.05 | 10.12 |       12.67 |           3.89 |             1609 |            112 |                | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | FHB   | First Hawaiian, Inc.            |       26.87 |       -1.03 |  1.19 | 12.21 |       11.28 |  9.75 |       10.55 |           3.87 |              330 |            618 |           -142 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | IFS   | Intercorp Financial Services In |       47.70 |       -2.63 |  1.48 |  9.86 |        8.12 | 15.01 |       18.23 |           3.77 |              529 |            109 |            860 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | SLF   | Sun Life Financial Inc.         |       70.32 |       -0.13 |  2.33 | 15.77 |       11.28 | 14.77 |       20.66 |           3.75 |             3896 |            308 |          -7681 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | RF    | Regions Financial Corporation   |       28.35 |        0.14 |  1.39 | 11.76 |        9.93 | 11.82 |       14.00 |           3.74 |             2421 |           2154 |           -480 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | KEY   | KeyCorp                         |       22.10 |       -0.41 |  1.36 | 13.56 |       10.29 | 10.03 |       13.22 |           3.71 |             2402 |           3169 |           1514 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | FG    | F&G Annuities & Life, Inc.      |       27.11 |        0.15 |  0.77 | 14.42 |        4.48 |  5.34 |       17.19 |           3.69 |              367 |             90 |            -34 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | LYG   | Lloyds Banking Group Plc        |        5.42 |       -3.56 |  1.41 | 14.65 |       10.19 |  9.62 |       13.84 |           3.69 |             7958 |           1185 |          -2300 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | HBAN  | Huntington Bancshares Incorpora |       16.97 |       -0.53 |  1.23 | 12.21 |        8.87 | 10.07 |       13.87 |           3.65 |             3456 |           2382 |            489 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | EXC   | Exelon Corporation              |       46.27 |       -0.28 |  1.64 | 16.95 |       15.21 |  9.68 |       10.78 |           3.63 |             4734 |           4490 |           4961 | Utilities              | HIGH_YIELD (고배당가치)
+ 2026-04-21 | DB    | Deutsche Bank AG                |       32.57 |       -2.46 |  0.65 |  8.95 |        6.04 |  7.26 |       10.76 |           3.62 |             6317 |            695 |         -22060 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | USB   | U.S. Bancorp                    |       56.84 |       -0.28 |  1.51 | 11.92 |       10.09 | 12.67 |       14.97 |           3.62 |             8838 |           3589 |           3079 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | BOH   | Bank of Hawaii Corporation      |       77.78 |       -2.85 |  2.05 | 15.68 |       11.24 | 13.07 |       18.24 |           3.60 |              308 |            385 |            -23 | Financial Services     | HIGH_YIELD (고배당가치)
+ 2026-04-21 | WIT   | Wipro Limited                   |        2.13 |       -0.47 |  2.33 | 15.21 |       13.38 | 15.32 |       17.41 |           8.92 |             2278 |            288 |         -34032 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | PAYX  | Paychex, Inc.                   |       93.68 |        0.63 |  8.36 | 20.68 |       15.87 | 40.43 |       52.68 |           4.61 |             3356 |           3037 |            323 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | UMC   | United Microelectronics Corpora |       12.33 |       -2.45 |  2.57 | 23.26 |       16.52 | 11.05 |       15.56 |           3.89 |             3129 |           1612 |          -4939 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | CHT   | Chunghwa Telecom Co., Ltd.      |       43.10 |       -0.90 | 10.91 | 27.28 |       25.90 | 39.99 |       42.12 |           3.87 |             3343 |             42 |          -1948 | Communication Services | INNOVATION (혁신성장)
+ 2026-04-21 | PHG   | Koninklijke Philips N.V. NY Reg |       28.48 |       -2.43 |  2.10 | 26.13 |       13.90 |  8.04 |       15.11 |           3.55 |             2730 |            307 |            529 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | MDT   | Medtronic plc.                  |       82.00 |       -3.53 |  2.15 | 22.91 |       13.53 |  9.38 |       15.89 |           3.46 |            10527 |           7488 |           1968 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | DOX   | Amdocs Limited                  |       66.37 |       -0.88 |  2.09 | 12.84 |        8.20 | 16.28 |       25.49 |           3.44 |              716 |            558 |             70 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | ACN   | Accenture plc                   |      194.42 |       -0.33 |  3.83 | 15.95 |       13.04 | 24.01 |       29.37 |           3.35 |            11965 |           6194 |           -105 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | NVS   | Novartis AG                     |      147.97 |       -2.00 |  6.12 | 20.67 |       15.24 | 29.61 |       40.16 |           3.20 |            28561 |           3133 |           2392 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | GSK   | GSK plc                         |       56.12 |       -2.14 |  5.07 | 14.93 |       10.87 | 33.96 |       46.64 |           3.17 |            11205 |           2244 |           1436 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | MRK   | Merck & Company, Inc.           |      112.56 |       -3.88 |  5.29 | 15.46 |       11.56 | 34.22 |       45.76 |           3.02 |            27829 |          11776 |           3596 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | ABT   | Abbott Laboratories             |       92.72 |       -3.42 |  3.09 | 25.97 |       15.30 | 11.90 |       20.20 |           2.72 |            16111 |          15876 |            519 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | QCOM  | QUALCOMM Incorporated           |      135.56 |       -1.43 |  6.31 | 27.33 |       12.27 | 23.09 |       51.43 |           2.71 |            14478 |          16058 |            299 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | IBM   | International Business Machines |      255.68 |        0.78 |  7.34 | 22.95 |       19.10 | 31.98 |       38.43 |           2.63 |            23993 |          14251 |           5018 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | UNH   | UnitedHealth Group Incorporated |      346.01 |        6.96 |  3.33 | 26.15 |       17.20 | 12.73 |       19.36 |           2.55 |            31406 |          90080 |           5488 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | GILD  | Gilead Sciences, Inc.           |      133.29 |       -1.90 |  7.29 | 19.66 |       13.85 | 37.08 |       52.64 |           2.46 |            16544 |           7428 |           1592 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | BR    | Broadridge Financial Solutions, |      161.87 |        0.37 |  6.56 | 17.89 |       15.64 | 36.67 |       41.94 |           2.41 |             1889 |           1533 |            300 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | JNJ   | Johnson & Johnson               |      226.16 |       -1.96 |  6.68 | 20.50 |       17.80 | 32.59 |       37.53 |           2.37 |            54502 |          25990 |           2923 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | CTSH  | Cognizant Technology Solutions  |       60.45 |        0.32 |  1.93 | 13.26 |        9.86 | 14.56 |       19.57 |           2.18 |             2917 |           3273 |            -74 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | G     | Genpact Limited                 |       37.03 |        1.06 |  2.47 | 11.83 |        8.35 | 20.88 |       29.58 |           2.03 |              629 |            837 |             55 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | RPRX  | Royalty Pharma plc              |       49.48 |        0.37 |  3.27 | 27.80 |        8.95 | 11.76 |       36.54 |           1.90 |             2933 |           1261 |            833 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | CSCO  | Cisco Systems, Inc.             |       89.70 |        2.27 |  7.42 | 32.27 |       19.88 | 22.99 |       37.32 |           1.87 |            35441 |          16717 |           1596 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | NXPI  | NXP Semiconductors N.V.         |      224.50 |        1.43 |  5.64 | 28.24 |       13.45 | 19.97 |       41.93 |           1.81 |             5672 |           7547 |            924 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | DGX   | Quest Diagnostics Incorporated  |      205.04 |        4.45 |  3.15 | 23.41 |       17.86 | 13.46 |       17.64 |           1.68 |             2269 |           4972 |            616 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | SAP   | SAP  SE                         |      176.44 |       -1.40 |  3.94 | 24.57 |       17.94 | 16.04 |       21.96 |           1.68 |            20747 |           5126 |           -206 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | LOGI  | Logitech International S.A. - R |       98.17 |       -1.84 |  6.17 | 20.58 |       17.08 | 29.98 |       36.12 |           1.62 |             1447 |            922 |           -172 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | AZN   | AstraZeneca PLC                 |      195.78 |       -2.45 |  6.24 | 29.94 |       24.64 | 20.84 |       25.32 |           1.61 |            30351 |           4171 |           2398 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | GRMN  | Garmin Ltd.                     |      265.49 |       -0.76 |  5.70 | 30.91 |       26.03 | 18.44 |       21.90 |           1.58 |             5110 |           1110 |           -254 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | JKHY  | Jack Henry & Associates, Inc.   |      155.50 |        1.06 |  5.09 | 22.31 |       22.24 | 22.81 |       22.89 |           1.51 |             1125 |           1675 |              4 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | ATR   | AptarGroup, Inc.                |      126.69 |       -3.23 |  3.05 | 21.51 |       19.90 | 14.18 |       15.33 |           1.47 |              815 |            310 |            113 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | DLO   | DLocal Limited                  |       13.30 |       -1.70 |  6.89 | 20.46 |       12.17 | 33.68 |       56.61 |           1.43 |              392 |            126 |            -75 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | BMI   | Badger Meter, Inc.              |      120.89 |        6.60 |  5.12 | 27.35 |       23.78 | 18.72 |       21.53 |           1.27 |              352 |           2082 |            -20 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | BZ    | KANZHUN LIMITED - American Depo |       13.82 |       -1.92 |  2.18 | 15.89 |        9.45 | 13.72 |       23.07 |           1.23 |              634 |            616 |          -1984 | Communication Services | INNOVATION (혁신성장)
+ 2026-04-21 | PAYC  | Paycom Software, Inc.           |      130.44 |       -1.91 |  4.03 | 16.12 |       11.20 | 25.00 |       35.98 |           1.15 |              707 |           1070 |            -27 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | INTU  | Intuit Inc.                     |      404.85 |        0.00 |  5.90 | 26.32 |       15.29 | 22.42 |       38.59 |           1.15 |            11265 |          12669 |            391 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | STE   | STERIS plc (Ireland)            |      219.45 |       -3.07 |  3.01 | 30.56 |       19.81 |  9.85 |       15.19 |           1.12 |             2153 |           2641 |            162 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | LDOS  | Leidos Holdings, Inc.           |      153.20 |       -1.05 |  3.94 | 13.74 |       11.63 | 28.68 |       33.88 |           1.08 |             1936 |           1073 |            423 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | RMD   | ResMed Inc.                     |      221.22 |       -2.18 |  5.10 | 21.88 |       18.16 | 23.31 |       28.08 |           1.08 |             3229 |           1815 |            -56 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | INGM  | Ingram Micro Holding Corporatio |       30.86 |        1.81 |  1.71 | 22.20 |        8.68 |  7.70 |       19.70 |           1.07 |              725 |            299 |            179 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | LH    | Labcorp Holdings Inc.           |      273.42 |        1.57 |  2.61 | 26.11 |       14.18 | 10.00 |       18.41 |           1.05 |             2252 |           1559 |            599 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | FOX   | Fox Corporation                 |       57.63 |       -0.62 |  2.24 | 13.82 |       11.60 | 16.21 |       19.31 |           0.97 |             2690 |            405 |            547 | Communication Services | INNOVATION (혁신성장)
+ 2026-04-21 | CRM   | Salesforce, Inc.                |      187.11 |        0.45 |  2.94 | 23.99 |       12.53 | 12.26 |       23.46 |           0.94 |            17270 |          22496 |            814 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | SNX   | TD SYNNEX Corporation           |      215.19 |       -1.23 |  1.96 | 17.92 |       11.92 | 10.94 |       16.44 |           0.89 |             1734 |           1033 |            359 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | FOXA  | Fox Corporation                 |       64.31 |       -0.68 |  2.50 | 15.42 |       12.47 | 16.21 |       20.05 |           0.87 |             2735 |           1554 |            547 | Communication Services | INNOVATION (혁신성장)
+ 2026-04-21 | MSFT  | Microsoft Corporation           |      424.16 |        1.46 |  8.06 | 26.56 |       22.44 | 30.35 |       35.92 |           0.86 |           315251 |         134796 |           3381 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | A     | Agilent Technologies, Inc.      |      122.09 |        0.93 |  5.00 | 26.89 |       18.55 | 18.59 |       26.95 |           0.84 |             3453 |           1699 |            179 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | EHC   | Encompass Health Corporation    |      102.77 |       -3.29 |  4.21 | 18.52 |       15.87 | 22.73 |       26.53 |           0.74 |             1034 |            585 |            264 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | ADEA  | Adeia Inc.                      |       29.72 |        0.68 |  6.74 | 30.02 |       19.86 | 22.45 |       33.94 |           0.67 |              329 |            504 |             29 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | GIB   | CGI Inc.                        |       76.80 |       -0.18 |  2.27 | 14.17 |       10.80 | 16.02 |       21.02 |           0.65 |             1650 |            399 |            358 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | QGEN  | Qiagen N.V.                     |       40.10 |       -2.29 |  2.19 | 19.66 |       14.56 | 11.14 |       15.04 |           0.65 |              826 |            409 |             73 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | CHE   | Chemed Corp                     |      373.79 |       -3.11 |  5.23 | 20.40 |       14.04 | 25.64 |       37.25 |           0.62 |              514 |           1253 |              6 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | REGN  | Regeneron Pharmaceuticals, Inc. |      747.36 |       -0.27 |  2.45 | 18.00 |       14.26 | 13.61 |       17.18 |           0.50 |             7901 |           5286 |           -563 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | TMO   | Thermo Fisher Scientific Inc    |      524.57 |       -0.28 |  3.70 | 29.59 |       19.33 | 12.50 |       19.14 |           0.34 |            19494 |           9053 |           3125 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | PEGA  | Pegasystems Inc.                |       39.29 |      -10.30 |  8.50 | 18.45 |       12.82 | 46.07 |       66.30 |           0.31 |              666 |           2098 |            -34 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | META  | Meta Platforms, Inc.            |      668.84 |       -0.31 |  7.79 | 28.49 |       18.78 | 27.34 |       41.48 |           0.31 |           169779 |          57440 |            348 | Communication Services | INNOVATION (혁신성장)
+ 2026-04-21 | GOOG  | Alphabet Inc.                   |      330.47 |       -1.47 |  9.62 | 30.60 |       24.51 | 31.44 |       39.25 |           0.25 |           399769 |          47625 |          -5984 | Communication Services | INNOVATION (혁신성장)
+ 2026-04-21 | GOOGL | Alphabet Inc.                   |      332.29 |       -1.52 |  9.67 | 30.77 |       24.65 | 31.43 |       39.23 |           0.25 |           401971 |          76626 |          -5984 | Communication Services | INNOVATION (혁신성장)
+ 2026-04-21 | GEHC  | GE HealthCare Technologies Inc. |       72.26 |       -2.55 |  3.17 | 15.88 |       12.99 | 19.96 |       24.40 |           0.19 |             3297 |           1944 |            597 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | BDC   | Belden Inc                      |      132.63 |        0.65 |  4.09 | 22.48 |       14.90 | 18.19 |       27.45 |           0.15 |              516 |            316 |            102 | Technology             | INNOVATION (혁신성장)
+ 2026-04-21 | ENSG  | The Ensign Group, Inc.          |      191.74 |       -2.94 |  4.95 | 32.78 |       23.27 | 15.10 |       21.27 |           0.14 |             1120 |           1414 |            163 | Healthcare             | INNOVATION (혁신성장)
+ 2026-04-21 | MU    | Micron Technology, Inc.         |      449.38 |        0.21 |  7.00 | 21.19 |        4.45 | 33.03 |      157.30 |           0.13 |            50678 |         120785 |           -379 | Technology             | INNOVATION (혁신성장)
+(171 rows)
 
 
 -- grok
@@ -1188,4 +1238,5 @@ INGR → 30% (방어)
 🥈 2. 더 시그나 그룹 (CI - The Cigna Group)
 🥉 3. 뱅크 오즈케이 (OZK - Bank OZK)
 
-| grep -Ee 'trade_date|VICI|CMCSA|PRU|TROW|INGR'
+| grep -Ee 'trade_date|VICI|CMCSA|PRU|TROW|INGR|CI|OZK'
+
