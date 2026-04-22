@@ -1034,7 +1034,8 @@ ORDER BY
 위 쿼리 수행 결과가 아래와 같거든...
 여기서 다른 기업 정보 즉 roe나 배당이 꾸준히 증가하는지? 기업에 해자가 있는지?
 등도 추가로 파악해서...
-안정적으로 배당을 받거나 아니면 안정적으로 주가가 우상향할 수 있는 오래 보유할 장기 복리 가치주 TOP3 선별해줘...
+향후 AI 시대에도 경쟁력이 있고 안정적으로 배당을 받거나 아니면 안정적으로 주가가 우상향할 수 있는
+오래 보유할 장기 복리 가치주 TOP3 선별해줘...
 만약 리스트된 종목 모두 장기 보유에 적합한 가치주가 아니라면 솔직하게 모두 적합하지 않다고 답변해줘...
 
 
@@ -1216,27 +1217,14 @@ ORDER BY
 
 
 -- grok
-1. TROW - T. Rowe Price Group, Inc. (Financial Services, market_cap ≈ $21.39B, DIVIDEND track)
-2. INGR - Ingredion Incorporated (Consumer Defensive, market_cap ≈ $7.2B, GROWTH track)
-3. CI - The Cigna Group (Healthcare, market_cap ≈ $74.77B, GROWTH track)
 
 -- claud
 
-
 -- qwen
-🥇 1위: **U.S. Bancorp **(USB) - 미국 지역 은행
-🥈 2위: **T. Rowe Price **(TROW) - 자산운용사
-🥉 3위: **Ingredion **(INGR) - 식품 소재 기업
 
 -- chatgpt
-TROW → 40% (핵심)
-CTSH → 30% (성장)
-INGR → 30% (방어)
 
 -- gemini
-🥇 1. 티 로우 프라이스 그룹 (TROW - T. Rowe Price Group)
-🥈 2. 더 시그나 그룹 (CI - The Cigna Group)
-🥉 3. 뱅크 오즈케이 (OZK - Bank OZK)
 
 | grep -Ee 'trade_date|VICI|CMCSA|PRU|TROW|INGR|CI|OZK'
 
