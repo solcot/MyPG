@@ -521,7 +521,7 @@ SELECT  a.trade_date,a.code,a.name
    ,trade_hist_avg_pbr
    ,trade_close_price
    ,remark
-   ,((1- y.close_price / b.trade_close_price) * 100)::numeric(10,2) first_profit_ratio
+   ,((y.close_price / b.trade_close_price - 1) * 100)::numeric(10,2) first_profit_ratio
    ,':::' div
    ,case when b.trade_div = 'bond1' then a.expected_cagr - trade_expected_cagr end bond1_diff
    ,case when b.trade_div = 'bond1' then a.expected_cagr - 10 end bond1_sell
@@ -909,8 +909,8 @@ JOIN public.stockmainus m ON v.trade_date = m.trade_date AND v.code = m.code
 LEFT JOIN public.stock_debtus d ON v.code = d.code 
 WHERE v.trade_date = (SELECT MAX(trade_date) FROM public.stockmainus)
 and v.code in (
-'OZK'  
-,'CI' 
+'ACN'  
+,'DOX' 
 ,'' 
 ,'' 
 ,'' 
