@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 from bs4 import BeautifulSoup
 from io import StringIO
@@ -9,14 +10,24 @@ import psycopg2
 from psycopg2.extras import execute_batch
 import threading
 from concurrent.futures import ThreadPoolExecutor
-import requests  # 디스코드 전송을 위해 추가
-from datetime import datetime  # 디스코드 시간 표시를 위해 추가
+import requests  
+from datetime import datetime  
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By 
+
+# =========================================================
+# 🌟 [추가됨] 좀비 프로세스 완벽 청소 함수
+# =========================================================
+def kill_zombie_processes():
+    """백그라운드에 꼬여있는 크롬 드라이버를 강제로 싹 지웁니다."""
+    try:
+        os.system("taskkill /f /im chromedriver.exe /T >nul 2>&1")
+    except:
+        pass
 
 # =========================================================
 # 1. 설정 파일 로드 및 DB 연결 함수
@@ -28,7 +39,6 @@ try:
     DBNAME = _cfg['DBNAME']
     USER = _cfg['USER']
     PASSWORD = _cfg['PASSWORD']
-    # 🌟 디스코드 웹훅 URL 로드 추가
     DISCORD_WEBHOOK_URL = _cfg.get('DISCORD_WEBHOOK_URL', '') 
 except Exception as e:
     print(f"⚠️ 설정 파일 로드 실패: {e}")
@@ -38,34 +48,27 @@ except Exception as e:
 def get_db_connection():
     return psycopg2.connect(host=HOST, dbname=DBNAME, user=USER, password=PASSWORD)
 
-# 🌟 디스코드 메시지 전송 함수 추가
 def send_message(msg):
-    """디스코드 메세지 전송"""
-    if not DISCORD_WEBHOOK_URL:
-        return
+    if not DISCORD_WEBHOOK_URL: return
     now = datetime.now()
     message = {"content": f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] {str(msg)}"}
-    try:
-        requests.post(DISCORD_WEBHOOK_URL, json=message, timeout=5)
-    except Exception as e:
-        print(f"❌ Discord 전송 실패: {e}", flush=True)
+    try: requests.post(DISCORD_WEBHOOK_URL, json=message, timeout=5)
+    except Exception as e: print(f"❌ Discord 전송 실패: {e}", flush=True)
 
 # =========================================================
-# 2. 멀티스레딩용 크롬 드라이버 관리 (주기적 재부팅 적용)
+# 2. 멀티스레딩용 크롬 드라이버 관리 
 # =========================================================
 thread_local = threading.local()
 active_drivers = [] 
 
 def get_driver():
-    """각 스레드마다 크롬을 할당하되, 50번 쓰면 껐다 켜서 메모리를 확보합니다."""
     if hasattr(thread_local, "driver") and hasattr(thread_local, "usage_count"):
         if thread_local.usage_count > 50:
             try:
                 thread_local.driver.quit()
                 if thread_local.driver in active_drivers:
                     active_drivers.remove(thread_local.driver)
-            except:
-                pass
+            except: pass
             del thread_local.driver
 
     if not hasattr(thread_local, "driver"):
@@ -87,6 +90,9 @@ def get_driver():
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
+        # 🌟 [추가됨] 무한 대기 멈춤 방지: 15초 안에 응답 없으면 강제 에러 발생!
+        driver.set_page_load_timeout(15)
+        
         thread_local.driver = driver
         thread_local.usage_count = 0
         active_drivers.append(driver)
@@ -95,7 +101,7 @@ def get_driver():
     return thread_local.driver
 
 # =========================================================
-# 3. 크롤링 로직 (에러 발생 시 브라우저 강제 폐기 로직 포함)
+# 3. 크롤링 로직 (무한 대기 방지 및 폐기 로직 포함)
 # =========================================================
 def get_wisereport_recent_net_debt(stock_code):
     driver = get_driver()
@@ -111,24 +117,20 @@ def get_wisereport_recent_net_debt(stock_code):
                 try:
                     driver.execute_script("arguments[0].click();", el)
                     break 
-                except:
-                    continue
+                except: continue
                     
         time.sleep(1.5) 
-        
         html = driver.page_source
         tables = pd.read_html(StringIO(html))
         
     except Exception as e:
-        print(f"[{stock_code}] 크롤링/파싱 중 에러: {e}")
+        print(f"⚠️ [{stock_code}] 접속 지연 또는 파싱 에러 (드라이버 강제 폐기)")
         try:
             driver.quit()
             if driver in active_drivers:
                 active_drivers.remove(driver)
-        except:
-            pass
-        if hasattr(thread_local, 'driver'):
-            del thread_local.driver
+        except: pass
+        if hasattr(thread_local, 'driver'): del thread_local.driver
         return None
 
     # --- 데이터 정밀 매칭 및 추출 로직 ---
@@ -168,27 +170,23 @@ def get_wisereport_recent_net_debt(stock_code):
                 raw_val = df.loc[target_idx, target_col]
                 val_str = str(raw_val).replace(',', '').strip()
                 
-                if val_str in ['-', '', 'NaN', 'nan']:
-                    return None
-                    
-                try:
-                    return float(val_str)
-                except ValueError:
-                    return None
-                    
+                if val_str in ['-', '', 'NaN', 'nan']: return None
+                try: return float(val_str)
+                except ValueError: return None
     return None
 
 def process_stock(stock_info):
-    """멀티스레딩에서 개별 종목을 처리할 래퍼 함수"""
     code, name = stock_info
     net_debt_val = get_wisereport_recent_net_debt(code)
     return (code, name, net_debt_val)
 
 # =========================================================
-# 4. Main 실행: 멀티스레딩 병렬 처리 및 DB 연동
+# 4. Main 실행: [청크 분할] 및 DB 연동
 # =========================================================
 if __name__ == "__main__":
-    # 🌟 시작 알림 (터미널 출력 + 디스코드 전송)
+    # 시작 전 청소
+    kill_zombie_processes()
+    
     start_msg = "🚀 [순부채 수집 시스템 - 고속 병렬 버전] 작동 시작..."
     print(start_msg)
     send_message(start_msg)
@@ -196,10 +194,8 @@ if __name__ == "__main__":
     conn = get_db_connection()
     codes_to_fetch = []
     
-    # 🌟 [추가됨] 1. 실행되는 현재 시점의 날짜 구하기
+    # 🌟 1. 당일 날짜 설정 및 DB 초기화
     current_date = datetime.now().date()
-    
-    # 🌟 [추가됨] 2. 해당 날짜 데이터 초기화 (Truncate 효과)
     try:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM stock_debt WHERE trade_date = %s", (current_date,))
@@ -219,68 +215,80 @@ if __name__ == "__main__":
         
     print(f"✅ DB에서 수집 대상 {len(codes_to_fetch)}개 종목을 불러왔습니다.")
 
-    insert_values = []
     success_cnt = 0
     fail_cnt = 0
-
-    print("\n🌐 [병렬 수집 시작] 5개의 크롬이 동시에 데이터를 수집합니다...")
-    
     MAX_WORKERS = 5 
     
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        for idx, result in enumerate(executor.map(process_stock, codes_to_fetch), 1):
-            code, name, net_debt_val = result
-            
-            if net_debt_val is None or math.isnan(net_debt_val):
-                db_val = 'NaN'
-                fail_cnt += 1
-            else:
-                db_val = net_debt_val
-                success_cnt += 1
+    # 🌟 2. 회원님 아이디어 적용: 500개 단위 청크(Chunk) 분할
+    chunk_size = 500
+    chunks = [codes_to_fetch[i:i + chunk_size] for i in range(0, len(codes_to_fetch), chunk_size)]
+
+    print("\n🌐 [병렬 수집 시작] 500개씩 쪼개어 안전하게 수집을 진행합니다...")
+
+    for chunk_idx, chunk in enumerate(chunks):
+        print(f"\n📦 === 청크 {chunk_idx + 1}/{len(chunks)} 시작 (총 {len(chunk)}개) ===")
+        insert_values = []
+        
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            for idx, result in enumerate(executor.map(process_stock, chunk), 1):
+                code, name, net_debt_val = result
                 
-            # 🌟 [수정됨] 3. insert 데이터 구조에 current_date 추가
-            insert_values.append((current_date, code, name, db_val))
-            
-            if idx % 10 == 0:
-                print(f"⏳ 진행중... {idx}/{len(codes_to_fetch)} 완료 (최근 완료: {name}, 순부채: {db_val})")
+                if net_debt_val is None or math.isnan(net_debt_val):
+                    db_val = 'NaN'
+                    fail_cnt += 1
+                else:
+                    db_val = net_debt_val
+                    success_cnt += 1
+                    
+                insert_values.append((current_date, code, name, db_val))
+                
+                # 진행률 표시
+                if idx % 10 == 0:
+                    current_total = (chunk_idx * chunk_size) + idx
+                    print(f"⏳ 전체 진행중... {current_total}/{len(codes_to_fetch)} 완료 (최근: {name})")
 
-            if len(insert_values) >= 100:
-                with conn.cursor() as cur:
-                    # 🌟 [수정됨] 4. INSERT 쿼리에 trade_date 반영
-                    sql_insert = """
-                        INSERT INTO stock_debt (trade_date, code, name, net_debt)
-                        VALUES (%s, %s, %s, %s)
-                        ON CONFLICT (trade_date, code) DO UPDATE 
-                        SET name = EXCLUDED.name,
-                            net_debt = EXCLUDED.net_debt,
-                            created_at = now();
-                    """
-                    execute_batch(cur, sql_insert, insert_values, page_size=100)
-                    conn.commit()
-                insert_values.clear()
+                # DB 저장 (100개마다)
+                if len(insert_values) >= 100:
+                    with conn.cursor() as cur:
+                        sql_insert = """
+                            INSERT INTO stock_debt (trade_date, code, name, net_debt)
+                            VALUES (%s, %s, %s, %s)
+                            ON CONFLICT (trade_date, code) DO UPDATE 
+                            SET name = EXCLUDED.name,
+                                net_debt = EXCLUDED.net_debt,
+                                created_at = now();
+                        """
+                        execute_batch(cur, sql_insert, insert_values, page_size=100)
+                        conn.commit()
+                    insert_values.clear()
 
-    if insert_values:
-        with conn.cursor() as cur:
-            sql_insert = """
-                INSERT INTO stock_debt (trade_date, code, name, net_debt)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (trade_date, code) DO UPDATE 
-                SET name = EXCLUDED.name,
-                    net_debt = EXCLUDED.net_debt,
-                    created_at = now();
-            """
-            execute_batch(cur, sql_insert, insert_values, page_size=100)
-            conn.commit()
-            
-    for d in active_drivers:
-        try:
-            d.quit()
-        except:
-            pass
-            
+        # 청크 종료 후 남은 자투리 DB 저장
+        if insert_values:
+            with conn.cursor() as cur:
+                sql_insert = """
+                    INSERT INTO stock_debt (trade_date, code, name, net_debt)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (trade_date, code) DO UPDATE 
+                    SET name = EXCLUDED.name,
+                        net_debt = EXCLUDED.net_debt,
+                        created_at = now();
+                """
+                execute_batch(cur, sql_insert, insert_values, page_size=100)
+                conn.commit()
+
+        # 🌟 3. 청크(500개)가 끝날 때마다 크롬 완벽 초기화 & 휴식
+        print(f"💤 청크 {chunk_idx + 1} 완료. 메모리 정리를 위해 브라우저를 모두 닫고 3초 휴식합니다.")
+        for d in active_drivers:
+            try: d.quit()
+            except: pass
+        active_drivers.clear()
+        
+        kill_zombie_processes() # 확실하게 죽임
+        time.sleep(3) # 컴퓨터와 네트워크 휴식
+        
     conn.close()
     
-    # 🌟 최종 결과 알림 (터미널 출력 + 디스코드 전송)
+    # 🌟 최종 결과 알림
     end_msg = (
         f"🎉 [순부채 수집 시스템 작업 완료]\n"
         f"📊 총 {len(codes_to_fetch)}개 대상 중 성공: {success_cnt}건 / 데이터 없음(NaN): {fail_cnt}건\n"
