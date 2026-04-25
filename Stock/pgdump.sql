@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict H7qGYqKsxn413YnolylC85h3vRIcoTr6xamBUCHV62pfzXC9appudPpv9i45QaD
+\restrict KSc0Ewf66wvmfigrm6gavkfurVvO3Ac9q3diT6JYVbhRaqyM2cnogwqDCb8niLK
 
 -- Dumped from database version 13.23
 -- Dumped by pg_dump version 13.23
@@ -5291,6 +5291,7 @@ ALTER TABLE public.mytradeus OWNER TO postgres;
 --
 
 CREATE TABLE public.stock_debt (
+    trade_date date NOT NULL,
     code character varying(20) NOT NULL,
     name character varying(100),
     net_debt numeric(15,2),
@@ -5305,6 +5306,7 @@ ALTER TABLE public.stock_debt OWNER TO postgres;
 --
 
 CREATE TABLE public.stock_debtus (
+    trade_date date NOT NULL,
     code character varying(20) NOT NULL,
     name character varying(100),
     net_debt numeric(20,2),
@@ -5990,7 +5992,7 @@ ALTER TABLE ONLY public.mytradeus
 --
 
 ALTER TABLE ONLY public.stock_debt
-    ADD CONSTRAINT stock_debt_pkey PRIMARY KEY (code);
+    ADD CONSTRAINT stock_debt_pkey PRIMARY KEY (trade_date, code);
 
 
 --
@@ -5998,7 +6000,7 @@ ALTER TABLE ONLY public.stock_debt
 --
 
 ALTER TABLE ONLY public.stock_debtus
-    ADD CONSTRAINT stock_debtus_pkey PRIMARY KEY (code);
+    ADD CONSTRAINT stock_debtus_pkey PRIMARY KEY (trade_date, code);
 
 
 --
@@ -6045,4 +6047,4 @@ ALTER TABLE ONLY public.stockmainus
 -- PostgreSQL database dump complete
 --
 
-\unrestrict H7qGYqKsxn413YnolylC85h3vRIcoTr6xamBUCHV62pfzXC9appudPpv9i45QaD
+\unrestrict KSc0Ewf66wvmfigrm6gavkfurVvO3Ac9q3diT6JYVbhRaqyM2cnogwqDCb8niLK
