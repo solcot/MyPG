@@ -1,62 +1,4 @@
 "
-drop view stockfdt_pbr_v;
-CREATE VIEW public.stockfdt_pbr_v AS
- SELECT trade_date,
-    code,
-    name,
-    change_rate,
-    dividend_yield,
-    pbr,
-    per,
-    (pbr / per * 100::numeric)::numeric(10,2) AS roe,
-    forward_per,
-    (pbr / forward_per * 100::numeric)::numeric(10,2) AS forward_roe,
-    close_price,
-    (close_price/pbr)::int bps,
-    (close_price/per)::int eps
-   FROM stockfdt;
-"
-
-"
-CREATE TABLE public.stock_debt (
-    code character varying(20) NOT NULL primary key,
-    name character varying(100),
-    net_debt numeric(15,2),
-    created_at timestamp without time zone DEFAULT now() NOT NULL
-);
-"
-
-"
-drop table mytrade;
-create table mytrade
-(
-code varchar(20) not null,
-trade_div varchar(10),
-trade_status smallint,
-trade_expected_cagr numeric(10,2),
-trade_dividend numeric(10,2)
-,trade_per numeric(10,2)
-,trade_eps_ratio numeric(10,2)
-,trade_roe numeric(10,2)
-,trade_min_roe_ever numeric(10,2)
-,trade_pbr numeric(10,2)
-,trade_hist_avg_pbr numeric(10,2)
-,trade_close_price integer
-,trade_name varchar(100)
-,remark varchar(100),
-created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
-);
-
-ALTER TABLE ONLY mytrade
-    ADD CONSTRAINT mytrade_pkey PRIMARY KEY (code,created_at);
-
-COMMENT ON COLUMN public.mytrade.trade_div IS 'bond1:bpb_1, bond2:bpr_avg';
-COMMENT ON COLUMN public.mytrade.trade_status IS '0:예정, 1:매수, 2:매도';
-"
-
-
-
-"
 select code,to_char(trade_date, 'YYYY') as year,avg(roe)::int roe,max(per) per,max(pbr) pbr,max(name)
 from stockfdt_pbr_v
 where code='316140'
@@ -301,7 +243,7 @@ SELECT  (b.trade_value::numeric / 10000000)::int AS trade_value_chunman,
 FROM last_data a 
 JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code 
     AND ((a.expected_cagr >= 12.0 and a.fep_expected_cagr >= 10) OR (a.expected_cagr >= 8.0 and a.fep_expected_cagr >= 15))   -- 2. 저평가 종목 
-join stock_debt z on a.code = z.code
+join (select * from stock_debt where trade_date = (select max(trade_date) from stock_debt)) z on a.code = z.code
 WHERE b.market_cap > 30000000000   -- 3. 소형주도 대상에 포함
     and b.trade_value > 100000000   -- 4. 소형주라도 최소 거래량 충족해야 함
     and a.eps_ratio > a.per   -- 5. 성장성 저평가 종목
@@ -549,7 +491,7 @@ SELECT  a.trade_date,a.code,a.name
    ,(y.trade_value::numeric / 10000000)::int AS trade_value_chunman
    ,(y.market_cap::numeric / 10000000000)::int AS market_cap_bakuk
 FROM last_data a join mytrade b on a.code = b.code
-join stock_debt z on a.code = z.code
+join (select * from stock_debt where trade_date = (select max(trade_date) from stock_debt)) z on a.code = z.code
 join stockmain y on a.trade_date = y.trade_date and a.code = y.code
 where b.trade_status = 1
 order by b.trade_div,a.code
@@ -726,15 +668,11 @@ select  a.code,
         current_timestamp
 from last_data a
 where a.code in (
- '023910'
-,'004590'
-,'003800'
-,'002810'
-,'108320'
-,'049720'
-,'337930'
-,'376180'
-,'030000'
+ '036670'
+,''
+,''
+,''
+,''
 )
 EEOFF
 
@@ -781,7 +719,7 @@ FilteredStocks AS (
     JOIN public.stockmainus m 
         ON v.trade_date = m.trade_date 
        AND v.code = m.code
-    LEFT JOIN public.stock_debtus d 
+    LEFT JOIN (select * from stock_debtus where trade_date = (select max(trade_date) from stock_debtus)) d 
         ON v.code = d.code
     WHERE v.trade_date = (SELECT max_date FROM LatestDate)
 
@@ -880,7 +818,7 @@ SELECT z.trade_dividend, z.trade_per, z.trade_roe, z.trade_pbr, z.trade_close_pr
         END AS strategy_type
 FROM public.stockfdtus_pbr_v v
 JOIN public.stockmainus m ON v.trade_date = m.trade_date AND v.code = m.code
-LEFT JOIN public.stock_debtus d ON v.code = d.code 
+LEFT JOIN (select * from stock_debtus where trade_date = (select max(trade_date) from stock_debtus)) d ON v.code = d.code 
 join mytradeus z on v.code = z.code and z.trade_status = 1
 WHERE v.trade_date = (SELECT MAX(trade_date) FROM public.stockmainus)
 ORDER BY 
@@ -906,7 +844,7 @@ SELECT
     current_timestamp
 FROM public.stockfdtus_pbr_v v
 JOIN public.stockmainus m ON v.trade_date = m.trade_date AND v.code = m.code
-LEFT JOIN public.stock_debtus d ON v.code = d.code 
+LEFT JOIN (select * from stock_debtus where trade_date = (select max(trade_date) from stock_debtus)) d ON v.code = d.code 
 WHERE v.trade_date = (SELECT MAX(trade_date) FROM public.stockmainus)
 and v.code in (
 'ACN'  
@@ -961,7 +899,7 @@ FilteredStocks AS (
     JOIN public.stockmainus m 
         ON v.trade_date = m.trade_date 
        AND v.code = m.code
-    LEFT JOIN public.stock_debtus d 
+    LEFT JOIN (select * from stock_debtus where trade_date = (select max(trade_date) from stock_debtus)) d 
         ON v.code = d.code
     WHERE v.trade_date = (SELECT max_date FROM LatestDate)
 
