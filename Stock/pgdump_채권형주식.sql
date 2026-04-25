@@ -243,7 +243,7 @@ SELECT  (b.trade_value::numeric / 10000000)::int AS trade_value_chunman,
 FROM last_data a 
 JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code 
     AND ((a.expected_cagr >= 12.0 and a.fep_expected_cagr >= 10) OR (a.expected_cagr >= 8.0 and a.fep_expected_cagr >= 15))   -- 2. 저평가 종목 
-join (select * from stock_debt where trade_date = (select max(trade_date) from stock_debt)) z on a.code = z.code
+left join (select * from stock_debt where trade_date = (select max(trade_date) from stock_debt)) z on a.code = z.code
 WHERE b.market_cap > 30000000000   -- 3. 소형주도 대상에 포함
     and b.trade_value > 100000000   -- 4. 소형주라도 최소 거래량 충족해야 함
     and a.eps_ratio > a.per   -- 5. 성장성 저평가 종목
@@ -491,7 +491,7 @@ SELECT  a.trade_date,a.code,a.name
    ,(y.trade_value::numeric / 10000000)::int AS trade_value_chunman
    ,(y.market_cap::numeric / 10000000000)::int AS market_cap_bakuk
 FROM last_data a join mytrade b on a.code = b.code
-join (select * from stock_debt where trade_date = (select max(trade_date) from stock_debt)) z on a.code = z.code
+left join (select * from stock_debt where trade_date = (select max(trade_date) from stock_debt)) z on a.code = z.code
 join stockmain y on a.trade_date = y.trade_date and a.code = y.code
 where b.trade_status = 1
 order by b.trade_div,a.code
