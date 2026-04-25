@@ -46,7 +46,7 @@ def send_message(msg):
     now = datetime.now()
     message = {"content": f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] {str(msg)}"}
     try:
-        requests.post(DISCORD_WEBHOOK_URL, data=message, timeout=5)
+        requests.post(DISCORD_WEBHOOK_URL, json=message, timeout=5)
     except Exception as e:
         print(f"❌ Discord 전송 실패: {e}", flush=True)
 
@@ -196,6 +196,18 @@ if __name__ == "__main__":
     conn = get_db_connection()
     codes_to_fetch = []
     
+    # 🌟 [추가됨] 1. 실행되는 현재 시점의 날짜 구하기
+    current_date = datetime.now().date()
+    
+    # 🌟 [추가됨] 2. 해당 날짜 데이터 초기화 (Truncate 효과)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM stock_debt WHERE trade_date = %s", (current_date,))
+        conn.commit()
+        print(f"🗑️ 오늘 날짜({current_date}) 기존 데이터를 초기화했습니다.")
+    except Exception as e:
+        print(f"⚠️ 기존 데이터 초기화 중 오류 발생: {e}")
+
     with conn.cursor() as cur:
         sql_select = """
             SELECT code, name 
@@ -226,17 +238,19 @@ if __name__ == "__main__":
                 db_val = net_debt_val
                 success_cnt += 1
                 
-            insert_values.append((code, name, db_val))
+            # 🌟 [수정됨] 3. insert 데이터 구조에 current_date 추가
+            insert_values.append((current_date, code, name, db_val))
             
             if idx % 10 == 0:
                 print(f"⏳ 진행중... {idx}/{len(codes_to_fetch)} 완료 (최근 완료: {name}, 순부채: {db_val})")
 
             if len(insert_values) >= 100:
                 with conn.cursor() as cur:
+                    # 🌟 [수정됨] 4. INSERT 쿼리에 trade_date 반영
                     sql_insert = """
-                        INSERT INTO stock_debt (code, name, net_debt)
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT (code) DO UPDATE 
+                        INSERT INTO stock_debt (trade_date, code, name, net_debt)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (trade_date, code) DO UPDATE 
                         SET name = EXCLUDED.name,
                             net_debt = EXCLUDED.net_debt,
                             created_at = now();
@@ -248,9 +262,9 @@ if __name__ == "__main__":
     if insert_values:
         with conn.cursor() as cur:
             sql_insert = """
-                INSERT INTO stock_debt (code, name, net_debt)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (code) DO UPDATE 
+                INSERT INTO stock_debt (trade_date, code, name, net_debt)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (trade_date, code) DO UPDATE 
                 SET name = EXCLUDED.name,
                     net_debt = EXCLUDED.net_debt,
                     created_at = now();
@@ -270,7 +284,7 @@ if __name__ == "__main__":
     end_msg = (
         f"🎉 [순부채 수집 시스템 작업 완료]\n"
         f"📊 총 {len(codes_to_fetch)}개 대상 중 성공: {success_cnt}건 / 데이터 없음(NaN): {fail_cnt}건\n"
-        f"✅ stock_debt 테이블에 데이터 반영이 완료되었습니다."
+        f"✅ stock_debt 테이블에 데이터 반영이 완료되었습니다. (기준일: {current_date})"
     )
     print("\n" + end_msg)
     send_message(end_msg)
