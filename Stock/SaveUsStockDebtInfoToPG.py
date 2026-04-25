@@ -46,8 +46,6 @@ def safe_str(val, max_length=100):
     if val is None or pd.isna(val): return None
     return str(val)[:max_length]
 
-# 🚨 문제의 원인이었던 가짜 브라우저 세션(yf_session)을 완전히 삭제했습니다!
-
 # =========================================================
 # 2. 유효 종목만 DB에서 뽑아오기 (메인 테이블 연동)
 # =========================================================
@@ -141,17 +139,34 @@ def fetch_and_insert_us_debt():
         send_message("❌ 수집된 순부채 데이터가 없습니다.")
         return
 
+    # =========================================================
+    # 🚨 DB Insert (trade_date 반영 및 당일 데이터 삭제 후 삽입)
+    # =========================================================
     try:
+        # 1. 실행되는 현재 시점의 날짜(trade_date) 구하기
+        current_date = datetime.now().date()
+        
+        # 2. 기존 (code, name, net_debt) 구조 맨 앞에 current_date 추가
+        insert_data = [(current_date, item[0], item[1], item[2]) for item in debt_values]
+
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("TRUNCATE TABLE stock_debtus")
-                execute_batch(cur, """INSERT INTO stock_debtus (code, name, net_debt) VALUES (%s, %s, %s)""", debt_values, page_size=1000)
+                # 3. 해당 날짜 데이터만 완벽하게 초기화 (Truncate 효과)
+                cur.execute("DELETE FROM stock_debtus WHERE trade_date = %s", (current_date,))
+                
+                # 4. 새로운 스키마에 맞춰 일괄 Insert
+                sql_insert = """
+                    INSERT INTO stock_debtus (trade_date, code, name, net_debt) 
+                    VALUES (%s, %s, %s, %s)
+                """
+                execute_batch(cur, sql_insert, insert_data, page_size=1000)
+                
             conn.commit()
             
         nan_count = sum(1 for item in debt_values if math.isnan(item[2]))
         valid_count = len(debt_values) - nan_count
         
-        send_message(f"✅ 미국 주식 순부채(Net Debt) DB 갱신 완료 (정상: {valid_count}개 / 미제공(NaN): {nan_count}개)")
+        send_message(f"✅ 미국 주식 순부채(Net Debt) DB 갱신 완료 [기준일: {current_date}] (정상: {valid_count}개 / 미제공(NaN): {nan_count}개)")
         
     except Exception as e:
         send_message(f"❌ 순부채 DB 오류: {e}")
