@@ -73,7 +73,7 @@ from basic_number a
 #-- 3. 소형주도 대상에 포함
 #-- 4. 소형주라도 최소 거래량 충족해야 함
 #-- 5. 성장성 저평가 종목
-#-- 6. 순부채가 시가총액의 10%보다 작은 종목
+#-- 6. 순부채 시가총액대비 작은 종목
 #-- 7. 순자산이 계속적으로 증가하는 기업
 #-- 8. 최소 배당 조건 만족
 cat > bond_1_2.sql <<'EEOFF'
@@ -292,6 +292,14 @@ EEOFF
 
 
 
+#-- 1. trade_div 가 bond1 인경우 bond1_sell 값이 0이 될때까지 계속 분할매수
+#-- 2. trade_div 가 bond1 인경우 bond1_sell 값이 0이 되면 분할매도 시작
+#-- 3. trade_div 가 bond1 인경우 bond1_end 값이 0이 될때까지 분할매도 계속 수행
+#-- 4. trade_div 가 bond1 인경우 bond1_end 값이 0이 되면 전부 매도
+#-- 1. trade_div 가 bond2 인경우 bond2_sell 값이 0이 될때까지 계속 분할매수
+#-- 2. trade_div 가 bond2 인경우 bond2_sell 값이 0이 되면 분할매도 시작
+#-- 3. trade_div 가 bond2 인경우 bond2_end 값이 0이 될때까지 분할매도 계속 수행
+#-- 4. trade_div 가 bond2 인경우 bond2_end 값이 0이 되면 전부 매도
 cat > bond_1_2_mytrade.sql <<'EEOFF'
 WITH max_date_cte AS (
     -- 💡 [추가] 쿼리 수행일 기준 가장 최신(현재) 날짜를 한 번만 추출하여 성능 최적화
