@@ -230,45 +230,55 @@ def save_to_postgres(df, trade_date, conn):
 
 def save_to_postgres_fdt(df, trade_date, conn):
     """
-    [수정됨] 해당 날짜의 stockfdt 데이터를 모두 삭제 후 Insert
+    [수정됨] 해당 날짜의 stockfdt 데이터를 모두 삭제 후 Insert (NaN 완벽 대응)
     """
     trade_date = pd.to_datetime(trade_date, format='%Y%m%d').date()
     df["trade_date"] = trade_date
 
+    # 💡 [방어코드 1] 다운로드 받은 데이터에 아예 컬럼이 없으면 NaN으로 채워서 강제 생성!
+    if '선행 EPS' not in df.columns:
+        df['선행 EPS'] = float('nan')
+    if '선행 PER' not in df.columns:
+        df['선행 PER'] = float('nan')
+
     num_cols = ["종가", "대비", "등락률", "EPS", "PER", "선행 EPS", "선행 PER", "BPS", "PBR", "주당배당금", "배당수익률"]
     for col in num_cols:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
 
     values = []
-    for row in df.itertuples(index=False):
-        f_eps = getattr(row, '_6', None) if '선행 EPS' in df.columns else None
-        if hasattr(row, '_7'): f_eps = row._7
-        
-        f_per = getattr(row, '_7', None) if '선행 PER' in df.columns else None
-        if hasattr(row, '_8'): f_per = row._8
+    # 💡 [방어코드 2] itertuples 대신 딕셔너리 형태(to_dict)로 순회하면 띄어쓰기 컬럼 접근이 완벽해집니다.
+    for row in df.to_dict('records'):
+        # 안전하게 값 추출
+        f_eps = row.get('선행 EPS')
+        f_per = row.get('선행 PER')
 
         values.append((
-            row.trade_date, str(row.종목코드), str(row.종목명),
-            int(row.종가) if pd.notna(row.종가) else None,
-            int(row.대비) if pd.notna(row.대비) else None,
-            float(row.등락률) if pd.notna(row.등락률) else None,
-            float(row.EPS) if pd.notna(row.EPS) else None,
-            float(row.PER) if pd.notna(row.PER) else None,
-            float(f_eps) if f_eps else None,
-            float(f_per) if f_per else None,
-            float(row.BPS) if pd.notna(row.BPS) else None,
-            float(row.PBR) if pd.notna(row.PBR) else None,
-            int(row.주당배당금) if pd.notna(row.주당배당금) else None,
-            float(row.배당수익률) if pd.notna(row.배당수익률) else None
+            row['trade_date'], 
+            str(row['종목코드']), 
+            str(row['종목명']),
+            int(row['종가']) if pd.notna(row.get('종가')) else None,
+            int(row['대비']) if pd.notna(row.get('대비')) else None,
+            float(row['등락률']) if pd.notna(row.get('등락률')) else None,
+            float(row['EPS']) if pd.notna(row.get('EPS')) else None,
+            float(row['PER']) if pd.notna(row.get('PER')) else None,
+            
+            # 💡 [핵심] 값이 없으면 None(NULL) 대신 float('nan')을 삽입하여 DB에 NaN으로 기록되게 함
+            float(f_eps) if pd.notna(f_eps) else float('nan'),
+            float(f_per) if pd.notna(f_per) else float('nan'),
+            
+            float(row['BPS']) if pd.notna(row.get('BPS')) else None,
+            float(row['PBR']) if pd.notna(row.get('PBR')) else None,
+            int(row['주당배당금']) if pd.notna(row.get('주당배당금')) else None,
+            float(row['배당수익률']) if pd.notna(row.get('배당수익률')) else None
         ))
 
-    # [핵심 수정] DELETE 후 INSERT
     with conn.cursor() as cur:
         # 1. 해당 날짜 데이터 전체 삭제
         cur.execute("DELETE FROM stockfdt WHERE trade_date = %s", (trade_date,))
         print(f"🗑️ {trade_date} stockfdt 기존 데이터 삭제 완료")
 
-        # 2. 데이터 삽입 (ON CONFLICT 제거)
+        # 2. 데이터 삽입 
         sql = """
             INSERT INTO stockfdt (
                 trade_date, code, name, close_price, change_price, change_rate,
