@@ -9,6 +9,7 @@ import math
 import psycopg2
 from psycopg2.extras import execute_batch
 import threading
+import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
 import requests  
 from datetime import datetime  
@@ -20,7 +21,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By 
 
 # =========================================================
-# 🌟 [추가됨] 좀비 프로세스 완벽 청소 함수
+# 🌟 좀비 프로세스 완벽 청소 함수
 # =========================================================
 def kill_zombie_processes():
     """백그라운드에 꼬여있는 크롬 드라이버를 강제로 싹 지웁니다."""
@@ -90,8 +91,8 @@ def get_driver():
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
-        # 🌟 [추가됨] 무한 대기 멈춤 방지: 15초 안에 응답 없으면 강제 에러 발생!
         driver.set_page_load_timeout(15)
+        driver.set_script_timeout(15)
         
         thread_local.driver = driver
         thread_local.usage_count = 0
@@ -184,7 +185,6 @@ def process_stock(stock_info):
 # 4. Main 실행: [청크 분할] 및 DB 연동
 # =========================================================
 if __name__ == "__main__":
-    # 시작 전 청소
     kill_zombie_processes()
     
     start_msg = "🚀 [순부채 수집 시스템 - 고속 병렬 버전] 작동 시작..."
@@ -194,7 +194,6 @@ if __name__ == "__main__":
     conn = get_db_connection()
     codes_to_fetch = []
     
-    # 🌟 1. 당일 날짜 설정 및 DB 초기화
     current_date = datetime.now().date()
     try:
         with conn.cursor() as cur:
@@ -217,21 +216,27 @@ if __name__ == "__main__":
 
     success_cnt = 0
     fail_cnt = 0
-    MAX_WORKERS = 5 
+    MAX_WORKERS = 3 
     
-    # 🌟 2. 회원님 아이디어 적용: 500개 단위 청크(Chunk) 분할
     chunk_size = 500
     chunks = [codes_to_fetch[i:i + chunk_size] for i in range(0, len(codes_to_fetch), chunk_size)]
 
-    print("\n🌐 [병렬 수집 시작] 500개씩 쪼개어 안전하게 수집을 진행합니다...")
+    print(f"\n🌐 [병렬 수집 시작] 500개씩 쪼개어 안전하게 수집을 진행합니다... (워커 수: {MAX_WORKERS})")
 
     for chunk_idx, chunk in enumerate(chunks):
         print(f"\n📦 === 청크 {chunk_idx + 1}/{len(chunks)} 시작 (총 {len(chunk)}개) ===")
         insert_values = []
         
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            for idx, result in enumerate(executor.map(process_stock, chunk), 1):
-                code, name, net_debt_val = result
+            futures = {executor.submit(process_stock, item): item for item in chunk}
+            
+            for idx, future in enumerate(concurrent.futures.as_completed(futures), 1):
+                try:
+                    code, name, net_debt_val = future.result()
+                except Exception as e:
+                    code, name = futures[future]
+                    print(f"⚠️ [{name}] 스레드 예외 발생: 패스합니다.")
+                    net_debt_val = None
                 
                 if net_debt_val is None or math.isnan(net_debt_val):
                     db_val = 'NaN'
@@ -242,10 +247,10 @@ if __name__ == "__main__":
                     
                 insert_values.append((current_date, code, name, db_val))
                 
-                # 진행률 표시
+                # 💡 [핵심 수정] 진행률 표시에 db_val(순부채) 추가
                 if idx % 10 == 0:
                     current_total = (chunk_idx * chunk_size) + idx
-                    print(f"⏳ 전체 진행중... {current_total}/{len(codes_to_fetch)} 완료 (최근: {name})")
+                    print(f"⏳ 전체 진행중... {current_total}/{len(codes_to_fetch)} 완료 (최근: {name}, 순부채: {db_val})")
 
                 # DB 저장 (100개마다)
                 if len(insert_values) >= 100:
@@ -276,15 +281,15 @@ if __name__ == "__main__":
                 execute_batch(cur, sql_insert, insert_values, page_size=100)
                 conn.commit()
 
-        # 🌟 3. 청크(500개)가 끝날 때마다 크롬 완벽 초기화 & 휴식
+        # 🌟 청크(500개)가 끝날 때마다 크롬 완벽 초기화 & 휴식
         print(f"💤 청크 {chunk_idx + 1} 완료. 메모리 정리를 위해 브라우저를 모두 닫고 3초 휴식합니다.")
         for d in active_drivers:
             try: d.quit()
             except: pass
         active_drivers.clear()
         
-        kill_zombie_processes() # 확실하게 죽임
-        time.sleep(3) # 컴퓨터와 네트워크 휴식
+        kill_zombie_processes() 
+        time.sleep(3) 
         
     conn.close()
     
