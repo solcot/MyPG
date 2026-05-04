@@ -73,7 +73,7 @@ from basic_number a
 #-- 3. 소형주도 대상에 포함
 #-- 4. 소형주라도 최소 거래량 충족해야 함
 #-- 5. 성장성 저평가 종목
-#-- 6. 순부채 시가총액대비 작은 종목
+#-- 6. 순부채가 없는 종목
 #-- 7. 순자산이 계속적으로 증가하는 기업
 #-- 8. 최소 배당 조건 만족
 cat > bond_1_2.sql <<'EEOFF'
@@ -248,7 +248,7 @@ WHERE b.market_cap > 30000000000   -- 3. 소형주도 대상에 포함
     and b.trade_value > 100000000   -- 4. 소형주라도 최소 거래량 충족해야 함
     AND a.eps_ratio > a.per   -- 5. 성장성 저평가 종목
     --AND (a.eps_ratio + a.dividend_yield) > a.per   -- 5. 성장성 저평가 종목
-    AND (z.net_debt <= 0 OR z.net_debt = 'NaN')   -- 6. 순부채가 시가총액의 10%보다 작은 종목 
+    AND (z.net_debt < 0.0 OR z.net_debt = 'NaN')   -- 6. 순부채가 없는 종목 
     --AND (z.net_debt <= (b.market_cap::numeric / 100000000.0) * 0.10 OR z.net_debt = 'NaN')   -- 6. 순부채가 시가총액의 10%보다 작은 종목 
     AND ggg_pcap_bakuk <= iii_pcap_bakuk and iii_pcap_bakuk <= kkk_pcap_bakuk    -- 7. 순자산이 증가하는 기업
     and a.dividend_yield >= 3.0   -- 8. 최소 배당 조건 만족 
