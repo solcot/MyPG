@@ -502,7 +502,7 @@ FROM last_data a join mytrade b on a.code = b.code
 left join (select * from stock_debt where trade_date = (select max(trade_date) from stock_debt)) z on a.code = z.code
 join stockmain y on a.trade_date = y.trade_date and a.code = y.code
 where b.trade_status = 1
-order by b.trade_div,a.code
+order by b.trade_div,bond1_sell,bond2_sell
 EEOFF
 
 
@@ -676,14 +676,14 @@ select  a.code,
         current_timestamp
 from last_data a
 where a.code in (
- '036670'
-,''
-,''
-,''
-,''
+ '211050'
+,'036800'
+,'033270'
+,'216050'
+,'053980'
+,'067160'
 )
 EEOFF
-
 
 
 
