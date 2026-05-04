@@ -246,8 +246,10 @@ JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code
 left join (select * from stock_debt where trade_date = (select max(trade_date) from stock_debt)) z on a.code = z.code
 WHERE b.market_cap > 30000000000   -- 3. 소형주도 대상에 포함
     and b.trade_value > 100000000   -- 4. 소형주라도 최소 거래량 충족해야 함
-    AND (a.eps_ratio + a.dividend_yield) > a.per   -- 5. 성장성 저평가 종목
-    AND (z.net_debt <= (b.market_cap::numeric / 100000000.0) * 0.10 OR z.net_debt = 'NaN')   -- 6. 순부채가 시가총액의 10%보다 작은 종목 
+    AND a.eps_ratio > a.per   -- 5. 성장성 저평가 종목
+    --AND (a.eps_ratio + a.dividend_yield) > a.per   -- 5. 성장성 저평가 종목
+    AND (z.net_debt <= 0 OR z.net_debt = 'NaN')   -- 6. 순부채가 시가총액의 10%보다 작은 종목 
+    --AND (z.net_debt <= (b.market_cap::numeric / 100000000.0) * 0.10 OR z.net_debt = 'NaN')   -- 6. 순부채가 시가총액의 10%보다 작은 종목 
     AND ggg_pcap_bakuk <= iii_pcap_bakuk and iii_pcap_bakuk <= kkk_pcap_bakuk    -- 7. 순자산이 증가하는 기업
     and a.dividend_yield >= 3.0   -- 8. 최소 배당 조건 만족 
     --AND a.eps_ratio < 100            -- [방어코드 추가] 1년 만에 이익이 100% 이상 폭증한 것은 일회성 기저효과일 확률이 높으므로 제외
@@ -676,12 +678,12 @@ select  a.code,
         current_timestamp
 from last_data a
 where a.code in (
- '211050'
-,'036800'
-,'033270'
-,'216050'
-,'053980'
-,'067160'
+ '267980'
+,'099390'
+,'143240'
+,''
+,''
+,''
 )
 EEOFF
 
