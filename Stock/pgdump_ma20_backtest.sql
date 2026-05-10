@@ -186,7 +186,7 @@ sell_candidates AS (
     JOIN ma_base mc ON sm.trade_date = mc.trade_date AND sm.code = mc.code
     WHERE (
                 sm.close_price < mc.ma10 * 0.97                -- 1. 기존 손절 조건
-                OR sm.close_price >= b.buy_price * 1.70        -- 2. 추가된 익절 조건
+                OR sm.close_price >= b.buy_price * 1.50        -- 2. 추가된 익절 조건
            )
       AND sm.trade_date <= '2026-05-31'
 ),
@@ -281,7 +281,7 @@ sell_candidates AS (
     JOIN ma_base mc ON sm.trade_date = mc.trade_date AND sm.code = mc.code
     WHERE (
                 sm.close_price < mc.ma10 * 0.97                -- 1. 기존 손절 조건
-                OR sm.close_price >= b.buy_price * 1.70        -- 2. 추가된 익절 조건
+                OR sm.close_price >= b.buy_price * 1.50        -- 2. 추가된 익절 조건
            )
       AND sm.trade_date <= '2026-05-31'
 ),
@@ -371,7 +371,7 @@ sell_candidates AS (
     JOIN ma_base mc ON sm.trade_date = mc.trade_date AND sm.code = mc.code
     WHERE (
                 sm.close_price < mc.ma10 * 0.97                -- 1. 기존 손절 조건
-                OR sm.close_price >= b.buy_price * 1.70        -- 2. 추가된 익절 조건
+                OR sm.close_price >= b.buy_price * 1.50        -- 2. 추가된 익절 조건
            )
       AND sm.trade_date <= '2027-05-31'
 ),
@@ -466,7 +466,7 @@ sell_candidates AS (
     JOIN ma_base mc ON sm.trade_date = mc.trade_date AND sm.code = mc.code
     WHERE (
                 sm.close_price < mc.ma10 * 0.97                -- 1. 기존 손절 조건
-                OR sm.close_price >= b.buy_price * 1.70        -- 2. 추가된 익절 조건
+                OR sm.close_price >= b.buy_price * 1.50        -- 2. 추가된 익절 조건
            ) 
       AND sm.trade_date <= '2027-05-31'
 ),
