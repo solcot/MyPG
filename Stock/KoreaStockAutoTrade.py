@@ -1226,21 +1226,32 @@ def check_market_status_pre_market():
     # 2. 오늘 날짜 확인
     now = datetime.now()
     today_str = now.strftime('%Y-%m-%d')
+    #today_str = '2026-05-26'
     
     # 3. 넉넉하게 전후 20일간의 스케줄 조회
-    # 종료일을 오늘(now)까지로 제한하거나, 필터링 로직을 강화해야 합니다.
     schedule = krx.schedule(start_date=(now - timedelta(days=20)).strftime('%Y-%m-%d'), 
                             end_date=today_str)
     
-    # 4. 오늘이 개장일인지 확인
-    is_market_open = today_str in schedule.index.strftime('%Y-%m-%d')
+    # 4. 💡 [핵심 보완] mcal 스케줄에서 '진짜 영업일'만 걸러내기 (holidayskr 2차 방어)
+    valid_trading_days = []
+    for date_obj in schedule.index:
+        date_str_iter = date_obj.strftime('%Y-%m-%d')
+        
+        # mcal이 영업일이라고 우겨도, holidayskr에서 휴일이라고 판정하면 가차 없이 제외
+        if not is_holiday(date_str_iter):
+            valid_trading_days.append(date_str_iter)
     
-    # 5. 마지막 거래일(Last Trading Day) 계산
-    # '오늘보다 이전인' 거래일들만 필터링합니다.
-    past_trades = schedule[schedule.index < today_str]
+    # 5. 오늘이 개장일인지 확인 (진짜 영업일 리스트에 오늘이 포함되어 있는가?)
+    is_market_open = today_str in valid_trading_days
     
-    if not past_trades.empty:
-        last_trading_day = past_trades.index[-1].strftime('%Y%m%d')
+    # 6. 마지막 거래일(Last Trading Day) 계산
+    # '진짜 영업일' 리스트 중에서 '오늘보다 이전인' 날짜만 필터링
+    past_trades = [d for d in valid_trading_days if d < today_str]
+    
+    if past_trades:
+        # 리스트의 가장 마지막 요소가 가장 최근 영업일
+        # DB 조회를 위해 'YYYY-MM-DD' 형태를 'YYYYMMDD'로 변환
+        last_trading_day = past_trades[-1].replace('-', '') 
     else:
         # 혹시 모를 에러 방지 (데이터가 없을 경우)
         last_trading_day = None
@@ -1271,7 +1282,7 @@ try:
         #trade_date = get_last_trading_day()
         #trade_date = '20250909'
         is_open, trade_date = check_market_status_pre_market()
-        #send_message(f"✅ [{is_open},{trade_date}] ---")
+        send_message(f"✅ is_open,last_trade_date: [{is_open},{trade_date}]")
         MAX_BUY_PRICE = AMOUNT_TO_BUY
 
         # ✅ [수정됨] 핵심 이평선 4단계로 압축 (10, 20, 40, 60)
