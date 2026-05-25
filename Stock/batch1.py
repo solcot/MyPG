@@ -531,10 +531,22 @@ def insert_all_symbols(trade_date, session):
     with get_db_connection() as conn:
         save_moving_average_by_date(conn, trade_date)
 
+# ==========================================
+# 1. 휴장일 판단 함수 완벽 개선
+# ==========================================
 def is_trading_day(p_date):
     target_date = p_date.strftime('%Y-%m-%d')
+    
+    # 1차 방어: 주말 및 글로벌 공통 휴장일 (mcal)
     schedule = krx_cal.schedule(start_date=target_date, end_date=target_date)
-    return not schedule.empty
+    if schedule.empty:
+        return False
+        
+    # 2차 방어: 대체공휴일 및 한국 전용 달력 휴일 (holidayskr)
+    if is_holiday(target_date):
+        return False
+        
+    return True
 
 # =================================================================================
 # 매수 종목 Pool 조회 함수들
