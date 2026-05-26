@@ -15,7 +15,7 @@ Phase 1. 신규 매수 (Entry)
 
 Phase 2. 물타기 방어선 (Scale-In)
 - 조건: 내 평단가 대비 -15% / -30% 하락 시
-- 사용 쿼리: value_engine.sql (재조회)
+- 사용 쿼리: value_engine.sql (재조회: 시가총액(market_cap)과 거래대금(trade_value) 필터를 잠시 주석 처리)
 - 액션: 쿼리에 '여전히 존재하면' 추가 매수. 만약 사라졌다면 물타기 즉시 중단.
 
 Phase 3. 수익 실현 (Take Profit)
@@ -109,9 +109,29 @@ pivot_data AS (
         MAX(avg_roe_ever) AS avg_roe_ever,
         MAX(max_roe_ever) AS max_roe_ever,
         MAX(hist_avg_pbr) AS hist_avg_pbr,
-        -- 기존 시가총액 피벗 삭제 후 BPS 피벗으로 교체
+        -- ROE 피벗
+        MAX(avg_roe) FILTER (WHERE year = '2016') AS aaa_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2017') AS bbb_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2018') AS ccc_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2019') AS ddd_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2020') AS eee_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2021') AS fff_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2022') AS ggg_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2023') AS hhh_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2024') AS iii_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2025') AS jjj_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2026') AS kkk_roe,
+        -- BPS 피벗
+        MAX(avg_bps) FILTER (WHERE year = '2016') AS aaa_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2017') AS bbb_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2018') AS ccc_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2019') AS ddd_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2020') AS eee_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2021') AS fff_bps,
         MAX(avg_bps) FILTER (WHERE year = '2022') AS ggg_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2023') AS hhh_bps,
         MAX(avg_bps) FILTER (WHERE year = '2024') AS iii_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2025') AS jjj_bps,
         MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps
     FROM filtered_data
     GROUP BY code
@@ -433,10 +453,7 @@ FROM last_data a
 JOIN stockmain m ON a.trade_date = m.trade_date AND a.code = m.code 
 -- 💡 [NEW] 실적 데이터(INNER JOIN을 통해 재무 데이터가 있는 확실한 기업만 필터링)
 JOIN latest_debt_cte d ON a.code = d.code
-WHERE 1=1
-    -- 3, 4. 유동성 및 규모 하한선 (시장 소외주 방어)
-    AND m.market_cap > 100000000000   
-    AND m.trade_value > 1000000000      
+WHERE 1=1     
     -- 7. BPS 성장 검증
     AND ggg_bps <= iii_bps AND iii_bps <= kkk_bps   
 
@@ -469,7 +486,7 @@ Phase 1. 신규 매수 (Entry)
 
 Phase 2. 물타기 방어선 (Scale-In)
 - 조건: 내 평단가 대비 -15% / -30% 하락 시
-- 사용 쿼리: growth_engine.sql (재조회)
+- 사용 쿼리: growth_engine.sql (재조회: 시가총액(market_cap)과 거래대금(trade_value) 필터를 잠시 주석 처리)
 - 액션: 쿼리에 '여전히 존재하면' 기계적 2차, 3차 매수. 만약 사라졌다면 즉시 중단.
 
 Phase 3. 수익 실현 (Take Profit)
@@ -560,8 +577,29 @@ pivot_data AS (
         MAX(avg_roe_ever) AS avg_roe_ever,
         MAX(max_roe_ever) AS max_roe_ever,
         MAX(hist_avg_pbr) AS hist_avg_pbr,
+        -- ROE 피벗
+        MAX(avg_roe) FILTER (WHERE year = '2016') AS aaa_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2017') AS bbb_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2018') AS ccc_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2019') AS ddd_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2020') AS eee_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2021') AS fff_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2022') AS ggg_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2023') AS hhh_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2024') AS iii_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2025') AS jjj_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2026') AS kkk_roe,
+        -- BPS 피벗
+        MAX(avg_bps) FILTER (WHERE year = '2016') AS aaa_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2017') AS bbb_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2018') AS ccc_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2019') AS ddd_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2020') AS eee_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2021') AS fff_bps,
         MAX(avg_bps) FILTER (WHERE year = '2022') AS ggg_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2023') AS hhh_bps,
         MAX(avg_bps) FILTER (WHERE year = '2024') AS iii_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2025') AS jjj_bps,
         MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps
     FROM filtered_data
     GROUP BY code
@@ -880,21 +918,9 @@ SELECT
 JOIN stockmain m ON a.trade_date = m.trade_date AND a.code = m.code 
 JOIN latest_debt_cte d ON a.code = d.code
 WHERE 1=1
-    --------------------------------------------------------------------------------
-    -- 🚨 [삭제] 밸류에이션(가격) 상한선 전면 삭제
-    -- 이유: 보유 종목은 주가가 폭등하여 고평가(PER 35 초과, CAGR 8% 미달)가 되더라도
-    -- 대시세를 즐겨야 하므로 가격 때문에 탈락시키지 않음
-    -- AND (a.expected_cagr >= 8.0 OR a.fep_expected_cagr >= 12.0)  <-- 주석 처리
-    -- AND (a.per > 0 AND a.per < 35.0)                             <-- 주석 처리
-    --------------------------------------------------------------------------------
-    
-    -- 3, 4. 규모 및 유동성 조건 (유지)
-    AND m.market_cap > 100000000000   
-    AND m.trade_value > 1000000000    
-    
     -- 5. [핵심] 실적 모멘텀 유지 검증
     -- 분기 실적 발표 후 성장이 꺾이면(15% 미만) 여기서 가차 없이 탈락됨
-    AND a.eps_ratio >= 15.0 AND a.eps_ratio < 150.0   
+    AND a.eps_ratio >= 15.0
     
     -- 7. 순자산(BPS) 우상향 기조 검증 (유지)
     AND a.ggg_bps <= a.iii_bps AND a.iii_bps <= a.kkk_bps
