@@ -326,14 +326,7 @@ FROM last_data a
 JOIN stockmain m ON a.trade_date = m.trade_date AND a.code = m.code 
 -- 💡 [NEW] 실적 데이터(INNER JOIN을 통해 재무 데이터가 있는 확실한 기업만 필터링)
 JOIN latest_debt_cte d ON a.code = d.code
-where a.code in (
- '023590'
-,''
-,''
-,''
-,''
-,''
-)
+where a.code in (:'var1', :'var2', :'var3', :'var4', :'var5')
 EEOFF
 
 
@@ -955,14 +948,7 @@ FROM last_data a
 JOIN stockmain m ON a.trade_date = m.trade_date AND a.code = m.code 
 -- 💡 [NEW] 실적 데이터(INNER JOIN을 통해 재무 데이터가 있는 확실한 기업만 필터링)
 JOIN latest_debt_cte d ON a.code = d.code
-where a.code in (
- '272110'
-,'206650'
-,'035900'
-,'353810'
-,'200670'
-,''
-)
+where a.code in (:'var1', :'var2', :'var3', :'var4', :'var5')
 EEOFF
 
 
