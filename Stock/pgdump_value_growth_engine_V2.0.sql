@@ -339,32 +339,32 @@ WITH max_date_cte AS (
     SELECT MAX(trade_date) AS max_date FROM stockfdt_pbr_v
 ),
 past_eps_cte AS (
-    SELECT 
+    SELECT
         code,
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days' 
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days'
                          AND max_date - INTERVAL '1 year' + INTERVAL '3 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
-    SELECT 
+    SELECT
         a.code,
         to_char(a.trade_date, 'YYYY') AS year,
         AVG(a.roe) AS avg_roe,
-        AVG(a.pbr) AS avg_pbr,  
+        AVG(a.pbr) AS avg_pbr,
         -- 기존: avg(b.market_cap/a.pbr)::bigint AS avg_market_cap,
         -- 변경: 시가총액 대신 진짜 자산인 BPS(주당순자산)를 계산합니다.
         (AVG(a.bps))::bigint AS avg_bps,
         avg(a.dividend_yield) as avg_dividend
-    FROM stockfdt_pbr_v a 
+    FROM stockfdt_pbr_v a
     JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code
     WHERE a.trade_date >= '20160101'
     GROUP BY a.code, to_char(a.trade_date, 'YYYY')
 ),
 find_min_roe AS (
-    SELECT 
+    SELECT
         code,
         year,
         avg_roe,
@@ -377,13 +377,13 @@ find_min_roe AS (
     FROM calc_yearly_data
 ),
 filtered_data AS (
-    SELECT 
+    SELECT
         code,
         year,
         ROUND(min_roe_ever, 2) AS min_roe_ever,
         ROUND(avg_roe_ever, 2) AS avg_roe_ever,
         ROUND(max_roe_ever, 2) AS max_roe_ever,
-        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, 
+        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr,
         ROUND(avg_roe, 2) AS avg_roe,
         avg_bps AS avg_bps,
         round(avg_dividend, 2) as avg_dividend
@@ -391,7 +391,7 @@ filtered_data AS (
     WHERE avg_roe_ever >= 10.0 AND min_roe_ever >= 0.0   -- 1. 꾸준히 수익 창출하는 기업
 ),
 pivot_data AS (
-    SELECT 
+    SELECT
         code,
         MAX(min_roe_ever) AS min_roe_ever,
         MAX(avg_roe_ever) AS avg_roe_ever,
@@ -431,7 +431,7 @@ latest_debt_cte AS (
     WHERE trade_date = (SELECT MAX(trade_date) FROM stock_debt)
 ),
 last_data AS (
-    SELECT 
+    SELECT
         ROUND(((a.eps - p.past_eps) / NULLIF(ABS(p.past_eps), 0)) * 100, 2) AS eps_ratio,
         ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
@@ -440,46 +440,47 @@ last_data AS (
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
         *
-    FROM stockfdt_pbr_v a 
+    FROM stockfdt_pbr_v a
     JOIN pivot_data b USING (code)
     LEFT JOIN past_eps_cte p USING (code)
     CROSS JOIN max_date_cte
     WHERE a.trade_date = max_date_cte.max_date
-    AND a.bps > 0           
-    AND a.close_price > 0   
-)
-SELECT  
+    AND a.bps > 0
+    AND a.close_price > 0
+),
+f_data as (
+SELECT
     (m.trade_value::numeric / 10000000)::int AS trade_value_chunman,
-    (m.market_cap::numeric / 10000000000)::int AS market_cap_bakuk,     
+    (m.market_cap::numeric / 10000000000)::int AS market_cap_bakuk,
     m.sector,
     -- 💡 [NEW] 재무제표 출력 항목 추가
     d.revenue AS 매출액,
     d.operating_income AS 영업이익,
     ROUND((d.operating_income / NULLIF(d.revenue, 0)) * 100, 2) AS 영업이익률_pct,
     d.net_debt AS 순부채,
-    a.* 
-FROM last_data a 
-JOIN stockmain m ON a.trade_date = m.trade_date AND a.code = m.code 
+    a.*
+FROM last_data a
+JOIN stockmain m ON a.trade_date = m.trade_date AND a.code = m.code
 -- 💡 [NEW] 실적 데이터(INNER JOIN을 통해 재무 데이터가 있는 확실한 기업만 필터링)
 JOIN latest_debt_cte d ON a.code = d.code
 WHERE 1=1
-    -- 2. 저평가 종목 
-    AND (a.expected_cagr >= 15.0 OR a.fep_expected_cagr >= 20.0)  
+    -- 2. 저평가 종목
+    AND (a.expected_cagr >= 15.0 OR a.fep_expected_cagr >= 20.0)
     -- 5. 성장성 검증
-    AND a.eps_ratio > a.per AND a.eps_ratio < 100.0   
+    AND a.eps_ratio > a.per AND a.eps_ratio < 100.0
     -- 7. BPS 성장 검증
     AND ggg_bps <= iii_bps AND iii_bps <= kkk_bps
     -- 8. 배당수익률 최소 3% 이상
-    AND a.dividend_yield >= 3.0   
+    AND a.dividend_yield >= 3.0
     -- 기타 방어 코드
-    AND (a.per > 0 AND a.per < 15.0)   
+    AND (a.per > 0 AND a.per < 15.0)
 
     --------------------------------------------------------------------------------
     -- 🚀 [NEW] stock_debt 테이블을 활용한 퀄리티 펀더멘털 필터 3종 세트
     --------------------------------------------------------------------------------
     -- 9-1. 장사를 해서 돈을 벌고 있는가? (일회성 이익 속임수 방어)
     AND d.operating_income > 0
-    AND d.net_income > 0 
+    AND d.net_income > 0
     -- 9-2. 경제적 해자가 존재하는가? (영업이익률 최소 5% 이상)
     AND (d.operating_income / NULLIF(d.revenue, 0)) >= 0.05
     -- 6. 진짜 현금 부자인가? (보유 현금이 이자 발생 부채보다 많아야 함)
@@ -487,7 +488,12 @@ WHERE 1=1
     --------------------------------------------------------------------------------
 
 and a.code in (select code from mytrade where trade_div in ('bond','value') and trade_status = 1)
-ORDER BY a.expected_cagr DESC;
+)
+select b.close_price - a.trade_close_price as diff_price, a.*
+from mytrade a join (select code,close_price from stockmain where trade_date = (select max(trade_date) from stockmain)) b on a.code=b.code
+where a.code not in (select code from f_data)
+and a.trade_div in ('bond','value') and trade_status = 1
+;
 EEOFF
 
 
@@ -500,32 +506,32 @@ WITH max_date_cte AS (
     SELECT MAX(trade_date) AS max_date FROM stockfdt_pbr_v
 ),
 past_eps_cte AS (
-    SELECT 
+    SELECT
         code,
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days' 
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days'
                          AND max_date - INTERVAL '1 year' + INTERVAL '3 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
-    SELECT 
+    SELECT
         a.code,
         to_char(a.trade_date, 'YYYY') AS year,
         AVG(a.roe) AS avg_roe,
-        AVG(a.pbr) AS avg_pbr,  
+        AVG(a.pbr) AS avg_pbr,
         -- 기존: avg(b.market_cap/a.pbr)::bigint AS avg_market_cap,
         -- 변경: 시가총액 대신 진짜 자산인 BPS(주당순자산)를 계산합니다.
         (AVG(a.bps))::bigint AS avg_bps,
         avg(a.dividend_yield) as avg_dividend
-    FROM stockfdt_pbr_v a 
+    FROM stockfdt_pbr_v a
     JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code
     WHERE a.trade_date >= '20160101'
     GROUP BY a.code, to_char(a.trade_date, 'YYYY')
 ),
 find_min_roe AS (
-    SELECT 
+    SELECT
         code,
         year,
         avg_roe,
@@ -538,13 +544,13 @@ find_min_roe AS (
     FROM calc_yearly_data
 ),
 filtered_data AS (
-    SELECT 
+    SELECT
         code,
         year,
         ROUND(min_roe_ever, 2) AS min_roe_ever,
         ROUND(avg_roe_ever, 2) AS avg_roe_ever,
         ROUND(max_roe_ever, 2) AS max_roe_ever,
-        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, 
+        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr,
         ROUND(avg_roe, 2) AS avg_roe,
         avg_bps AS avg_bps,
         round(avg_dividend, 2) as avg_dividend
@@ -552,7 +558,7 @@ filtered_data AS (
     WHERE avg_roe_ever >= 10.0 AND min_roe_ever >= 0.0   -- 1. 꾸준히 수익 창출하는 기업
 ),
 pivot_data AS (
-    SELECT 
+    SELECT
         code,
         MAX(min_roe_ever) AS min_roe_ever,
         MAX(avg_roe_ever) AS avg_roe_ever,
@@ -572,7 +578,7 @@ latest_debt_cte AS (
     WHERE trade_date = (SELECT MAX(trade_date) FROM stock_debt)
 ),
 last_data AS (
-    SELECT 
+    SELECT
         ROUND(((a.eps - p.past_eps) / NULLIF(ABS(p.past_eps), 0)) * 100, 2) AS eps_ratio,
         ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
@@ -581,38 +587,39 @@ last_data AS (
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
         *
-    FROM stockfdt_pbr_v a 
+    FROM stockfdt_pbr_v a
     JOIN pivot_data b USING (code)
     LEFT JOIN past_eps_cte p USING (code)
     CROSS JOIN max_date_cte
     WHERE a.trade_date = max_date_cte.max_date
-    AND a.bps > 0           
-    AND a.close_price > 0   
-)
-SELECT  
+    AND a.bps > 0
+    AND a.close_price > 0
+),
+f_data as (
+SELECT
     (m.trade_value::numeric / 10000000)::int AS trade_value_chunman,
-    (m.market_cap::numeric / 10000000000)::int AS market_cap_bakuk,     
+    (m.market_cap::numeric / 10000000000)::int AS market_cap_bakuk,
     m.sector,
     -- 💡 [NEW] 재무제표 출력 항목 추가
     d.revenue AS 매출액,
     d.operating_income AS 영업이익,
     ROUND((d.operating_income / NULLIF(d.revenue, 0)) * 100, 2) AS 영업이익률_pct,
     d.net_debt AS 순부채,
-    a.* 
-FROM last_data a 
-JOIN stockmain m ON a.trade_date = m.trade_date AND a.code = m.code 
+    a.*
+FROM last_data a
+JOIN stockmain m ON a.trade_date = m.trade_date AND a.code = m.code
 -- 💡 [NEW] 실적 데이터(INNER JOIN을 통해 재무 데이터가 있는 확실한 기업만 필터링)
 JOIN latest_debt_cte d ON a.code = d.code
-WHERE 1=1     
+WHERE 1=1
     -- 7. BPS 성장 검증
-    AND ggg_bps <= iii_bps AND iii_bps <= kkk_bps   
+    AND ggg_bps <= iii_bps AND iii_bps <= kkk_bps
 
     --------------------------------------------------------------------------------
     -- 🚀 [NEW] stock_debt 테이블을 활용한 퀄리티 펀더멘털 필터 3종 세트
     --------------------------------------------------------------------------------
     -- 9-1. 장사를 해서 돈을 벌고 있는가? (일회성 이익 속임수 방어)
     AND d.operating_income > 0
-    AND d.net_income > 0 
+    AND d.net_income > 0
     -- 9-2. 경제적 해자가 존재하는가? (영업이익률 최소 5% 이상)
     AND (d.operating_income / NULLIF(d.revenue, 0)) >= 0.05
     -- 6. 진짜 현금 부자인가? (보유 현금이 이자 발생 부채보다 많아야 함)
@@ -620,7 +627,12 @@ WHERE 1=1
     --------------------------------------------------------------------------------
 
 and a.code in (select code from mytrade where trade_div in ('bond','value') and trade_status = 1)
-ORDER BY a.expected_cagr DESC;
+)
+select b.close_price - a.trade_close_price as diff_price, a.*
+from mytrade a join (select code,close_price from stockmain where trade_date = (select max(trade_date) from stockmain)) b on a.code=b.code
+where a.code not in (select code from f_data)
+and a.trade_div in ('bond','value') and trade_status = 1
+;
 EEOFF
 
 
@@ -960,30 +972,30 @@ WITH max_date_cte AS (
     SELECT MAX(trade_date) AS max_date FROM stockfdt_pbr_v
 ),
 past_eps_cte AS (
-    SELECT 
+    SELECT
         code,
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days' 
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days'
                          AND max_date - INTERVAL '1 year' + INTERVAL '3 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
-    SELECT 
+    SELECT
         a.code,
         to_char(a.trade_date, 'YYYY') AS year,
         AVG(a.roe) AS avg_roe,
-        AVG(a.pbr) AS avg_pbr,  
+        AVG(a.pbr) AS avg_pbr,
         (AVG(a.bps))::bigint AS avg_bps,
         avg(a.dividend_yield) as avg_dividend
-    FROM stockfdt_pbr_v a 
+    FROM stockfdt_pbr_v a
     JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code
     WHERE a.trade_date >= '20160101'
     GROUP BY a.code, to_char(a.trade_date, 'YYYY')
 ),
 find_min_roe AS (
-    SELECT 
+    SELECT
         code,
         year,
         avg_roe,
@@ -996,13 +1008,13 @@ find_min_roe AS (
     FROM calc_yearly_data
 ),
 filtered_data AS (
-    SELECT 
+    SELECT
         code,
         year,
         ROUND(min_roe_ever, 2) AS min_roe_ever,
         ROUND(avg_roe_ever, 2) AS avg_roe_ever,
         ROUND(max_roe_ever, 2) AS max_roe_ever,
-        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, 
+        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr,
         ROUND(avg_roe, 2) AS avg_roe,
         avg_bps AS avg_bps,
         round(avg_dividend, 2) as avg_dividend
@@ -1010,7 +1022,7 @@ filtered_data AS (
     WHERE avg_roe_ever >= 12.0 AND min_roe_ever >= 0.0   -- [상향] 성장주 기준: 평균 자본효율성(ROE) 12% 이상
 ),
 pivot_data AS (
-    SELECT 
+    SELECT
         code,
         MAX(min_roe_ever) AS min_roe_ever,
         MAX(avg_roe_ever) AS avg_roe_ever,
@@ -1049,7 +1061,7 @@ latest_debt_cte AS (
     WHERE trade_date = (SELECT MAX(trade_date) FROM stock_debt)
 ),
 last_data AS (
-    SELECT 
+    SELECT
         ROUND(((a.eps - p.past_eps) / NULLIF(ABS(p.past_eps), 0)) * 100, 2) AS eps_ratio,
         ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
@@ -1058,58 +1070,64 @@ last_data AS (
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
         *
-    FROM stockfdt_pbr_v a 
+    FROM stockfdt_pbr_v a
     JOIN pivot_data b USING (code)
     LEFT JOIN past_eps_cte p USING (code)
     CROSS JOIN max_date_cte
     WHERE a.trade_date = max_date_cte.max_date
-    AND a.bps > 0           
-    AND a.close_price > 0   
-)
-SELECT  
+    AND a.bps > 0
+    AND a.close_price > 0
+),
+f_data as (
+SELECT
     (m.trade_value::numeric / 10000000)::int AS trade_value_chunman,
-    (m.market_cap::numeric / 10000000000)::int AS market_cap_bakuk,     
+    (m.market_cap::numeric / 10000000000)::int AS market_cap_bakuk,
     m.sector,
     d.revenue AS 매출액,
     d.operating_income AS 영업이익,
     ROUND((d.operating_income / NULLIF(d.revenue, 0)) * 100, 2) AS 영업이익률_pct,
     d.net_debt AS 순부채,
-    a.* 
-FROM last_data a 
-JOIN stockmain m ON a.trade_date = m.trade_date AND a.code = m.code 
+    a.*
+FROM last_data a
+JOIN stockmain m ON a.trade_date = m.trade_date AND a.code = m.code
 JOIN latest_debt_cte d ON a.code = d.code
 WHERE 1=1
-    -- 2. [완화] 저평가 기준: 성장주의 프리미엄 가격 반영 
+    -- 2. [완화] 저평가 기준: 성장주의 프리미엄 가격 반영
     AND (a.expected_cagr >= 8.0 OR a.fep_expected_cagr >= 12.0)
-    
+
     -- 5. [핵심] 강력한 실적 모멘텀: 1년 전 대비 이익성장률 15% 이상 필수 검증
-    AND a.eps_ratio >= 15.0 AND a.eps_ratio < 150.0   
-    
+    AND a.eps_ratio >= 15.0 AND a.eps_ratio < 150.0
+
     -- 7. [유지] 순자산(BPS) 우상향 기조 검증
     AND a.ggg_bps <= a.iii_bps AND a.iii_bps <= a.kkk_bps
-    
+
     -- 8. [삭제] 배당 조건 삭제: 성장주는 버는 돈을 배당 대신 R&D와 시설 투자에 재투자해야 함
-    AND a.dividend_yield >= 0.0   
-    
+    AND a.dividend_yield >= 0.0
+
     -- [성장주 핵심] 밸류에이션 상한선 확장: 시장에서 성장 프리미엄을 받는 고멀티플 용인 (PER 15 -> 35로 상향)
-    AND (a.per > 0 AND a.per < 35.0)   
+    AND (a.per > 0 AND a.per < 35.0)
 
     --------------------------------------------------------------------------------
     -- 🚀 [NEW] stock_debt 테이블을 활용한 질적 우수성 조건 재설계
     --------------------------------------------------------------------------------
     -- 9-1. 본업 흑자 유지
     AND d.operating_income > 0
-    AND d.net_income > 0 
-    
+    AND d.net_income > 0
+
     -- 9-2. [상향] 경제적 해자 강화: 독점적 지위나 가격 결정력이 있는 고마진 기업 (영업이익률 5% -> 8%로 상향)
     AND (d.operating_income / NULLIF(d.revenue, 0)) >= 0.08
-    
+
     -- 6. [완화] 무차입 경영 조건 완화: 빚을 내서 효율적인 투자를 하는 합리적 레버리지 용인 (순부채 시가총액의 20% 이하)
     AND (d.net_debt <= m.market_cap * 0.2)
     --------------------------------------------------------------------------------
 
 and a.code in (select code from mytrade where trade_div in ('growth') and trade_status = 1)
-ORDER BY a.eps_ratio DESC; -- 기대 CAGR 대신 이익 성장률(Momentum)이 높은 순으로 정렬
+)
+select b.close_price - a.trade_close_price as diff_price, a.*
+from mytrade a join (select code,close_price from stockmain where trade_date = (select max(trade_date) from stockmain)) b on a.code=b.code
+where a.code not in (select code from f_data)
+and a.trade_div in ('growth') and trade_status = 1
+;
 EEOFF
 
 
@@ -1127,30 +1145,30 @@ WITH max_date_cte AS (
     SELECT MAX(trade_date) AS max_date FROM stockfdt_pbr_v
 ),
 past_eps_cte AS (
-    SELECT 
+    SELECT
         code,
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days' 
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days'
                          AND max_date - INTERVAL '1 year' + INTERVAL '3 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
-    SELECT 
+    SELECT
         a.code,
         to_char(a.trade_date, 'YYYY') AS year,
         AVG(a.roe) AS avg_roe,
-        AVG(a.pbr) AS avg_pbr,  
+        AVG(a.pbr) AS avg_pbr,
         (AVG(a.bps))::bigint AS avg_bps,
         avg(a.dividend_yield) as avg_dividend
-    FROM stockfdt_pbr_v a 
+    FROM stockfdt_pbr_v a
     JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code
     WHERE a.trade_date >= '20160101'
     GROUP BY a.code, to_char(a.trade_date, 'YYYY')
 ),
 find_min_roe AS (
-    SELECT 
+    SELECT
         code,
         year,
         avg_roe,
@@ -1163,21 +1181,21 @@ find_min_roe AS (
     FROM calc_yearly_data
 ),
 filtered_data AS (
-    SELECT 
+    SELECT
         code,
         year,
         ROUND(min_roe_ever, 2) AS min_roe_ever,
         ROUND(avg_roe_ever, 2) AS avg_roe_ever,
         ROUND(max_roe_ever, 2) AS max_roe_ever,
-        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, 
+        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr,
         ROUND(avg_roe, 2) AS avg_roe,
         avg_bps AS avg_bps,
         round(avg_dividend, 2) as avg_dividend
     FROM find_min_roe
-    WHERE avg_roe_ever >= 12.0 AND min_roe_ever >= 0.0   
+    WHERE avg_roe_ever >= 12.0 AND min_roe_ever >= 0.0
 ),
 pivot_data AS (
-    SELECT 
+    SELECT
         code,
         MAX(min_roe_ever) AS min_roe_ever,
         MAX(avg_roe_ever) AS avg_roe_ever,
@@ -1195,7 +1213,7 @@ latest_debt_cte AS (
     WHERE trade_date = (SELECT MAX(trade_date) FROM stock_debt)
 ),
 last_data AS (
-    SELECT 
+    SELECT
         ROUND(((a.eps - p.past_eps) / NULLIF(ABS(p.past_eps), 0)) * 100, 2) AS eps_ratio,
         ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
@@ -1204,48 +1222,54 @@ last_data AS (
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
         *
-    FROM stockfdt_pbr_v a 
+    FROM stockfdt_pbr_v a
     JOIN pivot_data b USING (code)
     LEFT JOIN past_eps_cte p USING (code)
     CROSS JOIN max_date_cte
     WHERE a.trade_date = max_date_cte.max_date
-    AND a.bps > 0           
-    AND a.close_price > 0   
-)
-SELECT  
+    AND a.bps > 0
+    AND a.close_price > 0
+),
+f_data as (
+SELECT
     (m.trade_value::numeric / 10000000)::int AS trade_value_chunman,
-    (m.market_cap::numeric / 10000000000)::int AS market_cap_bakuk,     
+    (m.market_cap::numeric / 10000000000)::int AS market_cap_bakuk,
     m.sector,
     d.revenue AS 매출액,
     d.operating_income AS 영업이익,
     ROUND((d.operating_income / NULLIF(d.revenue, 0)) * 100, 2) AS 영업이익률_pct,
     d.net_debt AS 순부채,
-    a.* FROM last_data a 
-JOIN stockmain m ON a.trade_date = m.trade_date AND a.code = m.code 
+    a.* FROM last_data a
+JOIN stockmain m ON a.trade_date = m.trade_date AND a.code = m.code
 JOIN latest_debt_cte d ON a.code = d.code
 WHERE 1=1
     -- 5. [핵심] 실적 모멘텀 유지 검증
     -- 분기 실적 발표 후 성장이 꺾이면(15% 미만) 여기서 가차 없이 탈락됨
     AND a.eps_ratio >= 15.0
-    
+
     -- 7. 순자산(BPS) 우상향 기조 검증 (유지)
     AND a.ggg_bps <= a.iii_bps AND a.iii_bps <= a.kkk_bps
-    
+
     -- 8. 배당 조건 (유지)
-    AND a.dividend_yield >= 0.0   
-    
+    AND a.dividend_yield >= 0.0
+
     -- 9-1. 본업 흑자 유지 (적자 전환 시 탈락)
     AND d.operating_income > 0
-    AND d.net_income > 0 
-    
+    AND d.net_income > 0
+
     -- 9-2. 경제적 해자 강화 (영업이익률 8% 붕괴 시 탈락)
     AND (d.operating_income / NULLIF(d.revenue, 0)) >= 0.08
-    
+
     -- 6. 재무 건전성 유지 (빚이 과도하게 늘어나면 탈락)
     AND (d.net_debt <= m.market_cap * 0.2)
 
 and a.code in (select code from mytrade where trade_div in ('growth') and trade_status = 1)
-ORDER BY a.eps_ratio DESC;
+)
+select b.close_price - a.trade_close_price as diff_price, a.*
+from mytrade a join (select code,close_price from stockmain where trade_date = (select max(trade_date) from stockmain)) b on a.code=b.code
+where a.code not in (select code from f_data)
+and a.trade_div in ('growth') and trade_status = 1
+;
 EEOFF
 
 
