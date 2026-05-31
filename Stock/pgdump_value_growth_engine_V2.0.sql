@@ -180,8 +180,8 @@ WHERE 1=1
     AND a.eps_ratio > a.per AND a.eps_ratio < 500.0   
     -- 7. ROE,BPS 성장 검증
     AND (ggg_roe >= 5.0 AND hhh_roe >= 5.0 AND iii_roe >= 5.0 AND jjj_roe >= 5.0 AND kkk_roe >= 5.0)
-    AND (iii_roe <= kkk_roe AND kkk_roe/jjj_roe >= 0.9)
-    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps/jjj_bps >= 0.9)
+    AND (iii_roe <= kkk_roe AND kkk_roe >= jjj_roe-2)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps >= jjj_bps*0.9)
     -- 8. 배당수익률 최소 3% 이상
     AND a.dividend_yield >= 3.0   
     -- 기타 방어 코드
@@ -473,8 +473,8 @@ WHERE 1=1
     AND a.eps_ratio > a.per AND a.eps_ratio < 500.0
     -- 7. ROE,BPS 성장 검증
     AND (ggg_roe >= 3.0 AND hhh_roe >= 3.0 AND iii_roe >= 3.0 AND jjj_roe >= 3.0 AND kkk_roe >= 3.0)
-    AND (iii_roe <= kkk_roe AND kkk_roe/jjj_roe >= 0.9)
-    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps/jjj_bps >= 0.9)
+    AND (iii_roe <= kkk_roe AND kkk_roe >= jjj_roe-2)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps >= jjj_bps*0.9)
     -- 8. 배당수익률 최소 3% 이상
     AND a.dividend_yield >= 3.0
     -- 기타 방어 코드
@@ -638,8 +638,8 @@ JOIN latest_debt_cte d ON a.code = d.code
 WHERE 1=1
     -- 7. ROE,BPS 성장 검증
     AND (ggg_roe >= 3.0 AND hhh_roe >= 3.0 AND iii_roe >= 3.0 AND jjj_roe >= 3.0 AND kkk_roe >= 3.0)
-    AND (iii_roe <= kkk_roe AND kkk_roe/jjj_roe >= 0.9)
-    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps/jjj_bps >= 0.9)
+    AND (iii_roe <= kkk_roe AND kkk_roe >= jjj_roe-2)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps >= jjj_bps*0.9)
 
     --------------------------------------------------------------------------------
     -- 🚀 [NEW] stock_debt 테이블을 활용한 퀄리티 펀더멘털 필터 3종 세트
@@ -844,8 +844,8 @@ WHERE 1=1
     
     -- 7. ROE,BPS 성장 검증
     AND (ggg_roe >= 8.0 AND hhh_roe >= 8.0 AND iii_roe >= 8.0 AND jjj_roe >= 8.0 AND kkk_roe >= 8.0)    
-    AND (iii_roe <= kkk_roe AND kkk_roe/jjj_roe >= 0.9)
-    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps/jjj_bps >= 0.9)
+    AND (iii_roe <= kkk_roe AND kkk_roe >= jjj_roe-2)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps >= jjj_bps*0.9)
     
     -- 8. [삭제] 배당 조건 삭제: 성장주는 버는 돈을 배당 대신 R&D와 시설 투자에 재투자해야 함
     AND a.dividend_yield >= 0.0   
@@ -1151,8 +1151,8 @@ WHERE 1=1
 
     -- 7. [유지] 순자산(BPS) 우상향 기조 검증
     AND (ggg_roe >= 5.0 AND hhh_roe >= 5.0 AND iii_roe >= 5.0 AND jjj_roe >= 5.0 AND kkk_roe >= 5.0)
-    AND (iii_roe <= kkk_roe AND kkk_roe/jjj_roe >= 0.9)
-    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps/jjj_bps >= 0.9)
+    AND (iii_roe <= kkk_roe AND kkk_roe >= jjj_roe-2)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps >= jjj_bps*0.9)
 
     -- 8. [삭제] 배당 조건 삭제: 성장주는 버는 돈을 배당 대신 R&D와 시설 투자에 재투자해야 함
     AND a.dividend_yield >= 0.0
@@ -1323,8 +1323,8 @@ WHERE 1=1
 
     -- 7. 순자산(BPS) 우상향 기조 검증 (유지)
     AND (ggg_roe >= 5.0 AND hhh_roe >= 5.0 AND iii_roe >= 5.0 AND jjj_roe >= 5.0 AND kkk_roe >= 5.0)
-    AND (iii_roe <= kkk_roe AND kkk_roe/jjj_roe >= 0.9)
-    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps/jjj_bps >= 0.9)
+    AND (iii_roe <= kkk_roe AND kkk_roe >= jjj_roe-2)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps >= jjj_bps*0.9)
 
     -- 8. 배당 조건 (유지)
     AND a.dividend_yield >= 0.0
