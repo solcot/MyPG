@@ -52,8 +52,8 @@ past_eps_cte AS (
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days' 
-                         AND max_date - INTERVAL '1 year' + INTERVAL '3 days'
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days' 
+                         AND max_date - INTERVAL '1 year' + INTERVAL '7 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
@@ -177,11 +177,11 @@ WHERE 1=1
     AND m.market_cap > 100000000000   
     AND m.trade_value > 1000000000    
     -- 5. 성장성 검증
-    AND a.eps_ratio > a.per AND a.eps_ratio < 100.0   
+    AND a.eps_ratio > a.per AND a.eps_ratio < 500.0   
     -- 7. ROE,BPS 성장 검증
     AND (ggg_roe >= 5.0 AND hhh_roe >= 5.0 AND iii_roe >= 5.0 AND jjj_roe >= 5.0 AND kkk_roe >= 5.0)
-    AND (iii_roe <= kkk_roe)
-    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps)
+    AND (iii_roe <= kkk_roe AND kkk_roe/jjj_roe >= 0.9)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps/jjj_bps >= 0.9)
     -- 8. 배당수익률 최소 3% 이상
     AND a.dividend_yield >= 3.0   
     -- 기타 방어 코드
@@ -216,8 +216,8 @@ past_eps_cte AS (
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days' 
-                         AND max_date - INTERVAL '1 year' + INTERVAL '3 days'
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days' 
+                         AND max_date - INTERVAL '1 year' + INTERVAL '7 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
@@ -347,8 +347,8 @@ past_eps_cte AS (
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days'
-                         AND max_date - INTERVAL '1 year' + INTERVAL '3 days'
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days'
+                         AND max_date - INTERVAL '1 year' + INTERVAL '7 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
@@ -470,11 +470,11 @@ WHERE 1=1
     -- 2. 저평가 종목
     AND (a.expected_cagr >= 15.0 OR a.fep_expected_cagr >= 20.0)
     -- 5. 성장성 검증
-    AND a.eps_ratio > a.per AND a.eps_ratio < 100.0
+    AND a.eps_ratio > a.per AND a.eps_ratio < 500.0
     -- 7. ROE,BPS 성장 검증
     AND (ggg_roe >= 3.0 AND hhh_roe >= 3.0 AND iii_roe >= 3.0 AND jjj_roe >= 3.0 AND kkk_roe >= 3.0)
-    AND (iii_roe <= kkk_roe)
-    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps)
+    AND (iii_roe <= kkk_roe AND kkk_roe/jjj_roe >= 0.9)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps/jjj_bps >= 0.9)
     -- 8. 배당수익률 최소 3% 이상
     AND a.dividend_yield >= 3.0
     -- 기타 방어 코드
@@ -516,8 +516,8 @@ past_eps_cte AS (
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days'
-                         AND max_date - INTERVAL '1 year' + INTERVAL '3 days'
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days'
+                         AND max_date - INTERVAL '1 year' + INTERVAL '7 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
@@ -638,8 +638,8 @@ JOIN latest_debt_cte d ON a.code = d.code
 WHERE 1=1
     -- 7. ROE,BPS 성장 검증
     AND (ggg_roe >= 3.0 AND hhh_roe >= 3.0 AND iii_roe >= 3.0 AND jjj_roe >= 3.0 AND kkk_roe >= 3.0)
-    AND (iii_roe <= kkk_roe)
-    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps)
+    AND (iii_roe <= kkk_roe AND kkk_roe/jjj_roe >= 0.9)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps/jjj_bps >= 0.9)
 
     --------------------------------------------------------------------------------
     -- 🚀 [NEW] stock_debt 테이블을 활용한 퀄리티 펀더멘털 필터 3종 세트
@@ -718,8 +718,8 @@ past_eps_cte AS (
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days' 
-                         AND max_date - INTERVAL '1 year' + INTERVAL '3 days'
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days' 
+                         AND max_date - INTERVAL '1 year' + INTERVAL '7 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
@@ -840,12 +840,12 @@ WHERE 1=1
     AND m.trade_value > 1000000000    
     
     -- 5. [핵심] 강력한 실적 모멘텀: 1년 전 대비 이익성장률 15% 이상 필수 검증
-    AND a.eps_ratio >= 15.0 AND a.eps_ratio < 150.0   
+    AND a.eps_ratio >= 15.0 AND a.eps_ratio < 500.0   
     
     -- 7. ROE,BPS 성장 검증
     AND (ggg_roe >= 8.0 AND hhh_roe >= 8.0 AND iii_roe >= 8.0 AND jjj_roe >= 8.0 AND kkk_roe >= 8.0)    
-    AND (iii_roe <= kkk_roe)
-    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps)
+    AND (iii_roe <= kkk_roe AND kkk_roe/jjj_roe >= 0.9)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps/jjj_bps >= 0.9)
     
     -- 8. [삭제] 배당 조건 삭제: 성장주는 버는 돈을 배당 대신 R&D와 시설 투자에 재투자해야 함
     AND a.dividend_yield >= 0.0   
@@ -884,8 +884,8 @@ past_eps_cte AS (
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days' 
-                         AND max_date - INTERVAL '1 year' + INTERVAL '3 days'
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days' 
+                         AND max_date - INTERVAL '1 year' + INTERVAL '7 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
@@ -1028,8 +1028,8 @@ past_eps_cte AS (
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days'
-                         AND max_date - INTERVAL '1 year' + INTERVAL '3 days'
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days'
+                         AND max_date - INTERVAL '1 year' + INTERVAL '7 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
@@ -1147,12 +1147,12 @@ WHERE 1=1
     AND (a.expected_cagr >= 8.0 OR a.fep_expected_cagr >= 12.0)
 
     -- 5. [핵심] 강력한 실적 모멘텀: 1년 전 대비 이익성장률 15% 이상 필수 검증
-    AND a.eps_ratio >= 15.0 AND a.eps_ratio < 150.0
+    AND a.eps_ratio >= 15.0 AND a.eps_ratio < 500.0
 
     -- 7. [유지] 순자산(BPS) 우상향 기조 검증
     AND (ggg_roe >= 5.0 AND hhh_roe >= 5.0 AND iii_roe >= 5.0 AND jjj_roe >= 5.0 AND kkk_roe >= 5.0)
-    AND (iii_roe <= kkk_roe)
-    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps)
+    AND (iii_roe <= kkk_roe AND kkk_roe/jjj_roe >= 0.9)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps/jjj_bps >= 0.9)
 
     -- 8. [삭제] 배당 조건 삭제: 성장주는 버는 돈을 배당 대신 R&D와 시설 투자에 재투자해야 함
     AND a.dividend_yield >= 0.0
@@ -1203,8 +1203,8 @@ past_eps_cte AS (
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days'
-                         AND max_date - INTERVAL '1 year' + INTERVAL '3 days'
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days'
+                         AND max_date - INTERVAL '1 year' + INTERVAL '7 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
@@ -1323,8 +1323,8 @@ WHERE 1=1
 
     -- 7. 순자산(BPS) 우상향 기조 검증 (유지)
     AND (ggg_roe >= 5.0 AND hhh_roe >= 5.0 AND iii_roe >= 5.0 AND jjj_roe >= 5.0 AND kkk_roe >= 5.0)
-    AND (iii_roe <= kkk_roe)
-    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps)
+    AND (iii_roe <= kkk_roe AND kkk_roe/jjj_roe >= 0.9)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps/jjj_bps >= 0.9)
 
     -- 8. 배당 조건 (유지)
     AND a.dividend_yield >= 0.0
@@ -1363,8 +1363,8 @@ past_eps_cte AS (
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '3 days' 
-                         AND max_date - INTERVAL '1 year' + INTERVAL '3 days'
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days' 
+                         AND max_date - INTERVAL '1 year' + INTERVAL '7 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
