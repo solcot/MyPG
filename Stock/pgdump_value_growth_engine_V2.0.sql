@@ -178,8 +178,9 @@ WHERE 1=1
     AND m.trade_value > 1000000000    
     -- 5. 성장성 검증
     AND a.eps_ratio > a.per AND a.eps_ratio < 100.0   
-    -- 7. BPS 성장 검증
-    AND ggg_bps <= iii_bps AND iii_bps <= kkk_bps
+    -- 7. ROE,BPS 성장 검증
+    AND (ggg_roe >= 5.0 AND hhh_roe >= 5.0 AND iii_roe >= 5.0 AND jjj_roe >= 5.0 AND kkk_roe >= 5.0)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps)
     -- 8. 배당수익률 최소 3% 이상
     AND a.dividend_yield >= 3.0   
     -- 기타 방어 코드
@@ -468,6 +469,7 @@ WHERE 1=1
     -- 2. 저평가 종목
     AND (a.expected_cagr >= 15.0 OR a.fep_expected_cagr >= 20.0)
     -- 5. 성장성 검증
+    AND (ggg_roe >= 3.0 AND hhh_roe >= 3.0 AND iii_roe >= 3.0 AND jjj_roe >= 3.0 AND kkk_roe >= 3.0)
     AND a.eps_ratio > a.per AND a.eps_ratio < 100.0
     -- 7. BPS 성장 검증
     AND ggg_bps <= iii_bps AND iii_bps <= kkk_bps
@@ -480,12 +482,12 @@ WHERE 1=1
     -- 🚀 [NEW] stock_debt 테이블을 활용한 퀄리티 펀더멘털 필터 3종 세트
     --------------------------------------------------------------------------------
     -- 9-1. 장사를 해서 돈을 벌고 있는가? (일회성 이익 속임수 방어)
-    AND d.operating_income > 0
-    AND d.net_income > 0
+    AND (d.operating_income > 0 or d.operating_income = 'NaN')
+    AND (d.net_income > 0 or d.net_income = 'NaN')
     -- 9-2. 경제적 해자가 존재하는가? (영업이익률 최소 5% 이상)
-    AND (d.operating_income / NULLIF(d.revenue, 0)) >= 0.05
+    AND ((d.operating_income / NULLIF(d.revenue, 0)) >= 0.05 or d.operating_income = 'NaN')
     -- 6. 진짜 현금 부자인가? (보유 현금이 이자 발생 부채보다 많아야 함)
-    AND (d.net_debt <= 0)
+    AND ((d.net_debt <= 0) or d.net_debt = 'NaN')
     --------------------------------------------------------------------------------
 
 and a.code in (select code from mytrade where trade_div in ('bond','value') and trade_status = 1)
@@ -565,9 +567,29 @@ pivot_data AS (
         MAX(avg_roe_ever) AS avg_roe_ever,
         MAX(max_roe_ever) AS max_roe_ever,
         MAX(hist_avg_pbr) AS hist_avg_pbr,
-        -- 기존 시가총액 피벗 삭제 후 BPS 피벗으로 교체
+        -- ROE 피벗
+        MAX(avg_roe) FILTER (WHERE year = '2016') AS aaa_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2017') AS bbb_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2018') AS ccc_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2019') AS ddd_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2020') AS eee_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2021') AS fff_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2022') AS ggg_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2023') AS hhh_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2024') AS iii_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2025') AS jjj_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2026') AS kkk_roe,
+        -- BPS 피벗
+        MAX(avg_bps) FILTER (WHERE year = '2016') AS aaa_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2017') AS bbb_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2018') AS ccc_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2019') AS ddd_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2020') AS eee_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2021') AS fff_bps,
         MAX(avg_bps) FILTER (WHERE year = '2022') AS ggg_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2023') AS hhh_bps,
         MAX(avg_bps) FILTER (WHERE year = '2024') AS iii_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2025') AS jjj_bps,
         MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps
     FROM filtered_data
     GROUP BY code
@@ -613,18 +635,19 @@ JOIN stockmain m ON a.trade_date = m.trade_date AND a.code = m.code
 JOIN latest_debt_cte d ON a.code = d.code
 WHERE 1=1
     -- 7. BPS 성장 검증
+    AND (ggg_roe >= 3.0 AND hhh_roe >= 3.0 AND iii_roe >= 3.0 AND jjj_roe >= 3.0 AND kkk_roe >= 3.0)
     AND ggg_bps <= iii_bps AND iii_bps <= kkk_bps
 
     --------------------------------------------------------------------------------
     -- 🚀 [NEW] stock_debt 테이블을 활용한 퀄리티 펀더멘털 필터 3종 세트
     --------------------------------------------------------------------------------
     -- 9-1. 장사를 해서 돈을 벌고 있는가? (일회성 이익 속임수 방어)
-    AND d.operating_income > 0
-    AND d.net_income > 0
+    AND (d.operating_income > 0 or d.operating_income = 'NaN')
+    AND (d.net_income > 0 or d.net_income = 'NaN')
     -- 9-2. 경제적 해자가 존재하는가? (영업이익률 최소 5% 이상)
-    AND (d.operating_income / NULLIF(d.revenue, 0)) >= 0.05
+    AND ((d.operating_income / NULLIF(d.revenue, 0)) >= 0.05 or d.operating_income = 'NaN') 
     -- 6. 진짜 현금 부자인가? (보유 현금이 이자 발생 부채보다 많아야 함)
-    AND (d.net_debt <= 0)
+    AND ((d.net_debt <= 0) or d.net_debt = 'NaN')
     --------------------------------------------------------------------------------
 
 and a.code in (select code from mytrade where trade_div in ('bond','value') and trade_status = 1)
@@ -816,7 +839,8 @@ WHERE 1=1
     -- 5. [핵심] 강력한 실적 모멘텀: 1년 전 대비 이익성장률 15% 이상 필수 검증
     AND a.eps_ratio >= 15.0 AND a.eps_ratio < 150.0   
     
-    -- 7. [유지] 순자산(BPS) 우상향 기조 검증
+    -- 7. ROE,BPS 성장 검증
+    AND (ggg_roe >= 8.0 AND hhh_roe >= 8.0 AND iii_roe >= 8.0 AND jjj_roe >= 8.0 AND kkk_roe >= 8.0)    
     AND a.ggg_bps <= a.iii_bps AND a.iii_bps <= a.kkk_bps
     
     -- 8. [삭제] 배당 조건 삭제: 성장주는 버는 돈을 배당 대신 R&D와 시설 투자에 재투자해야 함
@@ -909,9 +933,29 @@ pivot_data AS (
         MAX(avg_roe_ever) AS avg_roe_ever,
         MAX(max_roe_ever) AS max_roe_ever,
         MAX(hist_avg_pbr) AS hist_avg_pbr,
-        -- 기존 시가총액 피벗 삭제 후 BPS 피벗으로 교체
+        -- ROE 피벗
+        MAX(avg_roe) FILTER (WHERE year = '2016') AS aaa_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2017') AS bbb_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2018') AS ccc_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2019') AS ddd_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2020') AS eee_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2021') AS fff_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2022') AS ggg_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2023') AS hhh_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2024') AS iii_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2025') AS jjj_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2026') AS kkk_roe,
+        -- BPS 피벗
+        MAX(avg_bps) FILTER (WHERE year = '2016') AS aaa_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2017') AS bbb_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2018') AS ccc_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2019') AS ddd_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2020') AS eee_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2021') AS fff_bps,
         MAX(avg_bps) FILTER (WHERE year = '2022') AS ggg_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2023') AS hhh_bps,
         MAX(avg_bps) FILTER (WHERE year = '2024') AS iii_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2025') AS jjj_bps,
         MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps
     FROM filtered_data
     GROUP BY code
@@ -1102,6 +1146,7 @@ WHERE 1=1
     AND a.eps_ratio >= 15.0 AND a.eps_ratio < 150.0
 
     -- 7. [유지] 순자산(BPS) 우상향 기조 검증
+    AND (ggg_roe >= 5.0 AND hhh_roe >= 5.0 AND iii_roe >= 5.0 AND jjj_roe >= 5.0 AND kkk_roe >= 5.0)
     AND a.ggg_bps <= a.iii_bps AND a.iii_bps <= a.kkk_bps
 
     -- 8. [삭제] 배당 조건 삭제: 성장주는 버는 돈을 배당 대신 R&D와 시설 투자에 재투자해야 함
@@ -1114,14 +1159,14 @@ WHERE 1=1
     -- 🚀 [NEW] stock_debt 테이블을 활용한 질적 우수성 조건 재설계
     --------------------------------------------------------------------------------
     -- 9-1. 본업 흑자 유지
-    AND d.operating_income > 0
-    AND d.net_income > 0
+    AND (d.operating_income > 0 or d.operating_income = 'NaN')
+    AND (d.net_income > 0 or d.net_income = 'NaN')
 
     -- 9-2. [상향] 경제적 해자 강화: 독점적 지위나 가격 결정력이 있는 고마진 기업 (영업이익률 5% -> 8%로 상향)
-    AND (d.operating_income / NULLIF(d.revenue, 0)) >= 0.08
+    AND ((d.operating_income / NULLIF(d.revenue, 0)) >= 0.08 or d.operating_income = 'NaN')
 
     -- 6. [완화] 무차입 경영 조건 완화: 빚을 내서 효율적인 투자를 하는 합리적 레버리지 용인 (순부채 시가총액의 20% 이하)
-    AND (d.net_debt <= m.market_cap * 0.2)
+    AND ((d.net_debt <= m.market_cap * 0.2) or d.net_debt = 'NaN')
     --------------------------------------------------------------------------------
 
 and a.code in (select code from mytrade where trade_div in ('growth') and trade_status = 1)
@@ -1204,8 +1249,29 @@ pivot_data AS (
         MAX(avg_roe_ever) AS avg_roe_ever,
         MAX(max_roe_ever) AS max_roe_ever,
         MAX(hist_avg_pbr) AS hist_avg_pbr,
+        -- ROE 피벗
+        MAX(avg_roe) FILTER (WHERE year = '2016') AS aaa_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2017') AS bbb_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2018') AS ccc_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2019') AS ddd_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2020') AS eee_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2021') AS fff_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2022') AS ggg_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2023') AS hhh_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2024') AS iii_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2025') AS jjj_roe,
+        MAX(avg_roe) FILTER (WHERE year = '2026') AS kkk_roe,
+        -- BPS 피벗
+        MAX(avg_bps) FILTER (WHERE year = '2016') AS aaa_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2017') AS bbb_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2018') AS ccc_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2019') AS ddd_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2020') AS eee_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2021') AS fff_bps,
         MAX(avg_bps) FILTER (WHERE year = '2022') AS ggg_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2023') AS hhh_bps,
         MAX(avg_bps) FILTER (WHERE year = '2024') AS iii_bps,
+        MAX(avg_bps) FILTER (WHERE year = '2025') AS jjj_bps,
         MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps
     FROM filtered_data
     GROUP BY code
@@ -1251,20 +1317,21 @@ WHERE 1=1
     AND a.eps_ratio >= 15.0
 
     -- 7. 순자산(BPS) 우상향 기조 검증 (유지)
+    AND (ggg_roe >= 5.0 AND hhh_roe >= 5.0 AND iii_roe >= 5.0 AND jjj_roe >= 5.0 AND kkk_roe >= 5.0)
     AND a.ggg_bps <= a.iii_bps AND a.iii_bps <= a.kkk_bps
 
     -- 8. 배당 조건 (유지)
     AND a.dividend_yield >= 0.0
 
     -- 9-1. 본업 흑자 유지 (적자 전환 시 탈락)
-    AND d.operating_income > 0
-    AND d.net_income > 0
+    AND (d.operating_income > 0 or d.operating_income = 'NaN')
+    AND (d.net_income > 0 or d.net_income = 'NaN')
 
     -- 9-2. 경제적 해자 강화 (영업이익률 8% 붕괴 시 탈락)
-    AND (d.operating_income / NULLIF(d.revenue, 0)) >= 0.08
+    AND ((d.operating_income / NULLIF(d.revenue, 0)) >= 0.08 or d.operating_income = 'NaN')
 
     -- 6. 재무 건전성 유지 (빚이 과도하게 늘어나면 탈락)
-    AND (d.net_debt <= m.market_cap * 0.2)
+    AND ((d.net_debt <= m.market_cap * 0.2) or d.net_debt = 'NaN')
 
 and a.code in (select code from mytrade where trade_div in ('growth') and trade_status = 1)
 )
