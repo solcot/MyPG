@@ -144,9 +144,9 @@ last_data AS (
         ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
-        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
-        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS future_expected_price,
+        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
         *
     FROM stockfdt_pbr_v a 
     JOIN pivot_data b USING (code)
@@ -180,6 +180,7 @@ WHERE 1=1
     AND a.eps_ratio > a.per AND a.eps_ratio < 100.0   
     -- 7. ROE,BPS 성장 검증
     AND (ggg_roe >= 5.0 AND hhh_roe >= 5.0 AND iii_roe >= 5.0 AND jjj_roe >= 5.0 AND kkk_roe >= 5.0)
+    AND (iii_roe <= kkk_roe)
     AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps)
     -- 8. 배당수익률 최소 3% 이상
     AND a.dividend_yield >= 3.0   
@@ -287,9 +288,9 @@ last_data AS (
         ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
-        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
-        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS future_expected_price,
+        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
         *
     FROM stockfdt_pbr_v a 
     JOIN pivot_data b USING (code)
@@ -438,9 +439,9 @@ last_data AS (
         ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
-        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
-        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS future_expected_price,
+        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
         *
     FROM stockfdt_pbr_v a
     JOIN pivot_data b USING (code)
@@ -469,10 +470,11 @@ WHERE 1=1
     -- 2. 저평가 종목
     AND (a.expected_cagr >= 15.0 OR a.fep_expected_cagr >= 20.0)
     -- 5. 성장성 검증
-    AND (ggg_roe >= 3.0 AND hhh_roe >= 3.0 AND iii_roe >= 3.0 AND jjj_roe >= 3.0 AND kkk_roe >= 3.0)
     AND a.eps_ratio > a.per AND a.eps_ratio < 100.0
-    -- 7. BPS 성장 검증
-    AND ggg_bps <= iii_bps AND iii_bps <= kkk_bps
+    -- 7. ROE,BPS 성장 검증
+    AND (ggg_roe >= 3.0 AND hhh_roe >= 3.0 AND iii_roe >= 3.0 AND jjj_roe >= 3.0 AND kkk_roe >= 3.0)
+    AND (iii_roe <= kkk_roe)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps)
     -- 8. 배당수익률 최소 3% 이상
     AND a.dividend_yield >= 3.0
     -- 기타 방어 코드
@@ -606,9 +608,9 @@ last_data AS (
         ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
-        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
-        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS future_expected_price,
+        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
         *
     FROM stockfdt_pbr_v a
     JOIN pivot_data b USING (code)
@@ -634,9 +636,10 @@ JOIN stockmain m ON a.trade_date = m.trade_date AND a.code = m.code
 -- 💡 [NEW] 실적 데이터(INNER JOIN을 통해 재무 데이터가 있는 확실한 기업만 필터링)
 JOIN latest_debt_cte d ON a.code = d.code
 WHERE 1=1
-    -- 7. BPS 성장 검증
+    -- 7. ROE,BPS 성장 검증
     AND (ggg_roe >= 3.0 AND hhh_roe >= 3.0 AND iii_roe >= 3.0 AND jjj_roe >= 3.0 AND kkk_roe >= 3.0)
-    AND ggg_bps <= iii_bps AND iii_bps <= kkk_bps
+    AND (iii_roe <= kkk_roe)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps)
 
     --------------------------------------------------------------------------------
     -- 🚀 [NEW] stock_debt 테이블을 활용한 퀄리티 펀더멘털 필터 3종 세트
@@ -804,9 +807,9 @@ last_data AS (
         ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
-        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
-        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS future_expected_price,
+        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
         *
     FROM stockfdt_pbr_v a 
     JOIN pivot_data b USING (code)
@@ -841,7 +844,8 @@ WHERE 1=1
     
     -- 7. ROE,BPS 성장 검증
     AND (ggg_roe >= 8.0 AND hhh_roe >= 8.0 AND iii_roe >= 8.0 AND jjj_roe >= 8.0 AND kkk_roe >= 8.0)    
-    AND a.ggg_bps <= a.iii_bps AND a.iii_bps <= a.kkk_bps
+    AND (iii_roe <= kkk_roe)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps)
     
     -- 8. [삭제] 배당 조건 삭제: 성장주는 버는 돈을 배당 대신 R&D와 시설 투자에 재투자해야 함
     AND a.dividend_yield >= 0.0   
@@ -972,9 +976,9 @@ last_data AS (
         ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
-        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
-        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS future_expected_price,
+        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
         *
     FROM stockfdt_pbr_v a 
     JOIN pivot_data b USING (code)
@@ -1113,9 +1117,9 @@ last_data AS (
         ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
-        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
-        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS future_expected_price,
+        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
         *
     FROM stockfdt_pbr_v a
     JOIN pivot_data b USING (code)
@@ -1147,7 +1151,8 @@ WHERE 1=1
 
     -- 7. [유지] 순자산(BPS) 우상향 기조 검증
     AND (ggg_roe >= 5.0 AND hhh_roe >= 5.0 AND iii_roe >= 5.0 AND jjj_roe >= 5.0 AND kkk_roe >= 5.0)
-    AND a.ggg_bps <= a.iii_bps AND a.iii_bps <= a.kkk_bps
+    AND (iii_roe <= kkk_roe)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps)
 
     -- 8. [삭제] 배당 조건 삭제: 성장주는 버는 돈을 배당 대신 R&D와 시설 투자에 재투자해야 함
     AND a.dividend_yield >= 0.0
@@ -1287,9 +1292,9 @@ last_data AS (
         ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
-        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
-        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS future_expected_price,
+        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
         *
     FROM stockfdt_pbr_v a
     JOIN pivot_data b USING (code)
@@ -1318,7 +1323,8 @@ WHERE 1=1
 
     -- 7. 순자산(BPS) 우상향 기조 검증 (유지)
     AND (ggg_roe >= 5.0 AND hhh_roe >= 5.0 AND iii_roe >= 5.0 AND jjj_roe >= 5.0 AND kkk_roe >= 5.0)
-    AND a.ggg_bps <= a.iii_bps AND a.iii_bps <= a.kkk_bps
+    AND (iii_roe <= kkk_roe)
+    AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps)
 
     -- 8. 배당 조건 (유지)
     AND a.dividend_yield >= 0.0
@@ -1429,9 +1435,9 @@ last_data AS (
         ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) AS future_expected_price,
-        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
-        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * b.hist_avg_pbr) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS future_expected_price,
+        ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
         *
     FROM stockfdt_pbr_v a 
     JOIN pivot_data b USING (code)
