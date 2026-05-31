@@ -128,7 +128,19 @@ pivot_data AS (
         MAX(avg_bps) FILTER (WHERE year = '2023') AS hhh_bps,
         MAX(avg_bps) FILTER (WHERE year = '2024') AS iii_bps,
         MAX(avg_bps) FILTER (WHERE year = '2025') AS jjj_bps,
-        MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps
+        MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps,
+        -- dividend 피벗
+        MAX(avg_dividend) FILTER (WHERE year = '2016') AS aaa_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2017') AS bbb_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2018') AS ccc_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2019') AS ddd_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2020') AS eee_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2021') AS fff_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2022') AS ggg_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2023') AS hhh_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2024') AS iii_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2025') AS jjj_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2026') AS kkk_avg_dividend
     FROM filtered_data
     GROUP BY code
 ),
@@ -792,7 +804,19 @@ pivot_data AS (
         MAX(avg_bps) FILTER (WHERE year = '2023') AS hhh_bps,
         MAX(avg_bps) FILTER (WHERE year = '2024') AS iii_bps,
         MAX(avg_bps) FILTER (WHERE year = '2025') AS jjj_bps,
-        MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps
+        MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps,
+        -- dividend 피벗
+        MAX(avg_dividend) FILTER (WHERE year = '2016') AS aaa_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2017') AS bbb_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2018') AS ccc_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2019') AS ddd_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2020') AS eee_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2021') AS fff_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2022') AS ggg_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2023') AS hhh_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2024') AS iii_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2025') AS jjj_avg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2026') AS kkk_avg_dividend
     FROM filtered_data
     GROUP BY code
 ),
