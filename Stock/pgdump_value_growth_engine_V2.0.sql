@@ -65,6 +65,7 @@ calc_yearly_data AS (
         -- 기존: avg(b.market_cap/a.pbr)::bigint AS avg_market_cap,
         -- 변경: 시가총액 대신 진짜 자산인 BPS(주당순자산)를 계산합니다.
         (AVG(a.bps))::bigint AS avg_bps,
+        (AVG(a.eps))::bigint AS avg_eps,
         avg(a.dividend_yield) as avg_dividend
     FROM stockfdt_pbr_v a 
     JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code
@@ -77,6 +78,7 @@ find_min_roe AS (
         year,
         avg_roe,
         avg_bps,
+        avg_eps,
         avg_dividend,
         MIN(avg_roe) OVER (PARTITION BY code) AS min_roe_ever,
         AVG(avg_roe) OVER (PARTITION BY code) AS avg_roe_ever,
@@ -94,6 +96,7 @@ filtered_data AS (
         ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, 
         ROUND(avg_roe, 2) AS avg_roe,
         avg_bps AS avg_bps,
+        avg_eps AS avg_eps,
         round(avg_dividend, 2) as avg_dividend
     FROM find_min_roe
     WHERE avg_roe_ever >= 10.0 AND min_roe_ever >= 0.0   -- 1. 꾸준히 수익 창출하는 기업
@@ -129,18 +132,30 @@ pivot_data AS (
         MAX(avg_bps) FILTER (WHERE year = '2024') AS iii_bps,
         MAX(avg_bps) FILTER (WHERE year = '2025') AS jjj_bps,
         MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps,
+        -- EPS 피벗
+        MAX(avg_eps) FILTER (WHERE year = '2016') AS aaa_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2017') AS bbb_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2018') AS ccc_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2019') AS ddd_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2020') AS eee_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2021') AS fff_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2022') AS ggg_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2023') AS hhh_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2024') AS iii_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2025') AS jjj_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2026') AS kkk_eps,
         -- dividend 피벗
-        MAX(avg_dividend) FILTER (WHERE year = '2016') AS aaa_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2017') AS bbb_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2018') AS ccc_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2019') AS ddd_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2020') AS eee_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2021') AS fff_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2022') AS ggg_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2023') AS hhh_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2024') AS iii_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2025') AS jjj_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2026') AS kkk_avg_dividend
+        MAX(avg_dividend) FILTER (WHERE year = '2016') AS aaa_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2017') AS bbb_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2018') AS ccc_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2019') AS ddd_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2020') AS eee_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2021') AS fff_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2022') AS ggg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2023') AS hhh_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2024') AS iii_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2025') AS jjj_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2026') AS kkk_dividend
     FROM filtered_data
     GROUP BY code
 ),
@@ -194,6 +209,11 @@ WHERE 1=1
     AND (ggg_roe >= 5.0 AND hhh_roe >= 5.0 AND iii_roe >= 5.0 AND jjj_roe >= 5.0 AND kkk_roe >= 5.0)
     AND (iii_roe <= kkk_roe AND kkk_roe >= jjj_roe-2)
     AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps >= jjj_bps*0.9)
+    -- 🚀 [NEW] 7-2. EPS 안정성 및 장기 우상향 검증 (Value)
+    -- 조건 1: 최근 3년간(iii, jjj, kkk) 단 한 번도 적자(EPS < 0)가 없을 것
+    AND (iii_eps > 0 AND jjj_eps > 0 AND kkk_eps > 0)
+    -- 조건 2: 최근 연도(kkk)의 EPS가 4년 전(ggg) EPS보다 크거나 같을 것 (장기 우상향 방어선)
+    AND (kkk_eps >= ggg_eps)    
     -- 8. 배당수익률 최소 3% 이상
     AND a.dividend_yield >= 3.0   
     -- 기타 방어 코드
@@ -272,7 +292,7 @@ filtered_data AS (
         avg_bps AS avg_bps,
         round(avg_dividend, 2) as avg_dividend
     FROM find_min_roe
-    WHERE avg_roe_ever >= 10.0 AND min_roe_ever >= 0.0   -- 1. 꾸준히 수익 창출하는 기업
+    --WHERE avg_roe_ever >= 10.0 AND min_roe_ever >= 0.0   -- 1. 꾸준히 수익 창출하는 기업
 ),
 pivot_data AS (
     SELECT 
@@ -354,36 +374,38 @@ WITH max_date_cte AS (
     SELECT MAX(trade_date) AS max_date FROM stockfdt_pbr_v
 ),
 past_eps_cte AS (
-    SELECT
+    SELECT 
         code,
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days'
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days' 
                          AND max_date - INTERVAL '1 year' + INTERVAL '7 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
-    SELECT
+    SELECT 
         a.code,
         to_char(a.trade_date, 'YYYY') AS year,
         AVG(a.roe) AS avg_roe,
-        AVG(a.pbr) AS avg_pbr,
+        AVG(a.pbr) AS avg_pbr,  
         -- 기존: avg(b.market_cap/a.pbr)::bigint AS avg_market_cap,
         -- 변경: 시가총액 대신 진짜 자산인 BPS(주당순자산)를 계산합니다.
         (AVG(a.bps))::bigint AS avg_bps,
+        (AVG(a.eps))::bigint AS avg_eps,
         avg(a.dividend_yield) as avg_dividend
-    FROM stockfdt_pbr_v a
+    FROM stockfdt_pbr_v a 
     JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code
     WHERE a.trade_date >= '20160101'
     GROUP BY a.code, to_char(a.trade_date, 'YYYY')
 ),
 find_min_roe AS (
-    SELECT
+    SELECT 
         code,
         year,
         avg_roe,
         avg_bps,
+        avg_eps,
         avg_dividend,
         MIN(avg_roe) OVER (PARTITION BY code) AS min_roe_ever,
         AVG(avg_roe) OVER (PARTITION BY code) AS avg_roe_ever,
@@ -392,21 +414,22 @@ find_min_roe AS (
     FROM calc_yearly_data
 ),
 filtered_data AS (
-    SELECT
+    SELECT 
         code,
         year,
         ROUND(min_roe_ever, 2) AS min_roe_ever,
         ROUND(avg_roe_ever, 2) AS avg_roe_ever,
         ROUND(max_roe_ever, 2) AS max_roe_ever,
-        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr,
+        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, 
         ROUND(avg_roe, 2) AS avg_roe,
         avg_bps AS avg_bps,
+        avg_eps AS avg_eps,
         round(avg_dividend, 2) as avg_dividend
     FROM find_min_roe
     WHERE avg_roe_ever >= 10.0 AND min_roe_ever >= 0.0   -- 1. 꾸준히 수익 창출하는 기업
 ),
 pivot_data AS (
-    SELECT
+    SELECT 
         code,
         MAX(min_roe_ever) AS min_roe_ever,
         MAX(avg_roe_ever) AS avg_roe_ever,
@@ -435,7 +458,31 @@ pivot_data AS (
         MAX(avg_bps) FILTER (WHERE year = '2023') AS hhh_bps,
         MAX(avg_bps) FILTER (WHERE year = '2024') AS iii_bps,
         MAX(avg_bps) FILTER (WHERE year = '2025') AS jjj_bps,
-        MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps
+        MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps,
+        -- EPS 피벗
+        MAX(avg_eps) FILTER (WHERE year = '2016') AS aaa_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2017') AS bbb_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2018') AS ccc_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2019') AS ddd_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2020') AS eee_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2021') AS fff_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2022') AS ggg_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2023') AS hhh_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2024') AS iii_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2025') AS jjj_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2026') AS kkk_eps,
+        -- dividend 피벗
+        MAX(avg_dividend) FILTER (WHERE year = '2016') AS aaa_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2017') AS bbb_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2018') AS ccc_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2019') AS ddd_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2020') AS eee_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2021') AS fff_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2022') AS ggg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2023') AS hhh_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2024') AS iii_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2025') AS jjj_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2026') AS kkk_dividend
     FROM filtered_data
     GROUP BY code
 ),
@@ -487,6 +534,11 @@ WHERE 1=1
     AND (ggg_roe >= 3.0 AND hhh_roe >= 3.0 AND iii_roe >= 3.0 AND jjj_roe >= 3.0 AND kkk_roe >= 3.0)
     AND (iii_roe <= kkk_roe AND kkk_roe >= jjj_roe-2)
     AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps >= jjj_bps*0.9)
+    -- 🚀 [NEW] 7-2. EPS 안정성 및 장기 우상향 검증 (Value)
+    -- 조건 1: 최근 3년간(iii, jjj, kkk) 단 한 번도 적자(EPS < 0)가 없을 것
+    AND (iii_eps > 0 AND jjj_eps > 0 AND kkk_eps > 0)
+    -- 조건 2: 최근 연도(kkk)의 EPS가 4년 전(ggg) EPS보다 크거나 같을 것 (장기 우상향 방어선)
+    AND (kkk_eps >= ggg_eps)
     -- 8. 배당수익률 최소 3% 이상
     AND a.dividend_yield >= 3.0
     -- 기타 방어 코드
@@ -523,36 +575,38 @@ WITH max_date_cte AS (
     SELECT MAX(trade_date) AS max_date FROM stockfdt_pbr_v
 ),
 past_eps_cte AS (
-    SELECT
+    SELECT 
         code,
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days'
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days' 
                          AND max_date - INTERVAL '1 year' + INTERVAL '7 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
-    SELECT
+    SELECT 
         a.code,
         to_char(a.trade_date, 'YYYY') AS year,
         AVG(a.roe) AS avg_roe,
-        AVG(a.pbr) AS avg_pbr,
+        AVG(a.pbr) AS avg_pbr,  
         -- 기존: avg(b.market_cap/a.pbr)::bigint AS avg_market_cap,
         -- 변경: 시가총액 대신 진짜 자산인 BPS(주당순자산)를 계산합니다.
         (AVG(a.bps))::bigint AS avg_bps,
+        (AVG(a.eps))::bigint AS avg_eps,
         avg(a.dividend_yield) as avg_dividend
-    FROM stockfdt_pbr_v a
+    FROM stockfdt_pbr_v a 
     JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code
     WHERE a.trade_date >= '20160101'
     GROUP BY a.code, to_char(a.trade_date, 'YYYY')
 ),
 find_min_roe AS (
-    SELECT
+    SELECT 
         code,
         year,
         avg_roe,
         avg_bps,
+        avg_eps,
         avg_dividend,
         MIN(avg_roe) OVER (PARTITION BY code) AS min_roe_ever,
         AVG(avg_roe) OVER (PARTITION BY code) AS avg_roe_ever,
@@ -561,21 +615,22 @@ find_min_roe AS (
     FROM calc_yearly_data
 ),
 filtered_data AS (
-    SELECT
+    SELECT 
         code,
         year,
         ROUND(min_roe_ever, 2) AS min_roe_ever,
         ROUND(avg_roe_ever, 2) AS avg_roe_ever,
         ROUND(max_roe_ever, 2) AS max_roe_ever,
-        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr,
+        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, 
         ROUND(avg_roe, 2) AS avg_roe,
         avg_bps AS avg_bps,
+        avg_eps AS avg_eps,
         round(avg_dividend, 2) as avg_dividend
     FROM find_min_roe
     WHERE avg_roe_ever >= 10.0 AND min_roe_ever >= 0.0   -- 1. 꾸준히 수익 창출하는 기업
 ),
 pivot_data AS (
-    SELECT
+    SELECT 
         code,
         MAX(min_roe_ever) AS min_roe_ever,
         MAX(avg_roe_ever) AS avg_roe_ever,
@@ -604,7 +659,31 @@ pivot_data AS (
         MAX(avg_bps) FILTER (WHERE year = '2023') AS hhh_bps,
         MAX(avg_bps) FILTER (WHERE year = '2024') AS iii_bps,
         MAX(avg_bps) FILTER (WHERE year = '2025') AS jjj_bps,
-        MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps
+        MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps,
+        -- EPS 피벗
+        MAX(avg_eps) FILTER (WHERE year = '2016') AS aaa_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2017') AS bbb_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2018') AS ccc_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2019') AS ddd_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2020') AS eee_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2021') AS fff_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2022') AS ggg_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2023') AS hhh_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2024') AS iii_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2025') AS jjj_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2026') AS kkk_eps,
+        -- dividend 피벗
+        MAX(avg_dividend) FILTER (WHERE year = '2016') AS aaa_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2017') AS bbb_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2018') AS ccc_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2019') AS ddd_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2020') AS eee_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2021') AS fff_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2022') AS ggg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2023') AS hhh_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2024') AS iii_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2025') AS jjj_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2026') AS kkk_dividend
     FROM filtered_data
     GROUP BY code
 ),
@@ -652,6 +731,11 @@ WHERE 1=1
     AND (ggg_roe >= 3.0 AND hhh_roe >= 3.0 AND iii_roe >= 3.0 AND jjj_roe >= 3.0 AND kkk_roe >= 3.0)
     AND (iii_roe <= kkk_roe AND kkk_roe >= jjj_roe-2)
     AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps >= jjj_bps*0.9)
+    -- 🚀 [NEW] 7-2. EPS 안정성 및 장기 우상향 검증 (Value)
+    -- 조건 1: 최근 3년간(iii, jjj, kkk) 단 한 번도 적자(EPS < 0)가 없을 것
+    AND (iii_eps > 0 AND jjj_eps > 0 AND kkk_eps > 0)
+    -- 조건 2: 최근 연도(kkk)의 EPS가 4년 전(ggg) EPS보다 크거나 같을 것 (장기 우상향 방어선)
+    AND (kkk_eps >= ggg_eps)
 
     --------------------------------------------------------------------------------
     -- 🚀 [NEW] stock_debt 테이블을 활용한 퀄리티 펀더멘털 필터 3종 세트
@@ -741,6 +825,7 @@ calc_yearly_data AS (
         AVG(a.roe) AS avg_roe,
         AVG(a.pbr) AS avg_pbr,  
         (AVG(a.bps))::bigint AS avg_bps,
+        (AVG(a.eps))::bigint AS avg_eps,
         avg(a.dividend_yield) as avg_dividend
     FROM stockfdt_pbr_v a 
     JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code
@@ -753,6 +838,7 @@ find_min_roe AS (
         year,
         avg_roe,
         avg_bps,
+        avg_eps,
         avg_dividend,
         MIN(avg_roe) OVER (PARTITION BY code) AS min_roe_ever,
         AVG(avg_roe) OVER (PARTITION BY code) AS avg_roe_ever,
@@ -770,6 +856,7 @@ filtered_data AS (
         ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, 
         ROUND(avg_roe, 2) AS avg_roe,
         avg_bps AS avg_bps,
+        avg_eps AS avg_eps,
         round(avg_dividend, 2) as avg_dividend
     FROM find_min_roe
     WHERE avg_roe_ever >= 12.0 AND min_roe_ever >= 0.0   -- [상향] 성장주 기준: 평균 자본효율성(ROE) 12% 이상
@@ -805,18 +892,30 @@ pivot_data AS (
         MAX(avg_bps) FILTER (WHERE year = '2024') AS iii_bps,
         MAX(avg_bps) FILTER (WHERE year = '2025') AS jjj_bps,
         MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps,
+        -- EPS 피벗
+        MAX(avg_eps) FILTER (WHERE year = '2016') AS aaa_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2017') AS bbb_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2018') AS ccc_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2019') AS ddd_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2020') AS eee_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2021') AS fff_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2022') AS ggg_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2023') AS hhh_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2024') AS iii_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2025') AS jjj_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2026') AS kkk_eps,
         -- dividend 피벗
-        MAX(avg_dividend) FILTER (WHERE year = '2016') AS aaa_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2017') AS bbb_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2018') AS ccc_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2019') AS ddd_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2020') AS eee_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2021') AS fff_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2022') AS ggg_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2023') AS hhh_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2024') AS iii_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2025') AS jjj_avg_dividend,
-        MAX(avg_dividend) FILTER (WHERE year = '2026') AS kkk_avg_dividend
+        MAX(avg_dividend) FILTER (WHERE year = '2016') AS aaa_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2017') AS bbb_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2018') AS ccc_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2019') AS ddd_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2020') AS eee_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2021') AS fff_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2022') AS ggg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2023') AS hhh_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2024') AS iii_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2025') AS jjj_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2026') AS kkk_dividend
     FROM filtered_data
     GROUP BY code
 ),
@@ -870,6 +969,11 @@ WHERE 1=1
     AND (ggg_roe >= 8.0 AND hhh_roe >= 8.0 AND iii_roe >= 8.0 AND jjj_roe >= 8.0 AND kkk_roe >= 8.0)    
     AND (iii_roe <= kkk_roe AND kkk_roe >= jjj_roe-2)
     AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps >= jjj_bps*0.9)
+    -- 🚀 [NEW] 7-2. EPS 폭발적 우상향 검증 (Growth)
+    -- 조건 1: 최근 3년 연속 흑자 필수
+    AND (iii_eps > 0 AND jjj_eps > 0 AND kkk_eps > 0)
+    -- 조건 2: 2년 전(iii)보다 현재(kkk) EPS가 무조건 커야 하며, 직전 연도(jjj) 대비 하락폭은 최대 10% 이내로만 허용
+    AND (iii_eps < kkk_eps AND kkk_eps >= jjj_eps * 0.9)
     
     -- 8. [삭제] 배당 조건 삭제: 성장주는 버는 돈을 배당 대신 R&D와 시설 투자에 재투자해야 함
     AND a.dividend_yield >= 0.0   
@@ -952,7 +1056,7 @@ filtered_data AS (
         avg_bps AS avg_bps,
         round(avg_dividend, 2) as avg_dividend
     FROM find_min_roe
-    WHERE avg_roe_ever >= 10.0 AND min_roe_ever >= 0.0   -- 1. 꾸준히 수익 창출하는 기업
+    --WHERE avg_roe_ever >= 10.0 AND min_roe_ever >= 0.0   -- 1. 꾸준히 수익 창출하는 기업
 ),
 pivot_data AS (
     SELECT 
@@ -1047,34 +1151,36 @@ WITH max_date_cte AS (
     SELECT MAX(trade_date) AS max_date FROM stockfdt_pbr_v
 ),
 past_eps_cte AS (
-    SELECT
+    SELECT 
         code,
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days'
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days' 
                          AND max_date - INTERVAL '1 year' + INTERVAL '7 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
-    SELECT
+    SELECT 
         a.code,
         to_char(a.trade_date, 'YYYY') AS year,
         AVG(a.roe) AS avg_roe,
-        AVG(a.pbr) AS avg_pbr,
+        AVG(a.pbr) AS avg_pbr,  
         (AVG(a.bps))::bigint AS avg_bps,
+        (AVG(a.eps))::bigint AS avg_eps,
         avg(a.dividend_yield) as avg_dividend
-    FROM stockfdt_pbr_v a
+    FROM stockfdt_pbr_v a 
     JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code
     WHERE a.trade_date >= '20160101'
     GROUP BY a.code, to_char(a.trade_date, 'YYYY')
 ),
 find_min_roe AS (
-    SELECT
+    SELECT 
         code,
         year,
         avg_roe,
         avg_bps,
+        avg_eps,
         avg_dividend,
         MIN(avg_roe) OVER (PARTITION BY code) AS min_roe_ever,
         AVG(avg_roe) OVER (PARTITION BY code) AS avg_roe_ever,
@@ -1083,21 +1189,22 @@ find_min_roe AS (
     FROM calc_yearly_data
 ),
 filtered_data AS (
-    SELECT
+    SELECT 
         code,
         year,
         ROUND(min_roe_ever, 2) AS min_roe_ever,
         ROUND(avg_roe_ever, 2) AS avg_roe_ever,
         ROUND(max_roe_ever, 2) AS max_roe_ever,
-        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr,
+        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, 
         ROUND(avg_roe, 2) AS avg_roe,
         avg_bps AS avg_bps,
+        avg_eps AS avg_eps,
         round(avg_dividend, 2) as avg_dividend
     FROM find_min_roe
     WHERE avg_roe_ever >= 12.0 AND min_roe_ever >= 0.0   -- [상향] 성장주 기준: 평균 자본효율성(ROE) 12% 이상
 ),
 pivot_data AS (
-    SELECT
+    SELECT 
         code,
         MAX(min_roe_ever) AS min_roe_ever,
         MAX(avg_roe_ever) AS avg_roe_ever,
@@ -1126,7 +1233,31 @@ pivot_data AS (
         MAX(avg_bps) FILTER (WHERE year = '2023') AS hhh_bps,
         MAX(avg_bps) FILTER (WHERE year = '2024') AS iii_bps,
         MAX(avg_bps) FILTER (WHERE year = '2025') AS jjj_bps,
-        MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps
+        MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps,
+        -- EPS 피벗
+        MAX(avg_eps) FILTER (WHERE year = '2016') AS aaa_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2017') AS bbb_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2018') AS ccc_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2019') AS ddd_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2020') AS eee_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2021') AS fff_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2022') AS ggg_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2023') AS hhh_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2024') AS iii_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2025') AS jjj_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2026') AS kkk_eps,
+        -- dividend 피벗
+        MAX(avg_dividend) FILTER (WHERE year = '2016') AS aaa_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2017') AS bbb_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2018') AS ccc_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2019') AS ddd_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2020') AS eee_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2021') AS fff_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2022') AS ggg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2023') AS hhh_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2024') AS iii_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2025') AS jjj_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2026') AS kkk_dividend
     FROM filtered_data
     GROUP BY code
 ),
@@ -1177,7 +1308,12 @@ WHERE 1=1
     AND (ggg_roe >= 5.0 AND hhh_roe >= 5.0 AND iii_roe >= 5.0 AND jjj_roe >= 5.0 AND kkk_roe >= 5.0)
     AND (iii_roe <= kkk_roe AND kkk_roe >= jjj_roe-2)
     AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps >= jjj_bps*0.9)
-
+    -- 🚀 [NEW] 7-2. EPS 폭발적 우상향 검증 (Growth)
+    -- 조건 1: 최근 3년 연속 흑자 필수
+    AND (iii_eps > 0 AND jjj_eps > 0 AND kkk_eps > 0)
+    -- 조건 2: 2년 전(iii)보다 현재(kkk) EPS가 무조건 커야 하며, 직전 연도(jjj) 대비 하락폭은 최대 10% 이내로만 허용
+    AND (iii_eps < kkk_eps AND kkk_eps >= jjj_eps * 0.9)
+    
     -- 8. [삭제] 배당 조건 삭제: 성장주는 버는 돈을 배당 대신 R&D와 시설 투자에 재투자해야 함
     AND a.dividend_yield >= 0.0
 
@@ -1222,34 +1358,36 @@ WITH max_date_cte AS (
     SELECT MAX(trade_date) AS max_date FROM stockfdt_pbr_v
 ),
 past_eps_cte AS (
-    SELECT
+    SELECT 
         code,
         (AVG(eps))::numeric(10,2) AS past_eps
     FROM stockfdt_pbr_v
     CROSS JOIN max_date_cte
-    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days'
+    WHERE trade_date BETWEEN max_date - INTERVAL '1 year' - INTERVAL '7 days' 
                          AND max_date - INTERVAL '1 year' + INTERVAL '7 days'
     GROUP BY code
 ),
 calc_yearly_data AS (
-    SELECT
+    SELECT 
         a.code,
         to_char(a.trade_date, 'YYYY') AS year,
         AVG(a.roe) AS avg_roe,
-        AVG(a.pbr) AS avg_pbr,
+        AVG(a.pbr) AS avg_pbr,  
         (AVG(a.bps))::bigint AS avg_bps,
+        (AVG(a.eps))::bigint AS avg_eps,
         avg(a.dividend_yield) as avg_dividend
-    FROM stockfdt_pbr_v a
+    FROM stockfdt_pbr_v a 
     JOIN stockmain b ON a.trade_date = b.trade_date AND a.code = b.code
     WHERE a.trade_date >= '20160101'
     GROUP BY a.code, to_char(a.trade_date, 'YYYY')
 ),
 find_min_roe AS (
-    SELECT
+    SELECT 
         code,
         year,
         avg_roe,
         avg_bps,
+        avg_eps,
         avg_dividend,
         MIN(avg_roe) OVER (PARTITION BY code) AS min_roe_ever,
         AVG(avg_roe) OVER (PARTITION BY code) AS avg_roe_ever,
@@ -1258,21 +1396,22 @@ find_min_roe AS (
     FROM calc_yearly_data
 ),
 filtered_data AS (
-    SELECT
+    SELECT 
         code,
         year,
         ROUND(min_roe_ever, 2) AS min_roe_ever,
         ROUND(avg_roe_ever, 2) AS avg_roe_ever,
         ROUND(max_roe_ever, 2) AS max_roe_ever,
-        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr,
+        ROUND(hist_avg_pbr, 2) AS hist_avg_pbr, 
         ROUND(avg_roe, 2) AS avg_roe,
         avg_bps AS avg_bps,
+        avg_eps AS avg_eps,
         round(avg_dividend, 2) as avg_dividend
     FROM find_min_roe
-    WHERE avg_roe_ever >= 12.0 AND min_roe_ever >= 0.0
+    WHERE avg_roe_ever >= 12.0 AND min_roe_ever >= 0.0   -- [상향] 성장주 기준: 평균 자본효율성(ROE) 12% 이상
 ),
 pivot_data AS (
-    SELECT
+    SELECT 
         code,
         MAX(min_roe_ever) AS min_roe_ever,
         MAX(avg_roe_ever) AS avg_roe_ever,
@@ -1301,7 +1440,31 @@ pivot_data AS (
         MAX(avg_bps) FILTER (WHERE year = '2023') AS hhh_bps,
         MAX(avg_bps) FILTER (WHERE year = '2024') AS iii_bps,
         MAX(avg_bps) FILTER (WHERE year = '2025') AS jjj_bps,
-        MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps
+        MAX(avg_bps) FILTER (WHERE year = '2026') AS kkk_bps,
+        -- EPS 피벗
+        MAX(avg_eps) FILTER (WHERE year = '2016') AS aaa_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2017') AS bbb_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2018') AS ccc_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2019') AS ddd_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2020') AS eee_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2021') AS fff_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2022') AS ggg_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2023') AS hhh_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2024') AS iii_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2025') AS jjj_eps,
+        MAX(avg_eps) FILTER (WHERE year = '2026') AS kkk_eps,
+        -- dividend 피벗
+        MAX(avg_dividend) FILTER (WHERE year = '2016') AS aaa_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2017') AS bbb_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2018') AS ccc_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2019') AS ddd_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2020') AS eee_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2021') AS fff_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2022') AS ggg_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2023') AS hhh_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2024') AS iii_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2025') AS jjj_dividend,
+        MAX(avg_dividend) FILTER (WHERE year = '2026') AS kkk_dividend
     FROM filtered_data
     GROUP BY code
 ),
@@ -1349,7 +1512,12 @@ WHERE 1=1
     AND (ggg_roe >= 5.0 AND hhh_roe >= 5.0 AND iii_roe >= 5.0 AND jjj_roe >= 5.0 AND kkk_roe >= 5.0)
     AND (iii_roe <= kkk_roe AND kkk_roe >= jjj_roe-2)
     AND (ggg_bps <= iii_bps AND iii_bps <= kkk_bps AND kkk_bps >= jjj_bps*0.9)
-
+    -- 🚀 [NEW] 7-2. EPS 폭발적 우상향 검증 (Growth)
+    -- 조건 1: 최근 3년 연속 흑자 필수
+    AND (iii_eps > 0 AND jjj_eps > 0 AND kkk_eps > 0)
+    -- 조건 2: 2년 전(iii)보다 현재(kkk) EPS가 무조건 커야 하며, 직전 연도(jjj) 대비 하락폭은 최대 10% 이내로만 허용
+    AND (iii_eps < kkk_eps AND kkk_eps >= jjj_eps * 0.9)
+    
     -- 8. 배당 조건 (유지)
     AND a.dividend_yield >= 0.0
 
