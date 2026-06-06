@@ -992,7 +992,7 @@ WHERE 1=1
     AND (d.operating_income / NULLIF(d.revenue, 0)) >= 0.08
     
     -- 6. [완화] 무차입 경영 조건 완화: 빚을 내서 효율적인 투자를 하는 합리적 레버리지 용인 (순부채 시가총액의 20% 이하)
-    AND (d.net_debt <= m.market_cap * 0.2)
+    AND (d.net_debt <= (m.market_cap / 100000000) * 0.2)
     --------------------------------------------------------------------------------
 
 and a.code not in (select code from mytrade where trade_status = 1)
@@ -1331,7 +1331,7 @@ WHERE 1=1
     AND ((d.operating_income / NULLIF(d.revenue, 0)) >= 0.08 or d.operating_income = 'NaN')
 
     -- 6. [완화] 무차입 경영 조건 완화: 빚을 내서 효율적인 투자를 하는 합리적 레버리지 용인 (순부채 시가총액의 20% 이하)
-    AND ((d.net_debt <= m.market_cap * 0.2) or d.net_debt = 'NaN')
+    AND ((d.net_debt <= (m.market_cap / 100000000) * 0.2) or d.net_debt = 'NaN')
     --------------------------------------------------------------------------------
 
 and a.code in (select code from mytrade where trade_div in ('growth') and trade_status = 1)
@@ -1529,7 +1529,7 @@ WHERE 1=1
     AND ((d.operating_income / NULLIF(d.revenue, 0)) >= 0.08 or d.operating_income = 'NaN')
 
     -- 6. 재무 건전성 유지 (빚이 과도하게 늘어나면 탈락)
-    AND ((d.net_debt <= m.market_cap * 0.2) or d.net_debt = 'NaN')
+    AND ((d.net_debt <= (m.market_cap / 100000000) * 0.2) or d.net_debt = 'NaN')
 
 and a.code in (select code from mytrade where trade_div in ('growth') and trade_status = 1)
 )
