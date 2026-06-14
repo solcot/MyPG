@@ -64,7 +64,8 @@ active_drivers = []
 
 def get_driver():
     if hasattr(thread_local, "driver") and hasattr(thread_local, "usage_count"):
-        if thread_local.usage_count > 50:
+        # 💡 [안정성 강화] 50번 -> 30번으로 줄여 브라우저를 더 자주 교체합니다.
+        if thread_local.usage_count > 30:
             try:
                 thread_local.driver.quit()
                 if thread_local.driver in active_drivers:
@@ -105,7 +106,6 @@ def get_driver():
 # 3. 크롤링 헬퍼 함수 및 파싱 로직
 # =========================================================
 def click_tab(driver, tab_name):
-    """지정된 텍스트를 가진 탭을 안전하게 찾아 클릭하는 헬퍼 함수"""
     elements = driver.find_elements(By.XPATH, f"//*[contains(text(), '{tab_name}')]")
     for el in elements:
         if el.is_displayed() and el.tag_name not in ['title', 'h1', 'h2', 'script', 'style', 'html', 'head']:
@@ -117,7 +117,6 @@ def click_tab(driver, tab_name):
     return False
 
 def parse_value_from_tables(tables, target_keywords, exclude_keywords=None):
-    """테이블 리스트에서 원하는 행의 '(최근분기)' 데이터를 찾아 반환하는 범용 함수"""
     for df in tables:
         if isinstance(df.columns, pd.MultiIndex):
             flat_cols = []
@@ -180,12 +179,11 @@ def get_wisereport_financials(stock_code):
     
     try:
         driver.get(url)
-        time.sleep(1) # 기본 페이지 로드 대기
+        time.sleep(1) 
         
-        # 💡 [핵심 수정] 1. '포괄손익계산서' 탭을 명시적으로 클릭하고 대기
         clicked_is = click_tab(driver, '포괄손익계산서')
         if clicked_is:
-            time.sleep(1.5) # 데이터 렌더링 대기
+            time.sleep(1.5) 
             
         html_is = driver.page_source
         tables_is = pd.read_html(StringIO(html_is))
@@ -195,7 +193,6 @@ def get_wisereport_financials(stock_code):
         result['operating_income'] = parse_value_from_tables(tables_is, ['영업이익'])
         result['net_income'] = parse_value_from_tables(tables_is, ['당기순이익'])
         
-        # 💡 2. '재무상태표' 탭을 클릭하고 대기
         clicked_bs = click_tab(driver, '재무상태표')
         if clicked_bs:
             time.sleep(1.5) 
@@ -209,12 +206,8 @@ def get_wisereport_financials(stock_code):
         
     except Exception as e:
         print(f"⚠️ [{stock_code}] 접속 지연 또는 파싱 에러 (드라이버 강제 폐기)")
-        try:
-            driver.quit()
-            if driver in active_drivers:
-                active_drivers.remove(driver)
-        except: pass
-        if hasattr(thread_local, 'driver'): del thread_local.driver
+        if hasattr(thread_local, 'driver'): 
+            del thread_local.driver
         return result
 
     return result
@@ -225,7 +218,6 @@ def process_stock(stock_info):
     return (code, name, fin['revenue'], fin['gross_profit'], fin['operating_income'], fin['net_income'], fin['total_assets'], fin['net_debt'])
 
 def safe_db_val(val):
-    """DB Insert를 위해 안전한 문자열 'NaN' 또는 숫자 반환"""
     return 'NaN' if val is None or math.isnan(val) else val
 
 # =========================================================
@@ -234,7 +226,7 @@ def safe_db_val(val):
 if __name__ == "__main__":
     kill_zombie_processes()
     
-    start_msg = "🚀 [재무 지표 수집 시스템 - 고속 병렬 버전] 작동 시작..."
+    start_msg = "🚀 [재무 지표 수집 시스템 - 무손실 안전 버전] 작동 시작..."
     print(start_msg)
     send_message(start_msg)
     
@@ -265,15 +257,17 @@ if __name__ == "__main__":
     fail_cnt = 0
     MAX_WORKERS = 3 
     
-    chunk_size = 500
+    # 💡 [안정성 강화] 청크 사이즈를 500 -> 150으로 대폭 줄여서 메모리 과부하를 막습니다.
+    chunk_size = 150
     chunks = [codes_to_fetch[i:i + chunk_size] for i in range(0, len(codes_to_fetch), chunk_size)]
 
-    print(f"\n🌐 [병렬 수집 시작] 500개씩 쪼개어 안전하게 수집을 진행합니다... (워커 수: {MAX_WORKERS})")
+    print(f"\n🌐 [병렬 수집 시작] {chunk_size}개씩 쪼개어 안전하게 수집을 진행합니다... (워커 수: {MAX_WORKERS})")
 
     for chunk_idx, chunk in enumerate(chunks):
         print(f"\n📦 === 청크 {chunk_idx + 1}/{len(chunks)} 시작 (총 {len(chunk)}개) ===")
         insert_values = []
         
+        # 💡 [복구] 데이터를 누락시키는 타임아웃을 없애고 모든 작업이 끝날 때까지 묵묵히 기다립니다.
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             futures = {executor.submit(process_stock, item): item for item in chunk}
             
@@ -297,7 +291,6 @@ if __name__ == "__main__":
                     
                 insert_values.append((current_date, code, name, db_rev, db_gp, db_op, db_ni, db_ta, db_nd))
                 
-                # 💡 [핵심 수정] 진행률 표시에 6개의 모든 지표를 이쁘게 출력합니다!
                 if idx % 10 == 0:
                     current_total = (chunk_idx * chunk_size) + idx
                     log_msg = (f"⏳ 진행중... {current_total}/{len(codes_to_fetch)} 완료 (최근: {name} | "
