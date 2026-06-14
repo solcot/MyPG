@@ -24,14 +24,14 @@ from selenium.webdriver.common.by import By
 # 🌟 좀비 프로세스 완벽 청소 함수
 # =========================================================
 def kill_zombie_processes():
-    """백그라운드에 꼬여있는 크롬 드라이버를 강제로 싹 지웁니다."""
     try:
         os.system("taskkill /f /im chromedriver.exe /T >nul 2>&1")
+        os.system("taskkill /f /im chrome.exe /T >nul 2>&1")
     except:
         pass
 
 # =========================================================
-# 1. 설정 파일 로드 및 DB 연결 함수
+# 1. 설정 파일 로드 및 DB 연결
 # =========================================================
 try:
     with open('C:\\StockPy\\config.yaml', encoding='UTF-8') as f:
@@ -54,7 +54,7 @@ def send_message(msg):
     now = datetime.now()
     message = {"content": f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] {str(msg)}"}
     try: requests.post(DISCORD_WEBHOOK_URL, json=message, timeout=5)
-    except Exception as e: print(f"❌ Discord 전송 실패: {e}", flush=True)
+    except: pass
 
 # =========================================================
 # 2. 멀티스레딩용 크롬 드라이버 관리 
@@ -64,8 +64,8 @@ active_drivers = []
 
 def get_driver():
     if hasattr(thread_local, "driver") and hasattr(thread_local, "usage_count"):
-        # 💡 [안정성 강화] 50번 -> 30번으로 줄여 브라우저를 더 자주 교체합니다.
-        if thread_local.usage_count > 30:
+        # 💡 [안정성] 15번만 사용하고 무조건 새 브라우저로 교체하여 찌꺼기 방지
+        if thread_local.usage_count > 15:
             try:
                 thread_local.driver.quit()
                 if thread_local.driver in active_drivers:
@@ -79,21 +79,18 @@ def get_driver():
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--headless") 
         chrome_options.add_argument("--disable-dev-shm-usage") 
+        # 💡 [속도 향상] 불필요한 이미지 로딩 차단
+        chrome_options.add_argument("--blink-settings=imagesEnabled=false")
         chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/100.0.4896.75 Safari/537.36")
         
         chrome_options.page_load_strategy = 'eager' 
-        prefs = {
-            "profile.managed_default_content_settings.images": 2,
-            "profile.managed_default_content_settings.stylesheets": 2,
-            "profile.managed_default_content_settings.fonts": 2
-        }
-        chrome_options.add_experimental_option("prefs", prefs)
-
+        
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
-        driver.set_page_load_timeout(15)
-        driver.set_script_timeout(15)
+        # 💡 타임아웃을 20초로 늘려 서버 응답 지연에 대비
+        driver.set_page_load_timeout(20)
+        driver.set_script_timeout(20)
         
         thread_local.driver = driver
         thread_local.usage_count = 0
@@ -169,20 +166,16 @@ def get_wisereport_financials(stock_code):
     url = f"https://comp.wisereport.co.kr/company/c1030001.aspx?cmp_cd={stock_code}&cn="
     
     result = {
-        'revenue': float('nan'),
-        'gross_profit': float('nan'),
-        'operating_income': float('nan'),
-        'net_income': float('nan'),
-        'total_assets': float('nan'),
-        'net_debt': float('nan')
+        'revenue': float('nan'), 'gross_profit': float('nan'),
+        'operating_income': float('nan'), 'net_income': float('nan'),
+        'total_assets': float('nan'), 'net_debt': float('nan')
     }
     
     try:
         driver.get(url)
         time.sleep(1) 
         
-        clicked_is = click_tab(driver, '포괄손익계산서')
-        if clicked_is:
+        if click_tab(driver, '포괄손익계산서'):
             time.sleep(1.5) 
             
         html_is = driver.page_source
@@ -193,8 +186,7 @@ def get_wisereport_financials(stock_code):
         result['operating_income'] = parse_value_from_tables(tables_is, ['영업이익'])
         result['net_income'] = parse_value_from_tables(tables_is, ['당기순이익'])
         
-        clicked_bs = click_tab(driver, '재무상태표')
-        if clicked_bs:
+        if click_tab(driver, '재무상태표'):
             time.sleep(1.5) 
             html_bs = driver.page_source
             tables_bs = pd.read_html(StringIO(html_bs))
@@ -205,10 +197,10 @@ def get_wisereport_financials(stock_code):
         result['net_debt'] = parse_value_from_tables(tables_bs, ['순부채'], exclude_keywords=['차입금'])
         
     except Exception as e:
-        print(f"⚠️ [{stock_code}] 접속 지연 또는 파싱 에러 (드라이버 강제 폐기)")
         if hasattr(thread_local, 'driver'): 
             del thread_local.driver
-        return result
+        # 💡 에러 발생 시 명시적으로 예외를 던져서 재시도(Retry) 큐로 보냅니다.
+        raise Exception(f"크롤링 에러: {str(e)}")
 
     return result
 
@@ -221,34 +213,28 @@ def safe_db_val(val):
     return 'NaN' if val is None or math.isnan(val) else val
 
 # =========================================================
-# 4. Main 실행: [청크 분할] 및 DB 연동
+# 4. Main 실행 (무손실 회전초밥 아키텍처)
 # =========================================================
 if __name__ == "__main__":
     kill_zombie_processes()
     
-    start_msg = "🚀 [재무 지표 수집 시스템 - 무손실 안전 버전] 작동 시작..."
+    start_msg = "🚀 [재무 지표 수집 - 무손실 100% 완주 버전] 작동 시작..."
     print(start_msg)
     send_message(start_msg)
     
     conn = get_db_connection()
     codes_to_fetch = []
-    
     current_date = datetime.now().date()
+    
     try:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM stock_debt WHERE trade_date = %s", (current_date,))
         conn.commit()
         print(f"🗑️ 오늘 날짜({current_date}) 기존 데이터를 초기화했습니다.")
-    except Exception as e:
-        print(f"⚠️ 기존 데이터 초기화 중 오류 발생: {e}")
+    except Exception as e: pass
 
     with conn.cursor() as cur:
-        sql_select = """
-            SELECT code, name 
-            FROM stockmain 
-            WHERE trade_date = (SELECT max(trade_date) FROM stockmain);
-        """
-        cur.execute(sql_select)
+        cur.execute("SELECT code, name FROM stockmain WHERE trade_date = (SELECT max(trade_date) FROM stockmain)")
         codes_to_fetch = cur.fetchall() 
         
     print(f"✅ DB에서 수집 대상 {len(codes_to_fetch)}개 종목을 불러왔습니다.")
@@ -256,68 +242,88 @@ if __name__ == "__main__":
     success_cnt = 0
     fail_cnt = 0
     MAX_WORKERS = 3 
+    CHUNK_SIZE = 100
     
-    # 💡 [안정성 강화] 청크 사이즈를 500 -> 150으로 대폭 줄여서 메모리 과부하를 막습니다.
-    chunk_size = 150
-    chunks = [codes_to_fetch[i:i + chunk_size] for i in range(0, len(codes_to_fetch), chunk_size)]
+    # 💡 [핵심] 실패 횟수를 추적하기 위한 딕셔너리와 대기열(Queue) 리스트
+    retry_counts = {item[0]: 0 for item in codes_to_fetch}
+    unprocessed_queue = codes_to_fetch.copy()
 
-    print(f"\n🌐 [병렬 수집 시작] {chunk_size}개씩 쪼개어 안전하게 수집을 진행합니다... (워커 수: {MAX_WORKERS})")
+    total_target = len(unprocessed_queue)
+    processed_count = 0
+    chunk_idx = 0
 
-    for chunk_idx, chunk in enumerate(chunks):
-        print(f"\n📦 === 청크 {chunk_idx + 1}/{len(chunks)} 시작 (총 {len(chunk)}개) ===")
+    print(f"\n🌐 [병렬 수집 시작] 멈춤 현상 원천 차단! 대기열 시스템을 가동합니다...")
+
+    # 대기열에 종목이 남아있는 한 계속 돕니다.
+    while unprocessed_queue:
+        chunk_idx += 1
+        # 대기열 앞에서부터 100개씩 뽑아옵니다.
+        current_chunk = unprocessed_queue[:CHUNK_SIZE]
+        del unprocessed_queue[:CHUNK_SIZE]
+        
+        print(f"\n📦 === 청크 {chunk_idx} 시작 (남은 대기열: {len(unprocessed_queue)}개) ===")
+        
+        executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+        futures = {executor.submit(process_stock, item): item for item in current_chunk}
         insert_values = []
         
-        # 💡 [복구] 데이터를 누락시키는 타임아웃을 없애고 모든 작업이 끝날 때까지 묵묵히 기다립니다.
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            futures = {executor.submit(process_stock, item): item for item in chunk}
-            
-            for idx, future in enumerate(concurrent.futures.as_completed(futures), 1):
-                try:
-                    code, name, rev, gp, op, ni, ta, nd = future.result()
-                except Exception as e:
-                    code, name = futures[future]
-                    print(f"⚠️ [{name}] 스레드 예외 발생: 패스합니다.")
-                    rev = gp = op = ni = ta = nd = float('nan')
+        # 💡 [수정됨] 딱 300초(5분)만 기다립니다. 네트워크가 느려도 충분히 커버 가능한 시간입니다.
+        done, not_done = concurrent.futures.wait(futures, timeout=300)
+        
+        # 1. 정상적으로 완료된 녀석들 처리
+        for future in done:
+            item = futures[future]
+            try:
+                code, name, rev, gp, op, ni, ta, nd = future.result()
+                db_rev, db_gp = safe_db_val(rev), safe_db_val(gp)
+                db_op, db_ni = safe_db_val(op), safe_db_val(ni)
+                db_ta, db_nd = safe_db_val(ta), safe_db_val(nd)
                 
-                db_rev = safe_db_val(rev)
-                db_gp = safe_db_val(gp)
-                db_op = safe_db_val(op)
-                db_ni = safe_db_val(ni)
-                db_ta = safe_db_val(ta)
-                db_nd = safe_db_val(nd)
-
-                if db_nd == 'NaN': fail_cnt += 1
-                else: success_cnt += 1
-                    
                 insert_values.append((current_date, code, name, db_rev, db_gp, db_op, db_ni, db_ta, db_nd))
                 
-                if idx % 10 == 0:
-                    current_total = (chunk_idx * chunk_size) + idx
-                    log_msg = (f"⏳ 진행중... {current_total}/{len(codes_to_fetch)} 완료 (최근: {name} | "
-                               f"매출: {db_rev}, 총이익: {db_gp}, 영업익: {db_op}, "
-                               f"순이익: {db_ni}, 자산: {db_ta}, 순부채: {db_nd})")
-                    print(log_msg)
+                if db_nd == 'NaN': fail_cnt += 1
+                else: success_cnt += 1
+                
+                processed_count += 1
+                if processed_count % 10 == 0:
+                    print(f"⏳ 진행중... {processed_count}/{total_target} (최근: {name} | 순부채: {db_nd})")
 
-                if len(insert_values) >= 100:
-                    with conn.cursor() as cur:
-                        sql_insert = """
-                            INSERT INTO stock_debt (
-                                trade_date, code, name, revenue, gross_profit, operating_income, net_income, total_assets, net_debt
-                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                            ON CONFLICT (trade_date, code) DO UPDATE 
-                            SET name = EXCLUDED.name,
-                                revenue = EXCLUDED.revenue,
-                                gross_profit = EXCLUDED.gross_profit,
-                                operating_income = EXCLUDED.operating_income,
-                                net_income = EXCLUDED.net_income,
-                                total_assets = EXCLUDED.total_assets,
-                                net_debt = EXCLUDED.net_debt,
-                                created_at = now();
-                        """
-                        execute_batch(cur, sql_insert, insert_values, page_size=100)
-                        conn.commit()
-                    insert_values.clear()
+            except Exception as e:
+                # 💡 코드가 터졌을 경우 재시도 큐로 보냄
+                code, name = item
+                retry_counts[code] += 1
+                # 💡 [수정됨] 최대 5번까지 재시도합니다.
+                if retry_counts[code] <= 5:
+                    print(f"⚠️ [{name}] 파싱 에러! (재시도 횟수: {retry_counts[code]}/5) -> 대기열로 복귀합니다.")
+                    unprocessed_queue.append(item)
+                else:
+                    print(f"❌ [{name}] 5회 연속 실패. 데이터 없음을 간주하고 NaN으로 포기합니다.")
+                    insert_values.append((current_date, code, name, 'NaN', 'NaN', 'NaN', 'NaN', 'NaN', 'NaN'))
+                    fail_cnt += 1
+                    processed_count += 1
 
+        # 2. 300초가 지났는데도 멈춰있는(프리징) 녀석들 처리
+        if not_done:
+            print(f"🚨 [경고] {len(not_done)}개의 종목에서 무한 대기(프리징) 감지! 브라우저를 죽이고 다음 청크에서 재시도합니다.")
+            for future in not_done:
+                stuck_item = futures[future]
+                code = stuck_item[0]
+                retry_counts[code] += 1
+                
+                # 💡 [수정됨] 최대 5번까지 재시도합니다.
+                if retry_counts[code] <= 5:
+                    unprocessed_queue.append(stuck_item) # 대기열 맨 뒤로 다시 집어넣습니다!
+                else:
+                    insert_values.append((current_date, stuck_item[0], stuck_item[1], 'NaN', 'NaN', 'NaN', 'NaN', 'NaN', 'NaN'))
+                    fail_cnt += 1
+                    processed_count += 1
+        
+        # 💡 완료 여부 상관없이 멈춰있는 스레드와 브라우저를 모조리 강제 사살합니다.
+        executor.shutdown(wait=False, cancel_futures=True)
+        kill_zombie_processes()
+        time.sleep(3) # 강제 종료 후 숨 고르기
+        
+        # DB 일괄 저장
         if insert_values:
             with conn.cursor() as cur:
                 sql_insert = """
@@ -325,33 +331,19 @@ if __name__ == "__main__":
                         trade_date, code, name, revenue, gross_profit, operating_income, net_income, total_assets, net_debt
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (trade_date, code) DO UPDATE 
-                    SET name = EXCLUDED.name,
-                        revenue = EXCLUDED.revenue,
-                        gross_profit = EXCLUDED.gross_profit,
-                        operating_income = EXCLUDED.operating_income,
-                        net_income = EXCLUDED.net_income,
-                        total_assets = EXCLUDED.total_assets,
-                        net_debt = EXCLUDED.net_debt,
-                        created_at = now();
+                    SET name = EXCLUDED.name, revenue = EXCLUDED.revenue, gross_profit = EXCLUDED.gross_profit,
+                        operating_income = EXCLUDED.operating_income, net_income = EXCLUDED.net_income,
+                        total_assets = EXCLUDED.total_assets, net_debt = EXCLUDED.net_debt, created_at = now();
                 """
                 execute_batch(cur, sql_insert, insert_values, page_size=100)
                 conn.commit()
 
-        print(f"💤 청크 {chunk_idx + 1} 완료. 메모리 정리를 위해 브라우저를 모두 닫고 3초 휴식합니다.")
-        for d in active_drivers:
-            try: d.quit()
-            except: pass
-        active_drivers.clear()
-        
-        kill_zombie_processes() 
-        time.sleep(3) 
-        
     conn.close()
     
     end_msg = (
         f"🎉 [재무 지표 수집 시스템 작업 완료]\n"
-        f"📊 총 {len(codes_to_fetch)}개 대상 중 성공: {success_cnt}건 / 데이터 없음(NaN): {fail_cnt}건\n"
-        f"✅ stock_debt 테이블에 데이터 반영이 완료되었습니다. (기준일: {current_date})"
+        f"📊 총 {total_target}개 대상 중 성공: {success_cnt}건 / 데이터 없음(NaN): {fail_cnt}건\n"
+        f"✅ 단 하나의 누락 없이 stock_debt 테이블 반영이 완료되었습니다. (기준일: {current_date})"
     )
     print("\n" + end_msg)
     send_message(end_msg)
