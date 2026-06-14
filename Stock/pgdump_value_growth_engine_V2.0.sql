@@ -168,12 +168,37 @@ latest_debt_cte AS (
 last_data AS (
     SELECT 
         ROUND(((a.eps - p.past_eps) / NULLIF(ABS(p.past_eps), 0)) * 100, 2) AS eps_ratio,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
+
+        -- pbr:1, roe:min_roe_ever
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS expected_price,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS future_expected_price,
+        -- pbr:1, roe:avg_roe_ever
+        ROUND((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) AS expected_price_avgroe,
+        ROUND(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple_avgroe,
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr_avgroe,
+        -- subtot_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) as stot_expected_carg,
+
+        -- pbr:hist_avg_pbr, roe:min_roe_ever
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS fep_expected_price,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
+        -- pbr:hist_avg_pbr, roe:avg_roe_ever
+        ROUND((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS fep_expected_price_avgroe,
+        ROUND(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple_avgroe,
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr_avgroe,
+        -- subtot_fep_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) as stot_fep_expected_carg,
+
+        -- tot_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS tot_expected_carg,
+
         *
     FROM stockfdt_pbr_v a 
     JOIN pivot_data b USING (code)
@@ -495,12 +520,37 @@ latest_debt_cte AS (
 last_data AS (
     SELECT
         ROUND(((a.eps - p.past_eps) / NULLIF(ABS(p.past_eps), 0)) * 100, 2) AS eps_ratio,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
+
+        -- pbr:1, roe:min_roe_ever
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS expected_price,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS future_expected_price,
+        -- pbr:1, roe:avg_roe_ever
+        ROUND((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) AS expected_price_avgroe,
+        ROUND(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple_avgroe,
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr_avgroe,
+        -- subtot_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) as stot_expected_carg,
+
+        -- pbr:hist_avg_pbr, roe:min_roe_ever
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS fep_expected_price,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
+        -- pbr:hist_avg_pbr, roe:avg_roe_ever
+        ROUND((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS fep_expected_price_avgroe,
+        ROUND(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple_avgroe,
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr_avgroe,
+        -- subtot_fep_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) as stot_fep_expected_carg,
+
+        -- tot_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS tot_expected_carg,
+
         *
     FROM stockfdt_pbr_v a
     JOIN pivot_data b USING (code)
@@ -696,12 +746,37 @@ latest_debt_cte AS (
 last_data AS (
     SELECT
         ROUND(((a.eps - p.past_eps) / NULLIF(ABS(p.past_eps), 0)) * 100, 2) AS eps_ratio,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
+
+        -- pbr:1, roe:min_roe_ever
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS expected_price,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS future_expected_price,
+        -- pbr:1, roe:avg_roe_ever
+        ROUND((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) AS expected_price_avgroe,
+        ROUND(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple_avgroe,
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr_avgroe,
+        -- subtot_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) as stot_expected_carg,
+
+        -- pbr:hist_avg_pbr, roe:min_roe_ever
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS fep_expected_price,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
+        -- pbr:hist_avg_pbr, roe:avg_roe_ever
+        ROUND((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS fep_expected_price_avgroe,
+        ROUND(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple_avgroe,
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr_avgroe,
+        -- subtot_fep_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) as stot_fep_expected_carg,
+
+        -- tot_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS tot_expected_carg,
+
         *
     FROM stockfdt_pbr_v a
     JOIN pivot_data b USING (code)
@@ -927,12 +1002,37 @@ latest_debt_cte AS (
 last_data AS (
     SELECT 
         ROUND(((a.eps - p.past_eps) / NULLIF(ABS(p.past_eps), 0)) * 100, 2) AS eps_ratio,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
+
+        -- pbr:1, roe:min_roe_ever
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS expected_price,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS future_expected_price,
+        -- pbr:1, roe:avg_roe_ever
+        ROUND((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) AS expected_price_avgroe,
+        ROUND(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple_avgroe,
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr_avgroe,
+        -- subtot_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) as stot_expected_carg,
+
+        -- pbr:hist_avg_pbr, roe:min_roe_ever
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS fep_expected_price,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
+        -- pbr:hist_avg_pbr, roe:avg_roe_ever
+        ROUND((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS fep_expected_price_avgroe,
+        ROUND(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple_avgroe,
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr_avgroe,
+        -- subtot_fep_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) as stot_fep_expected_carg,
+
+        -- tot_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS tot_expected_carg,
+
         *
     FROM stockfdt_pbr_v a 
     JOIN pivot_data b USING (code)
@@ -1269,12 +1369,37 @@ latest_debt_cte AS (
 last_data AS (
     SELECT
         ROUND(((a.eps - p.past_eps) / NULLIF(ABS(p.past_eps), 0)) * 100, 2) AS eps_ratio,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
+
+        -- pbr:1, roe:min_roe_ever
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS expected_price,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS future_expected_price,
+        -- pbr:1, roe:avg_roe_ever
+        ROUND((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) AS expected_price_avgroe,
+        ROUND(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple_avgroe,
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr_avgroe,
+        -- subtot_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) as stot_expected_carg,
+
+        -- pbr:hist_avg_pbr, roe:min_roe_ever
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS fep_expected_price,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
+        -- pbr:hist_avg_pbr, roe:avg_roe_ever
+        ROUND((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS fep_expected_price_avgroe,
+        ROUND(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple_avgroe,
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr_avgroe,
+        -- subtot_fep_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) as stot_fep_expected_carg,
+
+        -- tot_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS tot_expected_carg,
+
         *
     FROM stockfdt_pbr_v a
     JOIN pivot_data b USING (code)
@@ -1476,12 +1601,37 @@ latest_debt_cte AS (
 last_data AS (
     SELECT
         ROUND(((a.eps - p.past_eps) / NULLIF(ABS(p.past_eps), 0)) * 100, 2) AS eps_ratio,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS future_bps,
+
+        -- pbr:1, roe:min_roe_ever
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) AS expected_price,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr,
-        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS future_expected_price,
+        -- pbr:1, roe:avg_roe_ever
+        ROUND((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) AS expected_price_avgroe,
+        ROUND(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 2) AS return_multiple_avgroe,
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS expected_cagr_avgroe,
+        -- subtot_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) as stot_expected_carg,
+
+        -- pbr:hist_avg_pbr, roe:min_roe_ever
+        ROUND((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS fep_expected_price,
         ROUND(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple,
         ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr,
+        -- pbr:hist_avg_pbr, roe:avg_roe_ever
+        ROUND((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) AS fep_expected_price_avgroe,
+        ROUND(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 2) AS fep_return_multiple_avgroe,
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS fep_expected_cagr_avgroe,
+        -- subtot_fep_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) as stot_fep_expected_carg,
+
+        -- tot_expected_carg
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * 1) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.min_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) +
+        ROUND((POWER(((a.bps * POWER(1 + b.avg_roe_ever / 100.0, 10)) * least(b.hist_avg_pbr, 3.0)) / NULLIF(a.close_price, 0), 1.0 / 10.0) - 1) * 100, 2) AS tot_expected_carg,
+
         *
     FROM stockfdt_pbr_v a
     JOIN pivot_data b USING (code)
