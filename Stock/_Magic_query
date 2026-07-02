@@ -1,0 +1,36 @@
+.tables
+.schema tb_auto_config
+.headers on
+.mode column
+.exit
+
+----------------------------------------
+INSERT INTO "tb_auto_config" (
+    "ac_code", "ac_max_buycount", "ac_mode",
+    "ac_buy_yn", "ac_buy_ordertype",
+    "ac_buy_1st_per", "ac_buy_2st_per", "ac_buy_3st_per", "ac_buy_4st_per", "ac_buy_5st_per", "ac_buy_6st_per", "ac_buy_7st_per", "ac_buy_8st_per", "ac_buy_9st_per",
+    "ac_buy_2st_money", "ac_buy_3st_money", "ac_buy_4st_money", "ac_buy_5st_money", "ac_buy_6st_money", "ac_buy_7st_money", "ac_buy_8st_money", "ac_buy_9st_money", "ac_buy_10st_money",
+    "ac_sell_yn", "ac_sell_ordertype",
+    "ac_sell_1st_per", "ac_sell_2st_per", "ac_sell_3st_per", "ac_sell_4st_per", "ac_sell_5st_per", "ac_sell_6st_per", "ac_sell_7st_per", "ac_sell_8st_per", "ac_sell_9st_per", "ac_sell_10st_per",
+    "ac_buy_10st_per", "ac_buy_11st_per", "ac_buy_12st_per", "ac_buy_13st_per", "ac_buy_14st_per", "ac_buy_15st_per", "ac_buy_16st_per", "ac_buy_17st_per", "ac_buy_18st_per", "ac_buy_19st_per", "ac_buy_20st_per", "ac_buy_21st_per", "ac_buy_22st_per", "ac_buy_23st_per", "ac_buy_24st_per", "ac_buy_25st_per", "ac_buy_26st_per", "ac_buy_27st_per", "ac_buy_28st_per", "ac_buy_29st_per", "ac_buy_30st_per", "ac_buy_31st_per", "ac_buy_32st_per", "ac_buy_33st_per", "ac_buy_34st_per", "ac_buy_35st_per", "ac_buy_36st_per", "ac_buy_37st_per", "ac_buy_38st_per", "ac_buy_39st_per", "ac_buy_40st_per", "ac_buy_41st_per", "ac_buy_42st_per", "ac_buy_43st_per", "ac_buy_44st_per", "ac_buy_45st_per", "ac_buy_46st_per", "ac_buy_47st_per", "ac_buy_48st_per", "ac_buy_49st_per",
+    "ac_buy_11st_money", "ac_buy_12st_money", "ac_buy_13st_money", "ac_buy_14st_money", "ac_buy_15st_money", "ac_buy_16st_money", "ac_buy_17st_money", "ac_buy_18st_money", "ac_buy_19st_money", "ac_buy_20st_money", "ac_buy_21st_money", "ac_buy_22st_money", "ac_buy_23st_money", "ac_buy_24st_money", "ac_buy_25st_money", "ac_buy_26st_money", "ac_buy_27st_money", "ac_buy_28st_money", "ac_buy_29st_money", "ac_buy_30st_money", "ac_buy_31st_money", "ac_buy_32st_money", "ac_buy_33st_money", "ac_buy_34st_money", "ac_buy_35st_money", "ac_buy_36st_money", "ac_buy_37st_money", "ac_buy_38st_money", "ac_buy_39st_money", "ac_buy_40st_money", "ac_buy_41st_money", "ac_buy_42st_money", "ac_buy_43st_money", "ac_buy_44st_money", "ac_buy_45st_money", "ac_buy_46st_money", "ac_buy_47st_money", "ac_buy_48st_money", "ac_buy_49st_money", "ac_buy_50st_money",
+    "ac_sell_11st_per", "ac_sell_12st_per", "ac_sell_13st_per", "ac_sell_14st_per", "ac_sell_15st_per", "ac_sell_16st_per", "ac_sell_17st_per", "ac_sell_18st_per", "ac_sell_19st_per", "ac_sell_20st_per", "ac_sell_21st_per", "ac_sell_22st_per", "ac_sell_23st_per", "ac_sell_24st_per", "ac_sell_25st_per", "ac_sell_26st_per", "ac_sell_27st_per", "ac_sell_28st_per", "ac_sell_29st_per", "ac_sell_30st_per", "ac_sell_31st_per", "ac_sell_32st_per", "ac_sell_33st_per", "ac_sell_34st_per", "ac_sell_35st_per", "ac_sell_36st_per", "ac_sell_37st_per", "ac_sell_38st_per", "ac_sell_39st_per", "ac_sell_40st_per", "ac_sell_41st_per", "ac_sell_42st_per", "ac_sell_43st_per", "ac_sell_44st_per", "ac_sell_45st_per", "ac_sell_46st_per", "ac_sell_47st_per", "ac_sell_48st_per", "ac_sell_49st_per", "ac_sell_50st_per",
+    "ac_pb_yn", "ac_pb_per", "ac_pb_money", "ac_pb_ordertype", "ac_pb_day"
+) VALUES (
+    '137310', 50, 'AUTO',
+    'Y', 'MARKET',
+    -7.0, -7.0, -7.0, -7.0, -7.0, -7.0, -7.0, -7.0, -7.0,
+    1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000, 1000000,
+    'Y', 'MARKET',
+    500.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0,
+    -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0, -30.0,
+    100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000,
+    30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0,
+    'N', -10.0, 100000, 'MARKET', 30
+);
+
+
+
+
+
+
