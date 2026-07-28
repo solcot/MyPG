@@ -5,6 +5,8 @@
 .exit
 
 ---------------------------------------- 국장: 키움
+delete from tb_auto_config where ac_code = '025540';
+
 INSERT INTO "tb_auto_config" (
     "ac_code", "ac_max_buycount", "ac_mode",
     "ac_buy_yn", "ac_buy_ordertype",
@@ -17,7 +19,7 @@ INSERT INTO "tb_auto_config" (
     "ac_sell_11st_per", "ac_sell_12st_per", "ac_sell_13st_per", "ac_sell_14st_per", "ac_sell_15st_per", "ac_sell_16st_per", "ac_sell_17st_per", "ac_sell_18st_per", "ac_sell_19st_per", "ac_sell_20st_per", "ac_sell_21st_per", "ac_sell_22st_per", "ac_sell_23st_per", "ac_sell_24st_per", "ac_sell_25st_per", "ac_sell_26st_per", "ac_sell_27st_per", "ac_sell_28st_per", "ac_sell_29st_per", "ac_sell_30st_per", "ac_sell_31st_per", "ac_sell_32st_per", "ac_sell_33st_per", "ac_sell_34st_per", "ac_sell_35st_per", "ac_sell_36st_per", "ac_sell_37st_per", "ac_sell_38st_per", "ac_sell_39st_per", "ac_sell_40st_per", "ac_sell_41st_per", "ac_sell_42st_per", "ac_sell_43st_per", "ac_sell_44st_per", "ac_sell_45st_per", "ac_sell_46st_per", "ac_sell_47st_per", "ac_sell_48st_per", "ac_sell_49st_per", "ac_sell_50st_per",
     "ac_pb_yn", "ac_pb_per", "ac_pb_money", "ac_pb_ordertype", "ac_pb_day"
 ) VALUES (
-    '137310', 50, 'AUTO',
+    '025540', 50, 'AUTO',
     'Y', 'MARKET',
     -7.0, -7.0, -7.0, -7.0, -7.0, -7.0, -7.0, -7.0, -7.0,
     3000000, 3000000, 3000000, 3000000, 3000000, 3000000, 3000000, 3000000, 3000000,
@@ -30,6 +32,8 @@ INSERT INTO "tb_auto_config" (
 );
 
 ---------------------------------------- 미장: 한투
+delete from tb_auto_config where ac_code = 'SPCX';
+
 INSERT INTO "tb_auto_config" (
     "ac_code", "ac_max_buycount", "ac_mode",
     "ac_buy_yn", "ac_buy_ordertype",
