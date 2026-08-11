@@ -9,6 +9,13 @@ tb_auto_config 테이블 조회 / 등록 / 수정 / 삭제 프로그램
 - '추가' 버튼 : 빈 폼을 띄워 신규 row INSERT
 - '삭제' 버튼 : 선택된 row 삭제 (확인창 포함)
 
+추가 기능 (정보성, 읽기 전용):
+- 같은 DB 파일 안에 tb_trade 테이블이 있으면
+      select tr_code, max(tr_name) tr_name from tb_trade group by tr_code
+  쿼리로 ac_code(=tr_code)에 대응하는 종목명을 참고용으로 함께 보여줍니다.
+- 이 값은 조회 전용이며, tb_trade 테이블에는 어떤 INSERT/UPDATE/DELETE도 하지 않습니다.
+  (tb_trade 테이블이 없는 DB 파일이어도 오류 없이 정상 동작합니다)
+
 실행 방법:
     python3 db_config_manager.py
     (실행 후 상단 '파일 열기'로 sqlite db 파일을 선택하세요)
@@ -31,6 +38,21 @@ SUMMARY_COLUMNS = [
     "ac_sell_ordertype",
     "ac_pb_yn",
 ]
+
+# 리스트/폼에 참고용으로 추가 표시할 종목명 컬럼 라벨
+REF_NAME_COLUMN = "종목명(참고)"
+
+# ac_code(=tr_code) -> 종목명 참고 매핑을 만들 때 사용하는 쿼리 (tb_trade, 조회 전용)
+TRADE_NAME_LOOKUP_SQL = (
+    "SELECT tr_code, MAX(tr_name) AS tr_name FROM tb_trade GROUP BY tr_code"
+)
+
+# 리스트 화면에 실제로 표시할 컬럼 순서 (ac_code 바로 옆에 참고용 종목명이 오도록 배치)
+DISPLAY_COLUMNS = []
+for _col in SUMMARY_COLUMNS:
+    DISPLAY_COLUMNS.append(_col)
+    if _col == "ac_code":
+        DISPLAY_COLUMNS.append(REF_NAME_COLUMN)
 
 
 class ColumnInfo:
@@ -60,20 +82,31 @@ class RecordFormDialog(tk.Toplevel):
     mode == 'update' : 기존 row 값을 채워서 시작, ac_code는 PK 성격이라 수정 불가(읽기전용) 처리
     """
 
-    def __init__(self, master, columns, mode="insert", record=None, on_submit=None, copied_from=None):
+    def __init__(
+        self,
+        master,
+        columns,
+        mode="insert",
+        record=None,
+        on_submit=None,
+        copied_from=None,
+        code_name_map=None,
+    ):
         super().__init__(master)
         self.columns = columns
         self.mode = mode
         self.record = record or {}
         self.on_submit = on_submit
         self.entries = {}
+        self.code_name_map = code_name_map or {}
+        self.ref_name_var = None  # ac_code 참고용 종목명 표시
 
         if mode == "insert":
             title = f"행 추가 (복사 원본: {copied_from})" if copied_from else "행 추가"
         else:
             title = f"행 수정 - {self.record.get('ac_code', '')}"
         self.title(title)
-        self.geometry("520x650")
+        self.geometry("560x650")
         self.transient(master)
         self.grab_set()
 
@@ -130,6 +163,15 @@ class RecordFormDialog(tk.Toplevel):
             entry.grid(row=row_idx, column=1, sticky="ew", padx=4, pady=2)
             self.entries[col.name] = entry
 
+            # ac_code 필드 옆에 tb_trade 참고 종목명 표시 (읽기 전용, 정보성)
+            if col.name == "ac_code":
+                self.ref_name_var = tk.StringVar(value=self._lookup_name(value))
+                ref_label = ttk.Label(
+                    scroll_frame, textvariable=self.ref_name_var, foreground="gray"
+                )
+                ref_label.grid(row=row_idx, column=2, sticky="w", padx=6)
+                entry.bind("<KeyRelease>", self._on_code_changed)
+
         scroll_frame.columnconfigure(1, weight=1)
 
         # 하단 버튼 영역
@@ -145,6 +187,22 @@ class RecordFormDialog(tk.Toplevel):
         # 신규 추가 모드에서는 ac_code 입력란에 바로 포커스
         if self.mode == "insert" and "ac_code" in self.entries:
             self.entries["ac_code"].focus_set()
+
+    # ---------------- ac_code 참고 종목명 (읽기 전용, tb_trade 조회) ----------------
+    def _lookup_name(self, code):
+        code = (code or "").strip()
+        if not code:
+            return ""
+        name = self.code_name_map.get(code)
+        if name:
+            return f"참고: {name}"
+        return "참고: (일치하는 종목명 없음)"
+
+    def _on_code_changed(self, event=None):
+        if self.ref_name_var is None:
+            return
+        code = self.entries["ac_code"].get()
+        self.ref_name_var.set(self._lookup_name(code))
 
     def _collect_values(self):
         """입력 필드 -> {컬럼명: 파이썬 값} 딕셔너리로 변환 (타입 캐스팅 포함)"""
@@ -190,10 +248,11 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"{TABLE_NAME} 관리 프로그램")
-        self.geometry("900x500")
+        self.geometry("1150x520")
 
         self.conn = None
         self.columns = []  # ColumnInfo 리스트 (전체 컬럼)
+        self.code_name_map = {}  # ac_code(=tr_code) -> 종목명 참고 매핑 (tb_trade, 조회 전용)
 
         self._build_ui()
 
@@ -213,11 +272,17 @@ class App(tk.Tk):
         tree_frame.pack(fill="both", expand=True, padx=6, pady=6)
 
         self.tree = ttk.Treeview(
-            tree_frame, columns=SUMMARY_COLUMNS, show="headings", selectmode="browse"
+            tree_frame,
+            columns=DISPLAY_COLUMNS,
+            show="headings",
+            selectmode="browse",
         )
-        for col in SUMMARY_COLUMNS:
+        for col in DISPLAY_COLUMNS:
             self.tree.heading(col, text=col)
-            self.tree.column(col, width=110, anchor="center")
+            if col == REF_NAME_COLUMN:
+                self.tree.column(col, width=130, anchor="w")
+            else:
+                self.tree.column(col, width=100, anchor="center")
 
         vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
         hsb = ttk.Scrollbar(tree_frame, orient="horizontal", command=self.tree.xview)
@@ -275,7 +340,22 @@ class App(tk.Tk):
             for r in rows
         ]
         self.db_path_label.configure(text=path)
+        self._refresh_code_name_map()
         self.refresh()
+
+    def _refresh_code_name_map(self):
+        """ac_code(=tr_code) -> 종목명 참고 매핑 갱신 (tb_trade, 조회 전용).
+        tb_trade 테이블이 없는 DB 파일이면 조용히 빈 매핑으로 둠(오류 없음)."""
+        self.code_name_map = {}
+        if not self.conn:
+            return
+        try:
+            cur = self.conn.execute(TRADE_NAME_LOOKUP_SQL)
+            for code, name in cur.fetchall():
+                if code is not None:
+                    self.code_name_map[code] = name
+        except sqlite3.Error:
+            self.code_name_map = {}
 
     def refresh(self):
         if not self.conn:
@@ -283,10 +363,18 @@ class App(tk.Tk):
         for item in self.tree.get_children():
             self.tree.delete(item)
 
+        self._refresh_code_name_map()
+
         cur = self.conn.execute(f"SELECT * FROM {TABLE_NAME} ORDER BY ac_code")
         rows = cur.fetchall()
         for r in rows:
-            values = [r[col] if col in r.keys() else "" for col in SUMMARY_COLUMNS]
+            ref_name = self.code_name_map.get(r["ac_code"], "")
+            values = []
+            for col in DISPLAY_COLUMNS:
+                if col == REF_NAME_COLUMN:
+                    values.append(ref_name)
+                else:
+                    values.append(r[col] if col in r.keys() else "")
             # ac_code 를 iid로 사용해서 선택 시 바로 조회 가능하게 함
             self.tree.insert("", "end", iid=str(r["ac_code"]), values=values)
 
@@ -330,6 +418,7 @@ class App(tk.Tk):
             record=base_record,
             on_submit=self._handle_submit,
             copied_from=source_code,
+            code_name_map=self.code_name_map,
         )
 
     def edit_selected(self):
@@ -340,7 +429,12 @@ class App(tk.Tk):
         if record is None:
             return
         RecordFormDialog(
-            self, self.columns, mode="update", record=record, on_submit=self._handle_submit
+            self,
+            self.columns,
+            mode="update",
+            record=record,
+            on_submit=self._handle_submit,
+            code_name_map=self.code_name_map,
         )
 
     def delete_selected(self):
