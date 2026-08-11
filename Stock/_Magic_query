@@ -4,6 +4,9 @@
 .mode column
 .exit
 
+- ac_mode : AUTO / MANUAL
+- ac_buy_yn : Y / N
+- ac_buy_ordertype : MARKET / PENDING
 ---------------------------------------- 국장: 키움
 delete from tb_auto_config where ac_code = '025540';
 
