@@ -46,14 +46,14 @@ export RDAY=100
 #### db2 monitor
 cnt=0; rr=0; while true
 do
-perl ./db2inframon_apinfo.pl -d $DATABASE -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o ./LOG_PERL_D -z -x -c
+perl ./db2inframon_apinfo.pl -d $DATABASE -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -i 0 -a 0 -p 0 -o ./LOG_PERL_D -z -x -c
 cnt=`expr $cnt + 1`
 sleep 5
 
 if [ `expr $cnt % 120` -eq 0 ];
 then
-        #perl ./db2inframon_apinfo.pl -d $DATABASE -s 0 -q 10000000 -w 1000000 -e 10000000 -t 5 -a 0 -p 0 -o ./LOG_PERL -z -x -c -O
-        perl ./db2inframon_apinfo.pl -d $DATABASE -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o ./LOG_PERL -z -x -c -O
+        #perl ./db2inframon_apinfo.pl -d $DATABASE -s 0 -q 10000000 -w 1000000 -e 10000000 -t 5 -i 5 -a 0 -p 0 -o ./LOG_PERL -z -x -c -O
+        perl ./db2inframon_apinfo.pl -d $DATABASE -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -i 0 -a 0 -p 0 -o ./LOG_PERL -z -x -c -O
         sleep 5
         
         if [ `expr $cnt % 240` -eq 0 ];
