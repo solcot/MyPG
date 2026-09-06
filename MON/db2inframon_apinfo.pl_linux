@@ -350,7 +350,7 @@ if($before) {
 ################ print
 system(qq/ db2 -x "select max(application_handle)::varchar(10),stmtid,count(*),max(rows_read),max(pool_index_l_reads),max(total_act_time),max(lock_wait_time),sum(total_cpu_time),sum(total_disp_run_queue_time),max(activity_state) from table(mon_get_activity(null,-1)) where application_handle <> mon_get_application_handle() group by stmtid" /);
 ## timediff
-print "dbsecdiff: $snapdbtimediff tabsecdiff: $snaptabtimediff applsecdiff: $snapappltimediff\n";
+print "dbsecdiff: $snapdbtimediff tabsecdiff: $snaptabtimediff idxsecdiff: $snapidxtimediff applsecdiff: $snapappltimediff\n";
 ## cpu
 #print "$adate CPU $cpu < R: $rq B: $bq P: $pq W: $wq AVM: $avm FRE: $fre FI: $fi FO: $fo PI: $pi PO: $po IN: $in SC: $sc CS: $cs U: $us S: $sy W: $wa I: $id >\n";  #aix
 print "$adate CPU $cpu < R: $rq B: $bq PG: $swap FRE: $free BUFF: $buff CACHE: $cache FI: $fi FO: $fo PI: $pi PO: $po IN: $in CS: $cs U: $us S: $sy W: $wa I: $id >\n"; #linux
