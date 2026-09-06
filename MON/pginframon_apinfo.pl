@@ -1,12 +1,12 @@
 #!/usr/bin/perl
 #use strict; 
-#use perl /work2/pg/pgdata1/TMP/IFR/MONITOR/pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -a 0 -p 0 -o /work2/pg/pgdata1/TMP/IFR/MONITOR/LOG_PERL_D -z -x -c -v -O
+#use perl /work2/pg/pgdata1/TMP/IFR/MONITOR/pginframon_apinfo.pl -d $PGDB -s 0 -q 10000000 -w 1000000 -e 10000000 -t 0 -i 0 -a 0 -p 0 -o /work2/pg/pgdata1/TMP/IFR/MONITOR/LOG_PERL_D -z -x -c -v -O
 
 use Getopt::Std; 
- 
+
 my %options=(); 
-getopts("hd:s:q:w:e:t:a:p:o:zxcvWRO", \%options); 
- 
+getopts("hd:s:q:w:e:t:i:a:p:o:zxcvWRO", \%options); 
+
 if($options{h}) { do_help(); } 
 if($options{d}) { $db = $options{d}; } else { print "require -d option... for help -h option...\n"; exit; } 
 if($options{s} or $options{s} == 0) { $scnt = $options{s}; } else { print "require -s option... for help -h option...\n"; exit; } 
@@ -14,6 +14,7 @@ if($options{q}) { $sd1 = $options{q}; } else { print "require -q option... for h
 if($options{w}) { $sd2 = $options{w}; } else { print "require -w option... for help -h option...\n"; exit; } 
 if($options{e}) { $sd3 = $options{e}; } else { print "require -e option... for help -h option...\n"; exit; } 
 if($options{t} or $options{t} == 0) { $tabtopcnt = $options{t}; } else { print "require -t option... for help -h option...\n"; exit; } 
+if($options{i} or $options{i} == 0) { $idxtopcnt = $options{i}; } else { print "require -i option... for help -h option...\n"; exit; } 
 if($options{a} or $options{a} == 0) { $apptopcnt = $options{a}; } else { print "require -a option... for help -h option...\n"; exit; } 
 if($options{p} or $options{p} == 0) { $topappapinfo = $options{p}; } else { print "require -p option... for help -h option...\n"; exit; } 
 if($options{o}) { $logfile_dir = $options{o}; } else { print "require -o option... for help -h option...\n"; exit; } 
@@ -88,6 +89,17 @@ if($before) {
 %btabcnt1s = split /\s+/, $btabcnt1;
 }
 
+## snapidx
+if($idxtopcnt > 0) {
+open(IN, $logfile_dir . "/tmpidxts"); $bsnapidxts = <IN>; close(IN);
+if($before) {
+   open(IN, $logfile_dir . "/tmpidx"); $bidxcnt1 = do{local $/; <IN>}; close(IN);
+} else {
+   open(IN, $logfile_dir . "/tmpidx"); $bidxcnt1 = do{local $/; <IN>}; close(IN);
+}
+%bidxcnt1s = split /\s+/, $bidxcnt1;
+}
+
 ## snapappl
 if($apptopcnt > 0) {
 if($scnt > 0)
@@ -146,6 +158,20 @@ if($before) {
 %atabcnt1s = split /\s+/, $atabcnt1;
 }
 
+## snapidx
+if($idxtopcnt > 0) {
+$asnapidxts = qx{psql -F ' ' -A -t -c "select to_char(current_timestamp,'YYYY-MM-DD HH24:MI:SS')"};
+open(OUT, ">" . $logfile_dir . "/tmpidxts"); print OUT "$asnapidxts"; close(OUT);
+if($before) {
+   $aidxcnt1 = qx{psql -F ' ' -A -t -c "select schemaname||'.'||relname||'.'||indexrelname relname, coalesce(idx_scan,0) ||':'|| coalesce(idx_tup_read,0) from pg_stat_user_indexes"};  # =V9.7
+   open(OUT, ">" . $logfile_dir . "/tmpidx"); print OUT "$aidxcnt1"; close(OUT);
+} else {
+   $aidxcnt1 = qx{psql -F ' ' -A -t -c "select 'Detailed implementation required...'"; };
+   open(OUT, ">" . $logfile_dir . "/tmpidx"); print OUT "$aidxcnt1"; close(OUT);
+}
+%aidxcnt1s = split /\s+/, $aidxcnt1;
+}
+
 ## snapappl
 if($apptopcnt > 0) {
 $asnapapplts = qx{psql -F ' ' -A -t -c "select to_char(current_timestamp,'YYYY-MM-DD HH24:MI:SS')"};
@@ -163,6 +189,7 @@ if($before) {
 ################ delta time calc
 $snapdbtimediff = timediff $bsnapdbts, $asnapdbts;
 if($tabtopcnt > 0) { $snaptabtimediff = timediff $bsnaptabts, $asnaptabts; }
+if($idxtopcnt > 0) { $snapidxtimediff = timediff $bsnapidxts, $asnapidxts; }
 if($apptopcnt > 0) { $snapappltimediff = timediff $bsnapapplts, $asnapapplts; }
 
 ################ delta calc
@@ -204,6 +231,22 @@ foreach $k1 (keys %atabcnt1s) {
 												 sprintf("%.2f",($atabs[6] - $btabs[6])/$snaptabtimediff) . ":" .
 												 int($atabs[7]) . ":" .
 												 int($atabs[8]);
+                                next;
+                                }                               
+        }
+}
+}
+
+## snapidx
+if($idxtopcnt > 0) {
+%didxcnt1 = ();
+foreach $k1 (keys %aidxcnt1s) {
+        foreach $k2 (keys %bidxcnt1s) {
+                                if($k1 eq $k2) {
+                                @aidxs = split /:/, $aidxcnt1s{$k1};
+                                @bidxs = split /:/, $bidxcnt1s{$k2};
+                                $didxcnt1{$k1} = sprintf("%.2f",($aidxs[0] - $bidxs[0])/$snapidxtimediff) . ":" . 
+												 sprintf("%.2f",($aidxs[1] - $bidxs[1])/$snapidxtimediff);
                                 next;
                                 }                               
         }
@@ -261,8 +304,25 @@ $conn = qx{psql -F ' ' -A -t -c "select
 }
 @conns = split /\s+/, $conn;
 
+## connection uow
+$uow_sql = <<'EOF';
+SELECT COUNT(CASE WHEN state = 'idle' THEN 1 END) AS idle_CNT
+      , '/' as div1
+      ,COUNT(CASE WHEN state = 'active' THEN 1 END) AS active_CNT
+      ,COUNT(CASE WHEN state = 'idle in transaction' THEN 1 END) AS intran_idle_CNT
+      ,COUNT(CASE WHEN state = 'idle in transaction (aborted)' THEN 1 END) AS intran_abort_CNT
+FROM pg_stat_activity
+WHERE pid <> pg_backend_pid()
+EOF
+if($before) {
+   $uow = qx{psql -F ' ' -A -t -c "$uow_sql"; };
+} else {
+   $uow = qx{psql -F ' ' -A -t -c "select 'Detailed implementation required...'"; };
+}
+@uows = split /\s+/, $uow;
+
 ################ print
-#system(qq/ psql -t -c "select max(pid),query_id,count(*),max(now()-query_start),max(wait_event_type),max(wait_event) from pg_stat_activity where backend_type='client backend' and (backend_xid is not null or backend_xmin is not null) and pid<>pg_backend_pid() group by query_id"|grep -v '^[[:space:]]*\$' /);
+#system(qq/ psql -t -c "select max(pid),query_id,count(*),max(now()-query_start),max(wait_event_type),max(wait_event), '---' from pg_stat_activity where backend_type='client backend' and (backend_xid is not null or backend_xmin is not null) and pid<>pg_backend_pid() group by query_id"|grep -v '^[[:space:]]*\$' /);
 
 @pg_activity = qx/ psql -t -c "select max(pid),query_id,count(*),max(now()-query_start),max(wait_event_type),max(wait_event) from pg_stat_activity where backend_type='client backend' and (backend_xid is not null or backend_xmin is not null) and pid<>pg_backend_pid() group by query_id"|grep -v '^[[:space:]]*\$' /;
 foreach $pg_act (@pg_activity) {
@@ -279,7 +339,7 @@ print "$pg_act | $pg_pcpu \n";
 }
 
 ## timediff
-print "dbsecdiff: $snapdbtimediff tabsecdiff: $snaptabtimediff applsecdiff: $snapappltimediff\n";
+print "dbsecdiff: $snapdbtimediff tabsecdiff: $snaptabtimediff idxsecdiff: $snapidxtimediff applsecdiff: $snapappltimediff\n";
 
 ## cpu
 print "$adate CPU $cpu < R: $rq B: $bq PG: $swap FRE: $free BUFF: $buff CACHE: $cache FI: $fi FO: $fo PI: $pi PO: $po IN: $in CS: $cs U: $us S: $sy W: $wa I: $id >\n";
@@ -299,7 +359,7 @@ while(defined($flockap = shift @locks)) {
 ## snapdb
 print "$adate Rqsttime $avgrqsttime ( $ddb_rqsttime $ddb_calls ) : : \n"; #avgrequesttime, requesttime, requesttotal
 print "$adate Lock $ddb_deadlocks : $conns[2]\n"; #deadlock, lockwaiting
-print "$adate Connection : $conns[0] $conns[1]\n"; #total,active
+print "$adate Connection : $conns[0] $conns[1] ( @uows )\n"; #total,active
 print "$adate Trans $ddb_trans ( $ddb_commits $ddb_rollbacks ) > $gddbcnt3\n"; #tran,commit,rollback
 print "$adate Rows_read $ddb_tupreturned ( $ddb_tupfetched ) $ddb_blksall ( $ddb_blkshits $ddb_blksreads ) > $gddbcnt1\n"; # totread,idxread,totblk,hitblk,diskblk
 print "$adate Rows_write $ddb_tupmods > $gddbcnt2\n";
@@ -330,6 +390,36 @@ else {
         print "$adate Tab_Rows_rw $kk : $dtabcnt1{$kk} : $gdtabcnt1\n";
         $loopcnt++;
         last if($loopcnt == $tabtopcnt);
+        }
+}
+$loopcnt = 0;
+print "-" x 20 . "\n";
+}
+
+## snapidx : numscans,all_reads,numidxscans,seqtupreads,numidxscans,idxtupfetches,tupmods,livetups,deadtups
+if($idxtopcnt > 0) {
+if($sortwrite) {
+        foreach $kk (sort{(split /:/, $didxcnt1{$b})[0]  <=> (split /:/, $didxcnt1{$a})[0]} keys %didxcnt1) {
+        $gdidxcnt1 = "#" x (((split /:/, $didxcnt1{$kk})[0])/$sd3);
+        print "$adate Tab_Rows_rw $kk : $didxcnt1{$kk} : $gdidxcnt1\n";
+        $loopcnt++;
+        last if($loopcnt == $idxtopcnt);
+        }
+}
+elsif($sortread) {
+        foreach $kk (sort{(split /:/, $didxcnt1{$b})[1] <=> (split /:/, $didxcnt1{$a})[1]} keys %didxcnt1) {
+        $gdidxcnt1 = "#" x (((split /:/, $didxcnt1{$kk})[1])/$sd3);
+        print "$adate Tab_Rows_rw $kk : $didxcnt1{$kk} : $gdidxcnt1\n";
+        $loopcnt++;
+        last if($loopcnt == $idxtopcnt);
+        }
+}
+else {
+        foreach $kk (sort{(split /:/, $didxcnt1{$b})[0]+(split /:/, $didxcnt1{$b})[1]  <=> (split /:/, $didxcnt1{$a})[0]+(split /:/, $didxcnt1{$a})[1]} keys %didxcnt1) {
+        $gdidxcnt1 = "#" x (((split /:/, $didxcnt1{$kk})[0]+(split /:/, $didxcnt1{$kk})[1])/$sd3);
+        print "$adate Tab_Rows_rw $kk : $didxcnt1{$kk} : $gdidxcnt1\n";
+        $loopcnt++;
+        last if($loopcnt == $idxtopcnt);
         }
 }
 $loopcnt = 0;
@@ -396,7 +486,7 @@ close(LOG_APINFO);
 
 sub do_help { 
     $help = <<EOF; 
-usage: perl ./pginframon_apinfo -d <dbname> -s <appsleepsec,0> -q <read> -w <mod,tran> -e <table,appl> -t <toptab,0> -a <topappl,0> -p <topappllog> -o <directory> [-z:log] [-x:locklog] [-c:applog] [-v:before ver.] [-W:write sort] [-R:read sort] [-O:once a day logging]
+usage: perl ./pginframon_apinfo -d <dbname> -s <appsleepsec,0> -q <read> -w <mod,tran> -e <table,appl> -t <toptab,0> -i <topidx,0> -a <topappl,0> -p <topappllog> -o <directory> [-z:log] [-x:locklog] [-c:applog] [-v:before ver.] [-W:write sort] [-R:read sort] [-O:once a day logging]
 help: perl ./pginframon_apinfo -h 
 EOF
     print "$help\n"; 
