@@ -401,7 +401,7 @@ if($idxtopcnt > 0) {
 if($sortwrite) {
         foreach $kk (sort{(split /:/, $didxcnt1{$b})[0]  <=> (split /:/, $didxcnt1{$a})[0]} keys %didxcnt1) {
         $gdidxcnt1 = "#" x (((split /:/, $didxcnt1{$kk})[0])/$sd3);
-        print "$adate Tab_Rows_rw $kk : $didxcnt1{$kk} : $gdidxcnt1\n";
+        print "$adate Idx_Rows_rw $kk : $didxcnt1{$kk} : $gdidxcnt1\n";
         $loopcnt++;
         last if($loopcnt == $idxtopcnt);
         }
@@ -409,7 +409,7 @@ if($sortwrite) {
 elsif($sortread) {
         foreach $kk (sort{(split /:/, $didxcnt1{$b})[1] <=> (split /:/, $didxcnt1{$a})[1]} keys %didxcnt1) {
         $gdidxcnt1 = "#" x (((split /:/, $didxcnt1{$kk})[1])/$sd3);
-        print "$adate Tab_Rows_rw $kk : $didxcnt1{$kk} : $gdidxcnt1\n";
+        print "$adate Idx_Rows_rw $kk : $didxcnt1{$kk} : $gdidxcnt1\n";
         $loopcnt++;
         last if($loopcnt == $idxtopcnt);
         }
@@ -417,7 +417,7 @@ elsif($sortread) {
 else {
         foreach $kk (sort{(split /:/, $didxcnt1{$b})[0]+(split /:/, $didxcnt1{$b})[1]  <=> (split /:/, $didxcnt1{$a})[0]+(split /:/, $didxcnt1{$a})[1]} keys %didxcnt1) {
         $gdidxcnt1 = "#" x (((split /:/, $didxcnt1{$kk})[0]+(split /:/, $didxcnt1{$kk})[1])/$sd3);
-        print "$adate Tab_Rows_rw $kk : $didxcnt1{$kk} : $gdidxcnt1\n";
+        print "$adate Idx_Rows_rw $kk : $didxcnt1{$kk} : $gdidxcnt1\n";
         $loopcnt++;
         last if($loopcnt == $idxtopcnt);
         }
