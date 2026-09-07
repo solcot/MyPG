@@ -396,7 +396,7 @@ $loopcnt = 0;
 print "-" x 20 . "\n";
 }
 
-## snapidx : numscans,all_reads,numidxscans,seqtupreads,numidxscans,idxtupfetches,tupmods,livetups,deadtups
+## snapidx : idx_scan, idx_tup_read
 if($idxtopcnt > 0) {
 if($sortwrite) {
         foreach $kk (sort{(split /:/, $didxcnt1{$b})[0]  <=> (split /:/, $didxcnt1{$a})[0]} keys %didxcnt1) {
