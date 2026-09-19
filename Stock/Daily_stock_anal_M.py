@@ -131,8 +131,8 @@ def analyze_with_gemini_gems(data):
 def send_email(content):
     print("3. 분석 결과를 이메일로 전송 중입니다...")
     
-    sender_email = "gsolcot@gmail.com" 
-    receiver_email = "gsolcot@gmail.com" 
+    sender_email = "gso..." 
+    receiver_email = "gsol..." 
     password = "nb..." 
     
     msg = MIMEText(content)
