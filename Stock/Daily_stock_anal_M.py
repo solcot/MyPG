@@ -89,12 +89,16 @@ def analyze_with_gemini_gems(data):
     RANK_1. [종목명:코드]
     - 선정 이유 (핵심 지표 위주로 2~3줄 요약)
     - 모닝스타 방식의 기업의 경제적 해자: 넓다 / 좁다 / 없다 중 하나 표시
-    * 선정된 종목의 아래 지표 표시 (실제지표값은 굵게표시)
-    - market_cap_백억 / trade_value_천만 / 영업이익률_pct / curr_price
-    - dividend_yield / pbr / per 
+    * 선정된 종목의 아래 지표 표시 (지표값은 굵게 빨강색으로 표시)
+    - market_cap_백억 / trade_value_천만 / 영업이익률_pct / change_rate / curr_price
+    - dividend_yield / pbr / per / roe / forward_per / forward_roe
+    - psr / peg
     - ep_curr_10_dratio / epa_curr_10_dratio / fep_curr_10_dratio / fepa_curr_10_dratio
     - expected_cagr / expected_cagr_avgroe / fep_expected_cagr / fep_expected_cagr_avgroe
     - aaa_roe ~ kkk_roe
+    - aaa_bps / fff_bps / kkk_bps
+    - aaa_eps / fff_eps / kkk_eps
+    - aaa_dividend / fff_dividend / kkk_dividend
     RANK_2. ...
     RANK_3. ...
     RANK_4. ...
