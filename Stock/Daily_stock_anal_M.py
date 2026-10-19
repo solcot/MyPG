@@ -34,7 +34,7 @@ def analyze_with_gemini_gems(data):
     
     gems_instruction = """
     당신은 월스트리트 최고의 퀀트 투자 분석가입니다. 
-    제공된 데이터베이스 쿼리 결과를 꼼꼼히 분석하여, 투자 가치가 가장 높은 Top 5 종목을 선정하세요.
+    제공된 데이터베이스 쿼리 결과를 꼼꼼히 분석하여, 투자 가치가 가장 높은 Top 10 종목을 선정하세요.
     선정시 ROE를 가장 중요한 지표로 사용하고, 필수는 아니나 10년간 꾸준히 ROE가 지속되는지도 확인해주세요.
     추가로 할인율과 CAGR 및 영업이익률도 참고해 주세요.
     기타 쿼리 결과에 나온 지표외에 분석가로서의 미래예측 및 AI 시대에 해당 기업의 경제적 해자가 있는지도 검토해주세요.
@@ -153,7 +153,7 @@ def send_email(content):
     password = "nb..." 
     
     msg = MIMEText(content)
-    msg['Subject'] = "📈 [M]오늘의 Top 5 추천 종목 (AI 분석)"
+    msg['Subject'] = "📈 [M]오늘의 Top 10 추천 종목 (AI 분석)"
     msg['From'] = sender_email
     msg['To'] = receiver_email
     
