@@ -5,13 +5,15 @@ import smtplib
 from email.mime.text import MIMEText
 from google import genai
 from google.genai import types
+import yfinance as yf
+import requests
 
 # 1. 서버 접속 및 PostgreSQL 쿼리 실행
 def get_postgres_data():
-    host = "192...."
+    host = "192....3"
     port = 22
-    username = "postgres"
-    password = "1d..."
+    username = "po...s"
+    password = "1dl...!@"
     
     print("1. 서버에 접속하여 DB 쿼리를 실행 중입니다...")
     client = paramiko.SSHClient()
@@ -22,15 +24,53 @@ def get_postgres_data():
     result = stdout.read().decode('utf-8')
     # 결과를 줄 단위로 쪼갠 후 슬라이싱[:10]으로 10줄만 가져와서 출력
     #print('\n'.join(result.split('\n')[:10]))
+    err = stderr.read().decode('utf-8')
+    if err:
+        print("psql 에러:", err)
     client.close()
     
     return result
 
+def get_vix():
+    try:
+        h = yf.Ticker("^VIX").history(period="5d")
+        value = round(float(h["Close"].iloc[-1]), 2)
+        when = h.index[-1].strftime("%Y-%m-%d")
+        return f"{value} ({when} 종가 기준)"
+    except Exception as e:
+        return f"확인 불가 (조회 실패: {e})"
+
+def get_fear_greed():
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                          "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Origin": "https://edition.cnn.com",
+            "Referer": "https://edition.cnn.com/markets/fear-and-greed",
+        }
+        r = requests.get(
+            "https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
+            headers=headers,
+            timeout=15,
+        )
+        r.raise_for_status()
+        fg = r.json()["fear_and_greed"]
+
+        score = round(fg["score"], 1)
+        rating = fg["rating"]
+        timestamp = fg["timestamp"]
+
+        return f"{score} ({rating}, 기준시각 {timestamp} UTC)"
+    except Exception as e:
+        return f"확인 불가 (조회 실패: {e})"
+        
 # 2. 제미나이 데이터 분석 (최신 genai SDK 적용)
 def analyze_with_gemini_gems(data):
     print("2. 제미나이(Gems)가 데이터를 분석 중입니다...")
     
-    client = genai.Client(api_key="AQ.Ab...")
+    client = genai.Client(api_key="AQ.Ab....OX2iA")
     
     gems_instruction = """
     당신은 월스트리트 최고의 퀀트 투자 분석가입니다. 
@@ -86,10 +126,10 @@ def analyze_with_gemini_gems(data):
     ----------------------------------------------------------------------------------------
 
     결과는 다음 양식을 지켜주세요:
-    
+  
     >> VIX 지수: 수치 (수치반영된시간)
     >> CNN 공포탐욕 지수: 수치 (수치반영된시간) 
-    
+   
     RANK_1. [종목명:코드]
     - 선정 이유 (핵심 지표 위주로 2~3줄 요약)
     - 모닝스타 방식의 기업의 경제적 해자: 넓다 / 좁다 / 없다 중 하나 표시
@@ -116,10 +156,27 @@ def analyze_with_gemini_gems(data):
     RANK_3. ...
     RANK_4. ...
     RANK_5. ...
+    RANK_6. ...
+    RANK_7. ...
+    RANK_8. ...
+    RANK_9. ...
+    RANK_10. ...
     """
-    prompt = f"현재시점에서 가장 최신 수치로 VIX지수와 CNN공포탐욕지수 알려주고, 아래 쿼리 결과 데이터를 분석해 주세요:\n\n{data}"
+
+    vix_info = get_vix()
+    fg_info = get_fear_greed()
+    print("VIX:", vix_info)
+    print("공포탐욕:", fg_info)
+
+    prompt = f"""아래 시장 지표는 코드에서 직접 조회한 값입니다. 양식 상단에 그대로 사용하고, 웹 검색은 하지 마세요.
+VIX 지수: {vix_info}
+CNN 공포탐욕 지수: {fg_info}
+
+아래 쿼리 결과 데이터를 분석해 주세요:
+
+{data}"""
     
-    max_retries = 60 # 최대 3번까지 재시도
+    max_retries = 5 # 최대 5번까지 재시도
     
     for attempt in range(max_retries):
         try:
@@ -128,10 +185,18 @@ def analyze_with_gemini_gems(data):
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=gems_instruction,
+                    #tools=[types.Tool(google_search=types.GoogleSearch())],
                 )
             )
-            return response.text # 성공하면 결과 반환
-            
+            if not response.text:
+                print("prompt_feedback:", response.prompt_feedback)
+                if response.candidates:
+                    c = response.candidates[0]
+                    print("finish_reason:", c.finish_reason)
+                    print("content:", c.content)
+                print("usage:", response.usage_metadata)
+            return response.text or "(응답이 비어 있습니다)"
+
         except Exception as e:
             error_msg = str(e)
             if "503" in error_msg or "UNAVAILABLE" in error_msg:
@@ -150,7 +215,7 @@ def send_email(content):
     
     sender_email = "gso..." 
     receiver_email = "gsol..." 
-    password = "nb..." 
+    password = "nbexko...h" 
     
     msg = MIMEText(content)
     msg['Subject'] = "📈 [M]오늘의 Top 10 추천 종목 (AI 분석)"
