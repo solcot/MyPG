@@ -70,7 +70,7 @@ def get_fear_greed():
 def analyze_with_gemini_gems(data):
     print("2. 제미나이(Gems)가 데이터를 분석 중입니다...")
     
-    client = genai.Client(api_key="AQ.Ab....OX2iA")
+    client = genai.Client(api_key="AQ.Ab8RN6KW...poDw")
     
     gems_instruction = """
     당신은 월스트리트 최고의 퀀트 투자 분석가입니다. 
