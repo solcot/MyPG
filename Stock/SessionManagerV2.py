@@ -33,7 +33,7 @@ USER_AGENT = ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
 KRX_ID = os.environ.get('KRX_ID', '')
 KRX_PW = os.environ.get('KRX_PW', '')
 
-LOGIN_URL = 'http://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020506'
+LOGIN_URL = 'https://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020506'
 LOGIN_PAGE_KEY = 'MDCCOMS001'  # 로그인 화면 URL에 포함된 문자열 (로그인 성공 여부 판단용)
 
 MAX_LOGIN_RETRY = 3           # 한 주기당 자동 로그인 최대 시도 횟수 (계정 잠금 방지용으로 작게 유지)
@@ -69,11 +69,11 @@ def check_session_validity():
             sess.cookies.update(cookies)
 
         headers = {
-            'Referer': 'http://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020101',
+            'Referer': 'https://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020101',
             'X-Requested-With': 'XMLHttpRequest'
         }
 
-        otp_url = 'http://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd'
+        otp_url = 'https://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd'
         otp_params = {
             'locale': 'ko_KR',
             'name': 'fileDown',
