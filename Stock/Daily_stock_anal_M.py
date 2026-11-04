@@ -7,13 +7,16 @@ from google import genai
 from google.genai import types
 import yfinance as yf
 import requests
+import sys
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
 
 # 1. 서버 접속 및 PostgreSQL 쿼리 실행
 def get_postgres_data():
-    host = "192....3"
+    host = "192.168.1.33"
     port = 22
-    username = "po...s"
-    password = "1dl...!@"
+    username = "postgres"
+    password = "1dlsvmfk)(!@"
     
     print("1. 서버에 접속하여 DB 쿼리를 실행 중입니다...")
     client = paramiko.SSHClient()
@@ -70,7 +73,7 @@ def get_fear_greed():
 def analyze_with_gemini_gems(data):
     print("2. 제미나이(Gems)가 데이터를 분석 중입니다...")
     
-    client = genai.Client(api_key="AQ.Ab8RN6KW...poDw")
+    client = genai.Client(api_key="AQ.A...wUfhkSpoDw")
     
     gems_instruction = """
     당신은 월스트리트 최고의 퀀트 투자 분석가입니다. 
@@ -176,7 +179,7 @@ CNN 공포탐욕 지수: {fg_info}
 
 {data}"""
     
-    max_retries = 5 # 최대 5번까지 재시도
+    max_retries = 3 # 최대 5번까지 재시도
     
     for attempt in range(max_retries):
         try:
@@ -213,9 +216,9 @@ CNN 공포탐욕 지수: {fg_info}
 def send_email(content):
     print("3. 분석 결과를 이메일로 전송 중입니다...")
     
-    sender_email = "gso..." 
-    receiver_email = "gsol..." 
-    password = "nbexko...h" 
+    sender_email = "gsolcot@gmail.com" 
+    receiver_email = "gsolcot@gmail.com" 
+    password = "nb...qwh" 
     
     msg = MIMEText(content)
     msg['Subject'] = "📈 [M]오늘의 Top 10 추천 종목 (AI 분석)"
