@@ -320,7 +320,7 @@ def get_authenticated_session():
                 sess.cookies.update(cookies)
             
             # [수정] 타임아웃을 15초로 늘려 서버 지연으로 인한 오작동을 방지합니다.
-            test_url = 'http://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020506'
+            test_url = 'https://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020506'
             res = sess.get(test_url, timeout=15)
             
             # [수정] SessionManager와 동일하게 '응답 코드'와 '내용 길이'만으로 깔끔하게 판단합니다.
@@ -364,7 +364,7 @@ def get_authenticated_session():
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=chrome_options)
 
-            target_url = 'http://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020506'
+            target_url = 'https://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020506'
             driver.get(target_url)
             time.sleep(3) 
 
@@ -404,7 +404,7 @@ def get_authenticated_session():
 
 def fetch_krx_pbr_data(date_str, session):
     """ [PER/PBR 데이터] """
-    session.headers.update({'Referer': 'http://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020506'})
+    session.headers.update({'Referer': 'https://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020506'})
 
     target_markets = ['STK', 'KSQ'] 
     dfs = []
@@ -425,7 +425,7 @@ def fetch_krx_pbr_data(date_str, session):
         
         try:
             # 1. OTP 요청
-            otp_url = 'http://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd'
+            otp_url = 'https://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd'
             otp_code = session.post(otp_url, data=otp_params).text.strip()
 
             if "LOGOUT" in otp_code or "error" in otp_code.lower():
@@ -433,7 +433,7 @@ def fetch_krx_pbr_data(date_str, session):
                 continue 
 
             # 2. 다운로드 요청
-            down_url = 'http://data.krx.co.kr/comm/fileDn/download_csv/download.cmd'
+            down_url = 'https://data.krx.co.kr/comm/fileDn/download_csv/download.cmd'
             res = session.post(down_url, data={'code': otp_code})
 
             # 3. DataFrame 변환
@@ -454,7 +454,7 @@ def fetch_krx_pbr_data(date_str, session):
 
 def fetch_krx_data(trade_date, session):
     """ [KOSPI/KOSDAQ 전종목 시세 데이터] """
-    session.headers.update({'Referer': 'http://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020101'})
+    session.headers.update({'Referer': 'https://data.krx.co.kr/contents/MDC/MDI/mdiLoader/index.cmd?menuId=MDC0201020101'})
 
     target_markets = ['STK', 'KSQ']
     dfs = []
@@ -475,7 +475,7 @@ def fetch_krx_data(trade_date, session):
 
         try:
             # 1. OTP 요청
-            otp_url = 'http://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd'
+            otp_url = 'https://data.krx.co.kr/comm/fileDn/GenerateOTP/generate.cmd'
             otp_code = session.post(otp_url, data=otp_params).text.strip()
 
             if "LOGOUT" in otp_code or "error" in otp_code.lower():
@@ -483,7 +483,7 @@ def fetch_krx_data(trade_date, session):
                 continue
 
             # 2. 다운로드 요청
-            down_url = 'http://data.krx.co.kr/comm/fileDn/download_csv/download.cmd'
+            down_url = 'https://data.krx.co.kr/comm/fileDn/download_csv/download.cmd'
             csv_response = session.post(down_url, data={'code': otp_code})
             
             # 3. 데이터프레임 변환
