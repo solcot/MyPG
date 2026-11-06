@@ -23,7 +23,7 @@ def get_postgres_data():
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     client.connect(host, port=port, username=username, password=password)
     
-    stdin, stdout, stderr = client.exec_command("psql -P pager=off -f value_engine.sql_see")
+    stdin, stdout, stderr = client.exec_command("psql --csv -P pager=off -f value_engine.sql_see")
     result = stdout.read().decode('utf-8')
     # 결과를 줄 단위로 쪼갠 후 슬라이싱[:10]으로 10줄만 가져와서 출력
     #print('\n'.join(result.split('\n')[:10]))
@@ -73,7 +73,7 @@ def get_fear_greed():
 def analyze_with_gemini_gems(data):
     print("2. 제미나이(Gems)가 데이터를 분석 중입니다...")
     
-    client = genai.Client(api_key="AQ.A...wUfhkSpoDw")
+    client = genai.Client(api_key="AQ.Ab8...poDw")
     
     gems_instruction = """
     당신은 월스트리트 최고의 퀀트 투자 분석가입니다. 
@@ -122,7 +122,7 @@ def analyze_with_gemini_gems(data):
     - min_roe_ever / avg_roe_ever / max_roe_ever: 과거 10년간 기록한 ROE의 최솟값, 평균값, 최댓값.
     - hist_avg_pbr / hist_avg_dividend: 과거 10년간 평균 PBR 및 평균 배당수익률.
     - aaa_roe ~ kkk_roe: 10년전(aaa)부터 현재(kkk)까지 연도별 ROE 추이.
-    - aaa_bps ~ kkk_bps: 연도별 BPS 추이 (자본의 축적 과정 확인).
+    - aaa_bps ~ kkk_bps: 연도별 BPS 추이 (자본의 축적 과정 과정 확인).
     - aaa_eps ~ kkk_eps: 연도별 EPS 추이 (이익 창출력 확인).
     - aaa_dividend ~ kkk_dividend: 연도별 배당수익률 추이.
     - bbb_eps_ratio ~ kkk_eps_ratio: 연도별 EPS 전년 대비 증감률(YoY 성장률).
@@ -179,38 +179,63 @@ CNN 공포탐욕 지수: {fg_info}
 
 {data}"""
     
-    max_retries = 3 # 최대 5번까지 재시도
+    # 순차적으로 시도할 모델 리스트 (각 모델당 3번씩 시도)
+    models_to_try = [
+        'gemini-3.8-flash',
+        'gemini-3.6-flash',
+        'gemini-3.5-flash-lite'
+    ]
+    max_retries = 3 # 모델당 최대 3번 시도
     
-    for attempt in range(max_retries):
-        try:
-            response = client.models.generate_content(
-                model='gemini-3.8-flash',
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=gems_instruction,
-                    #tools=[types.Tool(google_search=types.GoogleSearch())],
+    for model_idx, model_name in enumerate(models_to_try):
+        print(f"👉 [{model_idx+1}/{len(models_to_try)}] '{model_name}' 모델로 분석을 시작합니다...")
+        
+        for attempt in range(max_retries):
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=gems_instruction,
+                        #tools=[types.Tool(google_search=types.GoogleSearch())],
+                    )
                 )
-            )
-            if not response.text:
-                print("prompt_feedback:", response.prompt_feedback)
-                if response.candidates:
-                    c = response.candidates[0]
-                    print("finish_reason:", c.finish_reason)
-                    print("content:", c.content)
-                print("usage:", response.usage_metadata)
-            return response.text or "(응답이 비어 있습니다)"
+                if not response.text:
+                    print("prompt_feedback:", response.prompt_feedback)
+                    if response.candidates:
+                        c = response.candidates[0]
+                        print("finish_reason:", c.finish_reason)
+                        print("content:", c.content)
+                    print("usage:", response.usage_metadata)
+                
+                result_text = response.text or "(응답이 비어 있습니다)"
+                
+                # 이메일 상단에 어떤 모델(몇 회차 시도)로 분석되었는지 헤더 추가
+                model_header = f">> 🤖 분석 수행 모델: {model_name} (시도 횟수: {attempt+1}/{max_retries})\n"
+                return model_header + result_text
 
-        except Exception as e:
-            error_msg = str(e)
-            if "503" in error_msg or "UNAVAILABLE" in error_msg:
-                if attempt < max_retries - 1:
-                    print(f"⚠️ 구글 서버 과부하 발생. 60초 후 재시도합니다... ({attempt+1}/{max_retries})")
-                    time.sleep(60) # 60초 대기
+            except Exception as e:
+                error_msg = str(e)
+                # 503(서버 과부하) 또는 429(할당량 초과) 에러인 경우
+                if any(err_keyword in error_msg for err_keyword in ["503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED"]):
+                    if attempt < max_retries - 1:
+                        print(f"⚠️ [{model_name}] 구글 서버 과부하 발생. 60초 후 재시도합니다... ({attempt+1}/{max_retries})")
+                        time.sleep(60) # 60초 대기
+                    else:
+                        print(f"❌ [{model_name}] {max_retries}회 재시도 모두 실패.")
+                        if model_idx < len(models_to_try) - 1:
+                            next_model = models_to_try[model_idx + 1]
+                            print(f"🔄 다음 대체 모델('{next_model}')로 전환하여 계속 시도합니다...")
                 else:
-                    raise Exception("서버 지연이 계속되어 분석을 실패했습니다.")
-            else:
-                # 503 외의 다른 에러는 즉시 중단
-                raise e
+                    # 503/429 외의 다른 에러 발생 시 로그 출력 후 다음 모델로 전환
+                    print(f"⚠️ [{model_name}] 호출 중 기타 오류 발생: {error_msg}")
+                    if model_idx < len(models_to_try) - 1:
+                        next_model = models_to_try[model_idx + 1]
+                        print(f"🔄 다음 대체 모델('{next_model}')로 전환합니다...")
+                    break # 현재 모델의 재시도 루프를 빠져나가 다음 모델로 이동
+                    
+    # 3개 모델 모두 3번씩(총 9번) 실패한 경우
+    raise Exception("모든 모델(3.8-flash, 3.6-flash, 3.5-flash-lite)에서 서버 지연이 계속되어 분석을 실패했습니다.")
 
 # 3. 분석 결과를 이메일로 전송
 def send_email(content):
