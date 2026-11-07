@@ -239,14 +239,21 @@ CNN 공포탐욕 지수: {fg_info}
 
 # 3. 분석 결과를 이메일로 전송
 def send_email(content):
+    from datetime import datetime
     print("3. 분석 결과를 이메일로 전송 중입니다...")
     
     sender_email = "gsolcot@gmail.com" 
     receiver_email = "gsolcot@gmail.com" 
-    password = "nb...qwh" 
+    password = "nbexkowbxzywiqwh" 
     
-    msg = MIMEText(content)
-    msg['Subject'] = "📈 [S]오늘의 Top 10 추천 종목 (AI 분석)"
+    # 오늘 날짜 생성 (예: 2026-11-07)
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    
+    # UTF-8 인코딩을 명시하여 한글 및 이모지 깨짐/스팸 오분류 방지
+    msg = MIMEText(content, 'plain', 'utf-8')
+    
+    # 제목에 날짜를 포함시켜 다른 날의 메일과 하나로 묶이지 않게 분리
+    msg['Subject'] = f"📈 [S]오늘의 Top 10 추천 종목 ({today_str})"
     msg['From'] = sender_email
     msg['To'] = receiver_email
     
