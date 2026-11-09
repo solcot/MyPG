@@ -33,7 +33,7 @@ def get_postgres_data():
         auth_timeout=30
     )
     
-    stdin, stdout, stderr = client.exec_command("psql --csv -P pager=off -f value_engine.sql_see_S")
+    stdin, stdout, stderr = client.exec_command("psql --csv -P pager=off -f value_engine.sql_see")
     result = stdout.read().decode('utf-8')
     err = stderr.read().decode('utf-8')
     if err:
