@@ -21,12 +21,20 @@ def get_postgres_data():
     print("1. 서버에 접속하여 DB 쿼리를 실행 중입니다...")
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(host, port=port, username=username, password=password)
+    
+    # banner_timeout, timeout, auth_timeout을 추가하여 지연으로 인한 에러 방지
+    client.connect(
+        host, 
+        port=port, 
+        username=username, 
+        password=password,
+        timeout=30,
+        banner_timeout=60,
+        auth_timeout=30
+    )
     
     stdin, stdout, stderr = client.exec_command("psql --csv -P pager=off -f value_engine.sql_see_S")
     result = stdout.read().decode('utf-8')
-    # 결과를 줄 단위로 쪼갠 후 슬라이싱[:10]으로 10줄만 가져와서 출력
-    #print('\n'.join(result.split('\n')[:10]))
     err = stderr.read().decode('utf-8')
     if err:
         print("psql 에러:", err)
