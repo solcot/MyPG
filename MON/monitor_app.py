@@ -149,6 +149,11 @@ class DataVisualizerApp:
             self.ax1.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
             self.fig.autofmt_xdate()
             self.ax1.grid(True, linestyle='--', alpha=0.6)
+
+            # 데이터 1의 시작 시간과 끝 시간으로 X축을 꽉 채워 고정
+            #self.ax1.set_xlim(times1[0], times1[-1])
+            # X축 양 끝의 기본 5% 여백(Margin) 제거하여 처음부터 끝까지 꽉 차게 표시
+            self.ax1.margins(x=0)
             
             self.y1_entry.delete(0, tk.END)
             self.y2_entry.delete(0, tk.END)
