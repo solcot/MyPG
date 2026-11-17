@@ -1,7 +1,5 @@
-# python -m pip install matplotlib
-
-# pip install pyinstaller
-# pyinstaller --onefile --windowed monitor_app.py
+# python -m pip install matplotlib pyinstaller
+# python -m PyInstaller --onefile --windowed monitor_app.py
 
 import tkinter as tk
 from tkinter import filedialog, messagebox
