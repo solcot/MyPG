@@ -189,6 +189,7 @@ CNN 공포탐욕 지수: {fg_info}
     
     # 순차적으로 시도할 모델 리스트 (각 모델당 3번씩 시도)
     models_to_try = [
+        'gemini-4-hydrogen',
         'gemini-3.8-flash',
         'gemini-3.6-flash',
         'gemini-3.5-flash-lite'
@@ -227,7 +228,7 @@ CNN 공포탐욕 지수: {fg_info}
                 # 503(서버 과부하) 또는 429(할당량 초과) 에러인 경우
                 if any(err_keyword in error_msg for err_keyword in ["503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED"]):
                     if attempt < max_retries - 1:
-                        print(f"⚠️ [{model_name}] 구글 서버 과부하 발생. 60초 후 재시도합니다... ({attempt+1}/{max_retries})")
+                        print(f"⚠️ [{model_name}] 서버 과부하 또는 할당량 제한 발생. 60초 후 재시도합니다... ({attempt+1}/{max_retries})")
                         time.sleep(60) # 60초 대기
                     else:
                         print(f"❌ [{model_name}] {max_retries}회 재시도 모두 실패.")
@@ -242,8 +243,9 @@ CNN 공포탐욕 지수: {fg_info}
                         print(f"🔄 다음 대체 모델('{next_model}')로 전환합니다...")
                     break # 현재 모델의 재시도 루프를 빠져나가 다음 모델로 이동
                     
-    # 3개 모델 모두 3번씩(총 9번) 실패한 경우
-    raise Exception("모든 모델(3.8-flash, 3.6-flash, 3.5-flash-lite)에서 서버 지연이 계속되어 분석을 실패했습니다.")
+    # 모든 모델에서 3번씩(총 12번) 실패한 경우
+    tried_models = ", ".join(models_to_try)
+    raise Exception(f"모든 모델({tried_models})에서 서버 지연 또는 할당량 초과가 계속되어 분석을 실패했습니다.")
 
 # 3. 분석 결과를 이메일로 전송
 def send_email(content):
