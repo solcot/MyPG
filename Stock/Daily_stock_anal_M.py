@@ -33,7 +33,7 @@ def get_postgres_data():
         auth_timeout=30
     )
     
-    stdin, stdout, stderr = client.exec_command("psql --csv -P pager=off -f value_engine.sql_see")
+    stdin, stdout, stderr = client.exec_command("psql --csv -P pager=off -f value_engine.sql_see_M")
     result = stdout.read().decode('utf-8')
     err = stderr.read().decode('utf-8')
     if err:
@@ -90,7 +90,7 @@ def analyze_with_gemini_gems(data):
     추가로 할인율과 CAGR 및 영업이익률도 참고해 주세요.
     기타 쿼리 결과에 나온 지표외에 분석가로서의 미래예측 및 AI 시대에 해당 기업의 경제적 해자가 있는지도 선정에 참고해주세요.
 
-    쿼리 결과로 나온 컬럼에 대한 설명은 아래와 같습니다.
+    쿼리 결과는 CSV 형태로 첫줄은 컬럼헤더입니다. 각 컬럼에 대한 설명은 아래와 같습니다.
     ----------------------------------------------------------------------------------------
 1. 기본 정보 및 시장 지표 (Basic Info & Market Indicators)
     - code / name / sector: 종목코드, 종목명, 해당 기업이 속한 산업 섹터
