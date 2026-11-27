@@ -3,13 +3,15 @@ import bisect
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from datetime import datetime
-import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('TkAgg')
+from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.dates as mdates
 
 # 윈도우 한글 폰트 깨짐 방지 및 마이너스 기호 설정
-plt.rcParams['font.family'] = 'Malgun Gothic'
-plt.rcParams['axes.unicode_minus'] = False
+matplotlib.rcParams['font.family'] = 'Malgun Gothic'
+matplotlib.rcParams['axes.unicode_minus'] = False
 
 # 축별 다중 데이터 구분용 색상 팔레트: (MA 추세선 색, Raw 데이터 색)
 AXIS1_COLORS = [
@@ -49,6 +51,8 @@ class DataVisualizerApp:
         self.base_y2_max = 100.0
         self.vline = None
         self._resize_job = None
+        self._closing = False
+        self._mpl_cids = []
         self.controls_visible = True
 
         # 축별 원본 데이터 유형 ('delta', 'cum_diff', 'cum_rate')
@@ -203,8 +207,9 @@ class DataVisualizerApp:
         )
         self.btn_toggle_ctrl.pack(side=tk.LEFT, padx=(3, 6), pady=2)
 
-        # Matplotlib 캔버스 생성 (툴바 연결용)
-        self.fig, self.ax1 = plt.subplots()
+        # Matplotlib 캔버스 생성 (pyplot 대신 Figure 직접 생성으로 종료 시 프로세스 잔류 방지)
+        self.fig = Figure()
+        self.ax1 = self.fig.add_subplot(111)
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
 
         toolbar_holder = tk.Frame(self.bar_frame, bg="#ececec")
@@ -248,14 +253,55 @@ class DataVisualizerApp:
         canvas_widget.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
 
         # Matplotlib 공식 resize_event 사용 (Tk <Configure> 덮어쓰기 방지 -> 전체 화면 꽉 채움)
-        self.canvas.mpl_connect('resize_event', self.on_fig_resize)
-        self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
-        self.canvas.mpl_connect('scroll_event', self.on_mouse_scroll)
+        self._mpl_cids = [
+            self.canvas.mpl_connect('resize_event', self.on_fig_resize),
+            self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move),
+            self.canvas.mpl_connect('scroll_event', self.on_mouse_scroll),
+        ]
 
         # 단축키 F2: 상단 설정 패널 접기/펼치기
         self.root.bind('<F2>', lambda _e: self.toggle_controls())
 
+        # 창 X 버튼 클릭 시 깔끔한 종료 처리 등록
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
         self.adjust_layout(draw=False)
+
+    # ------------------------------------------------------------------
+    # 안전한 프로그램 종료 처리
+    # ------------------------------------------------------------------
+    def on_closing(self):
+        """창 X 버튼 클릭 시 예약 작업과 Matplotlib 리소스를 정리하고 완전히 종료"""
+        if self._closing:
+            return
+        self._closing = True
+
+        # 1. 예약된 after 콜백 취소
+        if self._resize_job is not None:
+            try:
+                self.root.after_cancel(self._resize_job)
+            except Exception:
+                pass
+            self._resize_job = None
+
+        # 2. Matplotlib 이벤트 연결 해제 및 Figure 정리
+        for cid in self._mpl_cids:
+            try:
+                self.canvas.mpl_disconnect(cid)
+            except Exception:
+                pass
+        self._mpl_cids.clear()
+
+        try:
+            self.fig.clear()
+        except Exception:
+            pass
+
+        # 3. Tkinter mainloop 종료 및 창 파괴
+        try:
+            self.root.quit()
+        finally:
+            self.root.destroy()
 
     # ------------------------------------------------------------------
     # 설정 영역 접기/펼치기 및 그래프 여백 최소화
@@ -277,6 +323,8 @@ class DataVisualizerApp:
     def adjust_layout(self, draw=True):
         """축 라벨과 제목을 가리지 않는 최소 공백으로 그래프를 꽉 채움"""
         self._resize_job = None
+        if self._closing:
+            return
         try:
             self.fig.tight_layout(pad=0.3)
         except Exception:
@@ -285,12 +333,16 @@ class DataVisualizerApp:
             self.canvas.draw_idle()
 
     def schedule_layout_adjust(self):
+        if self._closing:
+            return
         if self._resize_job is not None:
             self.root.after_cancel(self._resize_job)
         self._resize_job = self.root.after(80, self.adjust_layout)
 
     def on_fig_resize(self, _event):
         """Matplotlib가 새 창 크기에 맞춰 캔버스를 리사이즈한 직후 여백 재계산"""
+        if self._closing:
+            return
         self.schedule_layout_adjust()
 
     # ------------------------------------------------------------------
@@ -728,6 +780,8 @@ class DataVisualizerApp:
         return pos if (after - target_dt) < (target_dt - before) else pos - 1
 
     def on_mouse_move(self, event):
+        if self._closing:
+            return
         if not event.inaxes or not self.series1:
             if self.vline and self.vline.get_visible():
                 self.vline.set_visible(False)
